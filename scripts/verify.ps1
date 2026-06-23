@@ -8,7 +8,8 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.1.0"
+$version = "1.1.1"
+
 $programSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
 $updateSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\UpdateManager.cs")
@@ -19,6 +20,17 @@ if ($programSource -notmatch "TrayApplicationContext" -or $programSource -notmat
 if ($traySource -notmatch "TimeSpan.FromHours\(1\)" -or $traySource -notmatch "NotifyIcon") {
     throw "Tray application context must check updates hourly from the notification area"
 }
+
+$updateStartedIndex = $traySource.IndexOf("case UpdateCheckStatus.UpdateStarted:")
+$nextCaseIndex = $traySource.IndexOf("case UpdateCheckStatus.NoUpdate", $updateStartedIndex)
+if ($updateStartedIndex -lt 0 -or $nextCaseIndex -le $updateStartedIndex) {
+    throw "Tray application context must handle update-started state explicitly"
+}
+$updateStartedBlock = $traySource.Substring($updateStartedIndex, $nextCaseIndex - $updateStartedIndex)
+if ($updateStartedBlock -match "ShowBalloon") {
+    throw "Automatic update start must not show a user-facing notification"
+}
+
 if ($updateSource -notmatch "releases/latest" -or $updateSource -notmatch "KidsTraining.msi" -or $updateSource -notmatch "UpdateRunner") {
     throw "Update manager must check GitHub Releases and launch a copied update runner"
 }

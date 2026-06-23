@@ -89,7 +89,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
             {
                 case UpdateCheckStatus.UpdateStarted:
                     exitingForUpdate = true;
-                    ShowBalloon("Kids Training", "更新をバックグラウンドでインストールします。");
                     ExitThread();
                     break;
                 case UpdateCheckStatus.NoUpdate when showNoUpdate:
