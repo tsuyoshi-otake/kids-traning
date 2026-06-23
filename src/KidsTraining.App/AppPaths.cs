@@ -10,6 +10,15 @@ internal static class AppPaths
     public static string WebViewUserDataFolder =>
         Path.Combine(LocalAppDataRoot, "WebView2UserData");
 
+    public static string UpdatesFolder =>
+        Path.Combine(LocalAppDataRoot, "Updates");
+
+    public static string UpdateRunnerPath =>
+        Path.Combine(UpdatesFolder, "KidsTraining.UpdateRunner.exe");
+
+    public static string UpdateLogPath =>
+        Path.Combine(UpdatesFolder, "updater.log");
+
     public static string HtmlPath =>
         Path.Combine(AppContext.BaseDirectory, "assets", "kids-training.html");
 
@@ -20,5 +29,6 @@ internal static class AppPaths
     {
         Directory.CreateDirectory(LocalAppDataRoot);
         Directory.CreateDirectory(WebViewUserDataFolder);
+        Directory.CreateDirectory(UpdatesFolder);
     }
 }

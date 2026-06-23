@@ -20,6 +20,21 @@ The MSI is written to `artifacts\KidsTraining.msi`.
 - Emergency unlock PIN is `1234`.
 - The window runs fullscreen, topmost, and blocks normal close shortcuts until completion.
 - Clicking the existing `パソコンを つかう` completion control closes the app.
-- The MSI installs under `%LOCALAPPDATA%\KidsTraining` and registers HKCU login startup.
+- The default executable mode is a task tray resident updater. Use the tray menu or run `KidsTraining.App.exe --training` to start fullscreen learning.
+- The tray app checks GitHub Releases once per hour. If a newer `KidsTraining.msi` is attached to the latest non-prerelease release, it downloads the MSI under `%LOCALAPPDATA%\KidsTraining\Updates`, starts a copied update runner, exits, and lets `msiexec` perform a quiet per-user reinstall.
+- The MSI installs under `%LOCALAPPDATA%\KidsTraining` and registers HKCU login startup for tray residency.
+- Start Menu includes a tray shortcut and a direct learning-mode shortcut.
 
-Tracking issue: https://github.com/tsuyoshi-otake/kids-traning/issues/1
+## Release Updates
+
+Build new releases with a version that matches the release tag:
+
+```powershell
+rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.1.0
+```
+
+Publish a GitHub Release such as `v1.1.0` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
+
+Tracking issues:
+- Initial app and installer: https://github.com/tsuyoshi-otake/kids-traning/issues/1
+- Tray updater: https://github.com/tsuyoshi-otake/kids-traning/issues/2

@@ -4,16 +4,36 @@ namespace KidsTraining.App;
 
 internal static class Program
 {
+    private const string SmokeTestArg = "--smoke-test";
+    private const string TrainingArg = "--training";
+    private const string LearnArg = "--learn";
+    private const string ApplyUpdateArg = "--apply-update";
+
     [STAThread]
     private static int Main(string[] args)
     {
-        if (args.Any(static arg => string.Equals(arg, "--smoke-test", StringComparison.OrdinalIgnoreCase)))
+        if (args.Any(static arg => string.Equals(arg, SmokeTestArg, StringComparison.OrdinalIgnoreCase)))
         {
             return RunSmokeTest();
         }
 
+        if (args.Any(static arg => string.Equals(arg, ApplyUpdateArg, StringComparison.OrdinalIgnoreCase)))
+        {
+            return UpdateInstaller.Run(args);
+        }
+
         ApplicationConfiguration.Initialize();
-        Application.Run(new TrainingForm());
+        if (args.Any(static arg =>
+                string.Equals(arg, TrainingArg, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(arg, LearnArg, StringComparison.OrdinalIgnoreCase)))
+        {
+            Application.Run(new TrainingForm());
+        }
+        else
+        {
+            Application.Run(new TrayApplicationContext());
+        }
+
         return 0;
     }
 
@@ -50,6 +70,20 @@ internal static class Program
                     StringComparison.OrdinalIgnoreCase))
             {
                 return 12;
+            }
+
+            if (!AppPaths.UpdatesFolder.StartsWith(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return 15;
+            }
+
+            if (!UpdateManager.TryGetReleaseVersion("v1.1.1", out var parsedVersion) ||
+                !UpdateManager.IsNewerVersion(parsedVersion, new Version(1, 1, 0, 0)) ||
+                !UpdateManager.TryGetReleaseVersion("1.1.0", out _))
+            {
+                return 16;
             }
 
             _ = CoreWebView2Environment.GetAvailableBrowserVersionString();

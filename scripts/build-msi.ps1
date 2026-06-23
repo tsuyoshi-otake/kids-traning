@@ -1,7 +1,7 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$Version = "1.0.0.0"
+    [string]$Version = "1.1.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -159,7 +159,8 @@ $wxsLines.AddRange($directoryRefs)
 $wxsLines.AddRange($fileComponents)
 $wxsLines.Add("    <DirectoryRef Id=`"ApplicationProgramsFolder`">")
 $wxsLines.Add("      <Component Id=`"ApplicationShortcutComponent`" Guid=`"$shortcutComponentGuid`">")
-$wxsLines.Add("        <Shortcut Id=`"ApplicationStartMenuShortcut`" Name=`"Kids Training`" Description=`"Kids Training`" Target=`"[INSTALLFOLDER]KidsTraining.App.exe`" WorkingDirectory=`"INSTALLFOLDER`" Icon=`"AppIcon.ico`" />")
+$wxsLines.Add("        <Shortcut Id=`"ApplicationStartMenuShortcut`" Name=`"Kids Training`" Description=`"Kids Training tray app`" Target=`"[INSTALLFOLDER]KidsTraining.App.exe`" WorkingDirectory=`"INSTALLFOLDER`" Icon=`"AppIcon.ico`" />")
+$wxsLines.Add("        <Shortcut Id=`"ApplicationTrainingShortcut`" Name=`"Kids Training - Learning`" Description=`"Start Kids Training learning mode`" Target=`"[INSTALLFOLDER]KidsTraining.App.exe`" Arguments=`"--training`" WorkingDirectory=`"INSTALLFOLDER`" Icon=`"AppIcon.ico`" />")
 $wxsLines.Add("        <RemoveFolder Id=`"RemoveApplicationProgramsFolder`" On=`"uninstall`" />")
 $wxsLines.Add("        <RegistryValue Root=`"HKCU`" Key=`"Software\KidsTraining`" Name=`"StartMenuShortcut`" Type=`"integer`" Value=`"1`" KeyPath=`"yes`" />")
 $wxsLines.Add("      </Component>")

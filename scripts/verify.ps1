@@ -8,8 +8,22 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
+$version = "1.1.0"
+$programSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\Program.cs")
+$traySource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
+$updateSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\UpdateManager.cs")
 
-& dotnet publish $project -c Release -r win-x64 --self-contained true
+if ($programSource -notmatch "TrayApplicationContext" -or $programSource -notmatch "--training" -or $programSource -notmatch "--apply-update") {
+    throw "Program entry point must support tray, training, and update-runner modes"
+}
+if ($traySource -notmatch "TimeSpan.FromHours\(1\)" -or $traySource -notmatch "NotifyIcon") {
+    throw "Tray application context must check updates hourly from the notification area"
+}
+if ($updateSource -notmatch "releases/latest" -or $updateSource -notmatch "KidsTraining.msi" -or $updateSource -notmatch "UpdateRunner") {
+    throw "Update manager must check GitHub Releases and launch a copied update runner"
+}
+
+& dotnet publish $project -c Release -r win-x64 --self-contained true /p:Version=$version
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE"
 }
@@ -39,7 +53,7 @@ if ($smoke.ExitCode -ne 0) {
     throw "Smoke test failed with exit code $($smoke.ExitCode)"
 }
 
-& (Join-Path $root "scripts\build-msi.ps1")
+& (Join-Path $root "scripts\build-msi.ps1") -Version $version
 if ($LASTEXITCODE -ne 0) {
     throw "MSI build failed with exit code $LASTEXITCODE"
 }
@@ -71,6 +85,9 @@ if ($generatedText -notmatch "LocalAppDataFolder") {
 }
 if ($generatedText -notmatch [regex]::Escape("Software\Microsoft\Windows\CurrentVersion\Run")) {
     throw "Generated MSI source must register HKCU Run startup"
+}
+if ($generatedText -notmatch "--training") {
+    throw "Generated MSI source must include a learning-mode shortcut"
 }
 if ($generatedText -notmatch "AppIcon.ico") {
     throw "Generated MSI source must include the application icon"
