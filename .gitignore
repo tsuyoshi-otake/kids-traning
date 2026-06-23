@@ -1,0 +1,16 @@
+.codex/
+.playwright-mcp/
+
+artifacts/
+
+**/bin/
+**/obj/
+
+*.user
+*.suo
+*.wixpdb
+*.log
+
+Thumbs.db
+ehthumbs.db
+Desktop.ini
