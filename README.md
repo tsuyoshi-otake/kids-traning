@@ -19,6 +19,7 @@ The MSI is written to `artifacts\KidsTraining.msi`.
 - The profile store is normalized to a single current Windows user profile at startup, so bundled samples and the temporary `キッズ` profile are removed while first-profile progress is preserved.
 - New or unstarted profiles start at grade 1, level 1, and beginner mastery (`.05`). Real progress is kept when stars, streaks, or mastery have changed.
 - Difficulty is staged from easiest first-grade addition, then subtraction, then clock/kokugo, and finally multiplication/hissan as stars and mastery rise.
+- Non-hissan addition and subtraction never generate two-digit-by-two-digit mental arithmetic; those larger written-calculation shapes belong to the hissan topic.
 - Non-hissan arithmetic shows level-aligned visual aids under the question: concrete/ten-frame dots for addition, crossed-out dots for subtraction, and equal groups for multiplication.
 - Initial emergency unlock password is `1234`. It can be changed from the parent control page.
 - The window runs fullscreen, topmost, and blocks normal close shortcuts until completion.
@@ -49,3 +50,4 @@ Tracking issues:
 - Level 1 beginner startup: https://github.com/tsuyoshi-otake/kids-traning/issues/4
 - Level-aligned arithmetic visuals: https://github.com/tsuyoshi-otake/kids-traning/issues/5
 - Parent remote control page: https://github.com/tsuyoshi-otake/kids-traning/issues/10
+- Mental arithmetic operand limits: https://github.com/tsuyoshi-otake/kids-traning/issues/11

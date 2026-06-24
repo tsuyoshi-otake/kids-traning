@@ -321,14 +321,14 @@ const sess=S.session||{};
     private static string BuildGenAddScript()
     {
         return """
-genAdd(p){const g=this.effectiveGrade(p),stage=this.learningStage(p),m=p&&p.mastery?Number(p.mastery.add):0.05;let a,b;if(g<=1){if(stage<=1||m<0.30){a=this.rand(1,5);b=this.rand(1,5);if(a+b>10)b=Math.max(1,10-a);}else if(stage<=2||m<0.65){a=this.rand(2,9);b=this.rand(1,9);if(a+b>18)b=Math.max(1,18-a);}else{a=this.rand(10,29);b=this.rand(1,9);}}else if(g===2){if(stage<=2||m<0.45){a=this.rand(10,49);b=this.rand(1,40);if(a%10+b%10>=10)b=Math.max(1,b-(a%10+b%10-9));}else{a=this.rand(18,79);b=this.rand(12,79);if(a+b>99)b=99-a;}}else{if(stage<=3||m<0.55){a=this.rand(25,79);b=this.rand(11,79);if(a+b>99)b=99-a;}else{a=this.rand(35,89);b=this.rand(10,99-a);}}const ans=a+b;return{topic:'add',mode:'num',n1:a,n2:b,prompt:a+' + '+b,answer:''+ans,explanation:a+' + '+b+' = '+ans};}
+genAdd(p){const g=this.effectiveGrade(p),stage=this.learningStage(p),m=p&&p.mastery?Number(p.mastery.add):0.05,mentalAddendMax=9;let a,b;if(g<=1){if(stage<=1||m<0.30){a=this.rand(1,5);b=this.rand(1,5);if(a+b>10)b=Math.max(1,10-a);}else if(stage<=2||m<0.65){a=this.rand(2,9);b=this.rand(1,9);if(a+b>18)b=Math.max(1,18-a);}else{a=this.rand(10,29);b=this.rand(1,mentalAddendMax);}}else if(g===2){if(stage<=2||m<0.45){a=this.rand(10,88);if(a%10===9)a--;b=this.rand(1,Math.min(mentalAddendMax,9-(a%10)));}else{a=this.rand(18,89);b=this.rand(1,mentalAddendMax);}}else{if(stage<=3||m<0.55){a=this.rand(25,89);b=this.rand(1,mentalAddendMax);}else{a=this.rand(35,89);b=this.rand(1,mentalAddendMax);}}const ans=a+b;return{topic:'add',mode:'num',n1:a,n2:b,prompt:a+' + '+b,answer:''+ans,explanation:a+' + '+b+' = '+ans};}
 """;
     }
 
     private static string BuildGenSubScript()
     {
         return """
-genSub(p){const g=this.effectiveGrade(p),stage=this.learningStage(p),m=p&&p.mastery?Number(p.mastery.sub):0.05;let a,b;if(g<=1){if(stage<=1||m<0.30){a=this.rand(2,10);b=this.rand(1,a-1);}else if(stage<=2||m<0.65){a=this.rand(11,18);b=this.rand(1,Math.max(1,a%10));}else{a=this.rand(11,29);b=this.rand(1,9);}}else if(g===2){if(stage<=2||m<0.45){a=this.rand(20,89);b=this.rand(1,Math.min(40,a-1));if(a%10<b%10)b=Math.max(1,b-(b%10)+(a%10));}else{a=this.rand(30,99);b=this.rand(11,a-1);}}else{if(stage<=3||m<0.55){a=this.rand(35,99);b=this.rand(11,a-1);}else{a=this.rand(50,99);b=this.rand(20,a-1);}}const ans=a-b;return{topic:'sub',mode:'num',a:a,b:b,prompt:a+' - '+b,answer:''+ans,explanation:a+' - '+b+' = '+ans};}
+genSub(p){const g=this.effectiveGrade(p),stage=this.learningStage(p),m=p&&p.mastery?Number(p.mastery.sub):0.05,mentalSubtrahendMax=9;let a,b;if(g<=1){if(stage<=1||m<0.30){a=this.rand(2,10);b=this.rand(1,a-1);}else if(stage<=2||m<0.65){a=this.rand(11,18);b=this.rand(1,Math.max(1,a%10));}else{a=this.rand(11,29);b=this.rand(1,mentalSubtrahendMax);}}else if(g===2){if(stage<=2||m<0.45){a=this.rand(21,89);if(a%10===0)a++;b=this.rand(1,Math.min(mentalSubtrahendMax,a%10));}else{a=this.rand(30,99);b=this.rand(1,mentalSubtrahendMax);}}else{if(stage<=3||m<0.55){a=this.rand(35,99);b=this.rand(1,mentalSubtrahendMax);}else{a=this.rand(50,99);b=this.rand(1,mentalSubtrahendMax);}}const ans=a-b;return{topic:'sub',mode:'num',a:a,b:b,prompt:a+' - '+b,answer:''+ans,explanation:a+' - '+b+' = '+ans};}
 """;
     }
 

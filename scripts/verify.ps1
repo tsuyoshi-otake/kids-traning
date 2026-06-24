@@ -8,7 +8,7 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.4.3"
+$version = "1.4.4"
 
 $programSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
@@ -52,6 +52,9 @@ if ($programSource -notmatch "ParentControlServer.BuildParentPage" -or $programS
 }
 if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "moji:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "effectiveGrade\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics" -or $runtimeSource -notmatch "profileGrade:this\.gradeLabel") {
     throw "Runtime HTML patch must start beginners at level 1 and stage topic difficulty"
+}
+if ($runtimeSource -notmatch "mentalAddendMax=9" -or $runtimeSource -notmatch "mentalSubtrahendMax=9" -or $runtimeSource -match "b=this\.rand\(11,a-1\)" -or $runtimeSource -match "b=this\.rand\(1,40\)" -or $runtimeSource -match "b=this\.rand\(12,79\)" -or $runtimeSource -match "b=this\.rand\(11,79\)" -or $runtimeSource -match "b=this\.rand\(10,99-a\)" -or $runtimeSource -match "b=this\.rand\(20,a-1\)" -or $runtimeSource -match "Math\.min\(40,a-1\)") {
+    throw "Runtime HTML patch must keep non-hissan add/sub from generating two-digit-by-two-digit mental arithmetic"
 }
 if ($runtimeSource -notmatch "PatchArithmeticVisuals" -or $runtimeSource -notmatch "linear-gradient\(135deg,#ffdad4" -or $runtimeSource -notmatch "isMulViz" -or $runtimeSource -notmatch "pickMul\(p\)" -or $runtimeSource -notmatch "op:'div'") {
     throw "Runtime HTML patch must render visual aids for non-hissan arithmetic"

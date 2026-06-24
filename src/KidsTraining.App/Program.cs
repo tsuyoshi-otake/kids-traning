@@ -83,11 +83,20 @@ internal static class Program
                 !template.Contains("kokuInstruction", StringComparison.Ordinal) ||
                 !template.Contains("effectiveGrade(p)", StringComparison.Ordinal) ||
                 !template.Contains("learningStage(p)", StringComparison.Ordinal) ||
+                !template.Contains("mentalAddendMax=9", StringComparison.Ordinal) ||
+                !template.Contains("mentalSubtrahendMax=9", StringComparison.Ordinal) ||
                 !template.Contains("profileGrade:this.gradeLabel(p)", StringComparison.Ordinal) ||
                 !template.Contains("const weakKeys=this.allowedTopics(p).filter", StringComparison.Ordinal) ||
                 !template.Contains("linear-gradient(135deg,#ffdad4", StringComparison.Ordinal) ||
                 !template.Contains("isMulViz", StringComparison.Ordinal) ||
                 !template.Contains("qs.push(this.genFor(this.weightedPick(p),p))", StringComparison.Ordinal) ||
+                template.Contains("b=this.rand(11,a-1)", StringComparison.Ordinal) ||
+                template.Contains("b=this.rand(1,40)", StringComparison.Ordinal) ||
+                template.Contains("b=this.rand(12,79)", StringComparison.Ordinal) ||
+                template.Contains("b=this.rand(11,79)", StringComparison.Ordinal) ||
+                template.Contains("b=this.rand(10,99-a)", StringComparison.Ordinal) ||
+                template.Contains("b=this.rand(20,a-1)", StringComparison.Ordinal) ||
+                template.Contains("Math.min(40,a-1)", StringComparison.Ordinal) ||
                 template.Contains("アバター", StringComparison.Ordinal) ||
                 template.Contains("avatarReady", StringComparison.Ordinal) ||
                 template.Contains("avatarParts", StringComparison.Ordinal) ||
