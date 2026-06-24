@@ -226,28 +226,23 @@ internal static class RuntimeHtmlPreparer
             BuildRewardMethodsScript() + "\n  freshQ(){return {hsStep:0,hsOnes:'',hsTens:'',hsCarry:false,hsBorrow:false,hsMistakes:0,hsHint:'',input:'',numMiss:0,numChoices:null,hsStepMiss:0,hsStepChoices:null};}",
             StringComparison.Ordinal);
 
-        markup = markup.Replace(
-            "goStart(){this.sfx('select');const p=this.curP();this.setState({session:this.buildSession(p,1),screen:'quiz',combo:0,...this.freshQ()});}",
-            "goStart(){this.sfx('select');const p=this.curP();if(!p.avatarReady){this.setState({avatarNotice:true});return;}this.setState({session:this.buildSession(p,1),screen:'quiz',combo:0,...this.freshQ()});}",
-            StringComparison.Ordinal);
-
         markup = ReplaceBlock(
             markup,
             "finishNumeric(){",
             "\n  submit(ans){",
-            "finishNumeric(){const q=this.cur(),p=this.curP();const perfect=(this.state.numMiss||0)===0;p.mastery[q.topic]=this.clamp((Number(p.mastery[q.topic])||0.05)+(perfect?0.12:-0.08),0.05,0.99);const combo=perfect?this.state.combo+1:0;const stars=perfect?(combo>=3?2:1):1,xpInfo=this.gainXp(p,perfect?(combo>=3?18:12):6);p.stars+=stars;if(perfect)this.state.session.correct++;this.sfx(perfect&&combo>=3?'combo':'correct');this.setState({screen:'feedback',combo:combo,lastResult:{correct:true,q:q,userAns:q.answer,stars:stars,combo:combo,helped:!perfect,xp:xpInfo.amount,levelUp:xpInfo.levelUp,unlock:xpInfo.unlock},input:'',numChoices:null});}");
+            "finishNumeric(){const q=this.cur(),p=this.curP();const perfect=(this.state.numMiss||0)===0;p.mastery[q.topic]=this.clamp((Number(p.mastery[q.topic])||0.05)+(perfect?0.12:-0.08),0.05,0.99);const combo=perfect?this.state.combo+1:0;const stars=perfect?(combo>=3?2:1):1,xpInfo=this.gainXp(p,perfect?(combo>=3?18:12):6);p.stars+=stars;if(perfect)this.state.session.correct++;this.sfx(perfect&&combo>=3?'combo':'correct');this.setState({screen:'feedback',combo:combo,lastResult:{correct:true,q:q,userAns:q.answer,stars:stars,combo:combo,helped:!perfect,xp:xpInfo.amount,levelUp:xpInfo.levelUp},input:'',numChoices:null});}");
 
         markup = ReplaceBlock(
             markup,
             "submit(ans){",
             "\n  next(){",
-            "submit(ans){const q=this.cur(),correct=String(ans)===String(q.answer),p=this.curP();p.mastery[q.topic]=this.clamp((Number(p.mastery[q.topic])||0.05)+(correct?0.12:-0.16),0.05,0.99);const combo=correct?this.state.combo+1:0,stars=correct?(combo>=3?2:1):0,xpInfo=correct?this.gainXp(p,combo>=3?18:12):{amount:0,levelUp:false,unlock:''};if(correct){p.stars+=stars;this.state.session.correct++;this.sfx(combo>=3?'combo':'correct');}else{this.sfx('wrong');}this.setState({screen:'feedback',combo:combo,lastResult:{correct:correct,q:q,userAns:ans,stars:stars,combo:combo,xp:xpInfo.amount,levelUp:xpInfo.levelUp,unlock:xpInfo.unlock},input:''});}");
+            "submit(ans){const q=this.cur(),correct=String(ans)===String(q.answer),p=this.curP();p.mastery[q.topic]=this.clamp((Number(p.mastery[q.topic])||0.05)+(correct?0.12:-0.16),0.05,0.99);const combo=correct?this.state.combo+1:0,stars=correct?(combo>=3?2:1):0,xpInfo=correct?this.gainXp(p,combo>=3?18:12):{amount:0,levelUp:false};if(correct){p.stars+=stars;this.state.session.correct++;this.sfx(combo>=3?'combo':'correct');}else{this.sfx('wrong');}this.setState({screen:'feedback',combo:combo,lastResult:{correct:correct,q:q,userAns:ans,stars:stars,combo:combo,xp:xpInfo.amount,levelUp:xpInfo.levelUp},input:''});}");
 
         markup = ReplaceBlock(
             markup,
             "submitHissanStep(val){",
             "\n  unlockPC(){",
-            "submitHissanStep(val){const q=this.cur(),st=q.steps[this.state.hsStep];const v=val!=null?val:this.state.input;if(v!==st.expect){this.sfx('wrong');const sm=(this.state.hsStepMiss||0)+1;const upd={hsHint:st.explain,input:'',hsMistakes:(this.state.hsMistakes||0)+1,hsStepMiss:sm};if(sm>=2)upd.hsStepChoices=this.numChoicesFor(st.expect);this.setState(upd);return;}const ns={input:'',hsHint:'',hsStepMiss:0,hsStepChoices:null};if(st.place==='ones'){ns.hsOnes=st.writeOnes;if(st.carry)ns.hsCarry=true;if(st.borrow)ns.hsBorrow=true;}else ns.hsTens=st.writeTens;const last=this.state.hsStep>=q.steps.length-1;if(last){const p=this.curP();const perfect=(this.state.hsMistakes||0)===0;p.mastery[q.topic]=this.clamp((Number(p.mastery[q.topic])||0.05)+(perfect?0.12:-0.05),0.05,0.99);const combo=perfect?this.state.combo+1:0;const stars=perfect?(combo>=3?2:1):1,xpInfo=this.gainXp(p,perfect?(combo>=3?20:14):8);p.stars+=stars;this.state.session.correct++;this.sfx(perfect&&combo>=3?'combo':'correct');this.setState({...ns,screen:'feedback',combo:combo,lastResult:{correct:true,q:q,userAns:q.answer,stars:stars,combo:combo,viaSteps:true,perfect:perfect,xp:xpInfo.amount,levelUp:xpInfo.levelUp,unlock:xpInfo.unlock}});}else{this.sfx('step');this.setState({...ns,hsStep:this.state.hsStep+1});}}");
+            "submitHissanStep(val){const q=this.cur(),st=q.steps[this.state.hsStep];const v=val!=null?val:this.state.input;if(v!==st.expect){this.sfx('wrong');const sm=(this.state.hsStepMiss||0)+1;const upd={hsHint:st.explain,input:'',hsMistakes:(this.state.hsMistakes||0)+1,hsStepMiss:sm};if(sm>=2)upd.hsStepChoices=this.numChoicesFor(st.expect);this.setState(upd);return;}const ns={input:'',hsHint:'',hsStepMiss:0,hsStepChoices:null};if(st.place==='ones'){ns.hsOnes=st.writeOnes;if(st.carry)ns.hsCarry=true;if(st.borrow)ns.hsBorrow=true;}else ns.hsTens=st.writeTens;const last=this.state.hsStep>=q.steps.length-1;if(last){const p=this.curP();const perfect=(this.state.hsMistakes||0)===0;p.mastery[q.topic]=this.clamp((Number(p.mastery[q.topic])||0.05)+(perfect?0.12:-0.05),0.05,0.99);const combo=perfect?this.state.combo+1:0;const stars=perfect?(combo>=3?2:1):1,xpInfo=this.gainXp(p,perfect?(combo>=3?20:14):8);p.stars+=stars;this.state.session.correct++;this.sfx(perfect&&combo>=3?'combo':'correct');this.setState({...ns,screen:'feedback',combo:combo,lastResult:{correct:true,q:q,userAns:q.answer,stars:stars,combo:combo,viaSteps:true,perfect:perfect,xp:xpInfo.amount,levelUp:xpInfo.levelUp}});}else{this.sfx('step');this.setState({...ns,hsStep:this.state.hsStep+1});}}");
 
         markup = markup.Replace(
             "      <!-- center -->",
@@ -255,18 +250,8 @@ internal static class RuntimeHtmlPreparer
             StringComparison.Ordinal);
 
         markup = markup.Replace(
-            "      <!-- start button -->",
-            BuildAvatarPanelMarkup() + "\n      <!-- start button -->",
-            StringComparison.Ordinal);
-
-        markup = markup.Replace(
-            "<div onclick=\"{{ goStart }}\" style=\"background:#ff8a3d; color:#fff; border:5px solid #e07d2a; border-radius:28px; padding:20px; text-align:center; font-size:38px; font-weight:900; cursor:pointer; box-shadow:0 8px 0 #d96a26;\">▶ スタート</div>",
-            "<div onclick=\"{{ goStart }}\" style=\"{{ startButtonStyle }}\">{{ startButtonLabel }}</div>",
-            StringComparison.Ordinal);
-
-        markup = markup.Replace(
             "      <div style=\"font-size:26px; color:#5b5040; margin-top:10px;\">{{ fbPrompt }} = <b>{{ fbAnswer }}</b></div>",
-            "      <div style=\"margin-top:12px; background:#fff; border:4px solid #f0e2c8; border-radius:22px; padding:10px 22px; min-width:280px; text-align:center;\">\n        <div style=\"font-size:15px; color:#4f7edb; font-weight:900;\">けいけんち</div>\n        <div style=\"font-size:34px; color:#4f7edb; font-weight:900;\">+{{ fbXp }} XP</div>\n        <sc-if value=\"{{ fbLevelUp }}\" hint-placeholder-val=\"{{ false }}\"><div style=\"font-size:22px; color:#e09020; font-weight:900; animation:popIn .45s ease-out;\">レベルアップ！ {{ level }}</div></sc-if>\n        <sc-if value=\"{{ fbHasUnlock }}\" hint-placeholder-val=\"{{ false }}\"><div style=\"font-size:18px; color:#7a6db5; font-weight:900;\">{{ fbUnlock }} が ふえた！</div></sc-if>\n      </div>\n      <div style=\"font-size:26px; color:#5b5040; margin-top:10px;\">{{ fbPrompt }} = <b>{{ fbAnswer }}</b></div>",
+            "      <div style=\"margin-top:12px; background:#fff; border:4px solid #f0e2c8; border-radius:22px; padding:10px 22px; min-width:280px; text-align:center;\">\n        <div style=\"font-size:15px; color:#4f7edb; font-weight:900;\">けいけんち</div>\n        <div style=\"font-size:34px; color:#4f7edb; font-weight:900;\">+{{ fbXp }} XP</div>\n        <sc-if value=\"{{ fbLevelUp }}\" hint-placeholder-val=\"{{ false }}\"><div style=\"font-size:22px; color:#e09020; font-weight:900; animation:popIn .45s ease-out;\">レベルアップ！ {{ level }}</div></sc-if>\n      </div>\n      <div style=\"font-size:26px; color:#5b5040; margin-top:10px;\">{{ fbPrompt }} = <b>{{ fbAnswer }}</b></div>",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
@@ -286,7 +271,7 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "profileName:p.name, profileInitial:p.name.charAt(0), avatarStyle:avatar(p.color,56,26), profileGrade:p.grade+'年生', stars:p.stars, streak:p.streak, level:this.lvl(p),",
-            "profileName:p.name, profileGrade:p.grade+'年生', stars:p.stars, streak:p.streak, level:this.lvl(p), xpText:xpText, xpToNext:xpToNext, xpBarStyle:xpBarStyle, avatarRows:avatarRows, avatarSetupNeeded:!p.avatarReady, avatarNotice:!!S.avatarNotice, avatarFace:avatarFace, avatarClothesStyle:avatarClothesStyle, avatarAccessory:avatarAccessory, avatarAccessoryStyle:avatarAccessoryStyle, finishAvatar:()=>this.finishAvatar(), startButtonStyle:startButtonStyle, startButtonLabel:startButtonLabel,",
+            "profileName:p.name, profileGrade:p.grade+'年生', stars:p.stars, streak:p.streak, level:this.lvl(p), xpText:xpText, xpToNext:xpToNext, xpBarStyle:xpBarStyle,",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
@@ -296,7 +281,7 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "fbCorrect:!!lr.correct, fbWrong:lr.correct===false, fbPrompt:fb.prompt||'', fbAnswer:fb.answer||'', fbExplanation:fb.explanation||'', fbStarText:lr.stars||0, fbCombo:(lr.combo||0)>=3, fbTopicLabel:fb.topic?T[fb.topic].label:'',",
-            "fbCorrect:!!lr.correct, fbWrong:lr.correct===false, fbPrompt:fb.prompt||'', fbAnswer:fb.answer||'', fbExplanation:fb.explanation||'', fbStarText:lr.stars||0, fbXp:lr.xp||0, fbLevelUp:!!lr.levelUp, fbUnlock:lr.unlock||'', fbHasUnlock:!!lr.unlock, fbCombo:(lr.combo||0)>=3, fbTopicLabel:fb.topic?T[fb.topic].label:'',",
+            "fbCorrect:!!lr.correct, fbWrong:lr.correct===false, fbPrompt:fb.prompt||'', fbAnswer:fb.answer||'', fbExplanation:fb.explanation||'', fbStarText:lr.stars||0, fbXp:lr.xp||0, fbLevelUp:!!lr.levelUp, fbCombo:(lr.combo||0)>=3, fbTopicLabel:fb.topic?T[fb.topic].label:'',",
             StringComparison.Ordinal);
 
         return markup;
@@ -305,17 +290,7 @@ internal static class RuntimeHtmlPreparer
     private static string BuildRewardMethodsScript()
     {
         return """
-avatarDefaults(){return{face:'smile',clothes:'red',accessory:'none'};}
-  avatarParts(){return{
-    face:[{v:'smile',label:'にこにこ',icon:'😊',lv:1},{v:'spark',label:'きらきら',icon:'🤩',lv:3},{v:'wink',label:'ウインク',icon:'😉',lv:6}],
-    clothes:[{v:'red',label:'あかい服',color:'#ff8a3d',lv:1},{v:'blue',label:'あおい服',color:'#4f7edb',lv:2},{v:'green',label:'みどり服',color:'#3aa655',lv:5}],
-    accessory:[{v:'none',label:'なし',icon:'',lv:1},{v:'ribbon',label:'リボン',icon:'🎀',lv:4},{v:'crown',label:'王冠',icon:'👑',lv:7}]
-  };}
-  normalizeAvatar(a){return{...this.avatarDefaults(),...(a||{})};}
-  unlockName(lv){const m={2:'あおい服',3:'きらきら目',4:'リボン',5:'みどり服',6:'ウインク',7:'王冠'};return m[lv]||'';}
-  gainXp(p,amount){const before=this.xpLevel(p);p.xp=(Number(p.xp)||0)+amount;const after=this.xpLevel(p);return{amount:amount,levelUp:after>before,unlock:after>before?this.unlockName(after):''};}
-  setAvatarPart(part,value){const p=this.curP(),parts=this.avatarParts()[part]||[],item=parts.find(x=>x.v===value);if(!item||this.xpLevel(p)<item.lv)return;p.avatar={...this.normalizeAvatar(p.avatar),[part]:value};this.sfx('tap');this.setState({profiles:this.state.profiles.slice(),avatarNotice:false});}
-  finishAvatar(){const p=this.curP();p.avatar=this.normalizeAvatar(p.avatar);p.avatarReady=true;this.sfx('unlock');this.setState({profiles:this.state.profiles.slice(),avatarNotice:false});}
+gainXp(p,amount){const before=this.xpLevel(p);p.xp=(Number(p.xp)||0)+amount;const after=this.xpLevel(p);return{amount:amount,levelUp:after>before};}
 """;
     }
 
@@ -328,42 +303,6 @@ const sess=S.session||{};
     const fbBgColor=lr.correct?'#eafbe8':'#fdeeee';
     const xpValue=Number(p.xp)||0,xpLevel=this.xpLevel(p),xpInto=xpValue%100,xpToNext=100-xpInto,xpText=xpInto+' / 100';
     const xpBarStyle='display:block;height:100%;width:'+Math.max(4,Math.min(100,xpInto))+'%;background:#4f7edb;transition:width .35s;border-radius:10px;';
-    const av=this.normalizeAvatar(p.avatar),parts=this.avatarParts(),faceItem=parts.face.find(x=>x.v===av.face)||parts.face[0],clothesItem=parts.clothes.find(x=>x.v===av.clothes)||parts.clothes[0],accItem=parts.accessory.find(x=>x.v===av.accessory)||parts.accessory[0];
-    const avatarFace=faceItem.icon,avatarAccessory=accItem.icon,avatarClothesStyle='width:118px;height:78px;background:'+clothesItem.color+';border:5px solid #3a3326;border-radius:34px 34px 22px 22px;margin:-10px auto 0;box-shadow:inset 0 -10px 0 rgba(0,0,0,.08);';
-    const avatarAccessoryStyle='height:34px;font-size:32px;line-height:1;text-align:center;margin-bottom:-6px;';
-    const partTitles={face:'かお',clothes:'ふく',accessory:'かざり'};
-    const avatarRows=Object.keys(parts).map(part=>({title:partTitles[part],options:parts[part].map(o=>{const unlocked=xpLevel>=o.lv,selected=av[part]===o.v;return{label:unlocked?o.label:'Lv'+o.lv,style:'min-width:88px;text-align:center;border-radius:16px;padding:8px 10px;font-size:15px;font-weight:900;cursor:'+(unlocked?'pointer':'not-allowed')+';border:3px solid '+(selected?'#4f7edb':'#ecd9b9')+';background:'+(selected?'#eaf0ff':(unlocked?'#fff':'#f3e8d4'))+';color:'+(unlocked?'#3a3326':'#9a8662')+';',onClick:()=>this.setAvatarPart(part,o.v)};})}));
-    const startButtonStyle=p.avatarReady?'background:#ff8a3d;color:#fff;border:5px solid #e07d2a;border-radius:28px;padding:20px;text-align:center;font-size:38px;font-weight:900;cursor:pointer;box-shadow:0 8px 0 #d96a26;':'background:#cfc4ea;color:#fff;border:5px solid #b8abe0;border-radius:28px;padding:20px;text-align:center;font-size:34px;font-weight:900;cursor:pointer;box-shadow:0 8px 0 #b8abe0;';
-    const startButtonLabel=p.avatarReady?'▶ スタート':'アバターを きめてね';
-""";
-    }
-
-    private static string BuildAvatarPanelMarkup()
-    {
-        return """
-      <div style="background:#fff; border:4px solid #f0e2c8; border-radius:24px; padding:14px 18px; display:grid; grid-template-columns:180px 1fr auto; gap:18px; align-items:center; margin-bottom:16px;">
-        <div style="text-align:center;">
-          <div style="{{ avatarAccessoryStyle }}">{{ avatarAccessory }}</div>
-          <div style="width:126px;height:126px;background:#ffd24a;border:5px solid #3a3326;border-radius:42px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:58px;box-shadow:0 8px 0 #d8a92e;">{{ avatarFace }}</div>
-          <div style="{{ avatarClothesStyle }}"></div>
-        </div>
-        <div>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div style="font-size:22px; font-weight:900;">アバター</div>
-            <sc-if value="{{ avatarSetupNeeded }}" hint-placeholder-val="{{ true }}"><span style="background:#fff4cc; border:2px solid #e0a02a; border-radius:16px; padding:4px 10px; color:#9a6a00; font-size:15px; font-weight:900;">さいしょに つくろう</span></sc-if>
-            <sc-if value="{{ avatarNotice }}" hint-placeholder-val="{{ false }}"><span style="background:#ffe6e0; border:2px solid #ff8a8a; border-radius:16px; padding:4px 10px; color:#d2503f; font-size:15px; font-weight:900;">まだ きまってないよ</span></sc-if>
-          </div>
-          <sc-for list="{{ avatarRows }}" as="row" hint-placeholder-count="3">
-            <div style="display:flex; gap:10px; align-items:center; margin-top:8px;">
-              <div style="width:48px; color:#9a8662; font-size:15px; font-weight:900;">{{ row.title }}</div>
-              <sc-for list="{{ row.options }}" as="opt" hint-placeholder-count="3">
-                <div onclick="{{ opt.onClick }}" style="{{ opt.style }}">{{ opt.label }}</div>
-              </sc-for>
-            </div>
-          </sc-for>
-        </div>
-        <div onclick="{{ finishAvatar }}" style="background:#4f7edb;color:#fff;border:4px solid #345eb1;border-radius:20px;padding:13px 18px;font-size:20px;font-weight:900;cursor:pointer;box-shadow:0 6px 0 #345eb1;white-space:nowrap;">これでOK</div>
-      </div>
 """;
     }
 
@@ -525,7 +464,7 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
         var escapedName = JsonSerializer.Serialize(profileName);
         var replacement =
             "profiles:[\n" +
-            $"      {{name:{escapedName},grade:1,color:'#4ad991',streak:0,stars:0,xp:0,avatarReady:false,avatar:{{face:'smile',clothes:'red',accessory:'none'}},{BeginnerMasteryMarkup}}},\n" +
+            $"      {{name:{escapedName},grade:1,color:'#4ad991',streak:0,stars:0,xp:0,{BeginnerMasteryMarkup}}},\n" +
             "    ],";
 
         return html[..start] + replacement + html[end..];

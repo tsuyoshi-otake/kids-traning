@@ -8,7 +8,7 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.4.1"
+$version = "1.4.2"
 
 $programSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
@@ -48,11 +48,17 @@ if ($runtimeSource -notmatch "pickKokugo\(p\)" -or $runtimeSource -notmatch "sub
 if ($runtimeSource -notmatch "pickMoji\(p\)" -or $runtimeSource -notmatch "subtype:'alphabet'" -or $runtimeSource -notmatch "subtype:'hiragana'" -or $runtimeSource -notmatch "subtype:'katakana'" -or $runtimeSource -notmatch "1cm.*10mm" -or $runtimeSource -notmatch "30mm") {
     throw "Runtime HTML patch must include alphabet, hiragana, katakana, and millimeter questions"
 }
-if ($runtimeSource -notmatch "PatchRewardSystem" -or $runtimeSource -notmatch "gainXp" -or $runtimeSource -notmatch "xpLevel" -or $runtimeSource -notmatch "avatarReady" -or $runtimeSource -notmatch "avatarParts" -or $runtimeSource -notmatch "fbXp" -or $runtimeSource -notmatch "earnedXp" -or $runtimeSource -notmatch "べんきょうを つづける") {
-    throw "Runtime HTML patch must include XP rewards and avatar customization"
+if ($runtimeSource -notmatch "PatchRewardSystem" -or $runtimeSource -notmatch "gainXp" -or $runtimeSource -notmatch "xpLevel" -or $runtimeSource -notmatch "fbXp" -or $runtimeSource -notmatch "earnedXp" -or $runtimeSource -notmatch "べんきょうを つづける") {
+    throw "Runtime HTML patch must include XP rewards without avatar customization"
 }
-if ($trainingSource -notmatch "beginnerMastery" -or $trainingSource -notmatch "kt_settings_v1" -or $trainingSource -notmatch "hasMeaningfulProgress" -or $trainingSource -notmatch "pass: 8" -or $trainingSource -notmatch "moji" -or $trainingSource -notmatch "avatarReady" -or $trainingSource -notmatch "defaultAvatar" -or $trainingSource -notmatch "xp") {
+if ($runtimeSource -match "avatarReady" -or $runtimeSource -match "avatarParts" -or $runtimeSource -match "finishAvatar" -or $runtimeSource -match "BuildAvatarPanelMarkup" -or $runtimeSource -match "アバター") {
+    throw "Runtime HTML patch must not include avatar setup or customization"
+}
+if ($trainingSource -notmatch "beginnerMastery" -or $trainingSource -notmatch "kt_settings_v1" -or $trainingSource -notmatch "hasMeaningfulProgress" -or $trainingSource -notmatch "pass: 8" -or $trainingSource -notmatch "moji" -or $trainingSource -notmatch "xp") {
     throw "Training storage bootstrap must migrate only unstarted profiles to beginner defaults"
+}
+if ($trainingSource -match "defaultAvatar" -or $trainingSource -match "avatarReady") {
+    throw "Training storage bootstrap must not add avatar state"
 }
 
 & dotnet publish $project -c Release -r win-x64 --self-contained true /p:Version=$version

@@ -201,7 +201,6 @@ internal sealed class TrainingForm : Form
           const profileName = __PROFILE_NAME__;
           const masteryKeys = ['add', 'sub', 'mul', 'clock', 'kokugo', 'hissan', 'moji'];
           const beginnerMastery = { add: .05, sub: .05, mul: .05, clock: .05, kokugo: .05, hissan: .05, moji: .05 };
-          const defaultAvatar = { face: 'smile', clothes: 'red', accessory: 'none' };
           const beginnerSettings = {
             count: 10,
             pass: 8,
@@ -214,8 +213,6 @@ internal sealed class TrainingForm : Form
             streak: 0,
             stars: 0,
             xp: 0,
-            avatarReady: false,
-            avatar: { ...defaultAvatar },
             mastery: { ...beginnerMastery }
           };
 
@@ -237,11 +234,6 @@ internal sealed class TrainingForm : Form
             numberOrDefault(profile.xp, 0) > 0 ||
             !isDefaultishMastery(profile.mastery);
 
-          const normalizeAvatar = avatar => ({
-            ...defaultAvatar,
-            ...(avatar && typeof avatar === 'object' ? avatar : {})
-          });
-
           const normalizeProfile = source => {
             const profile = source && typeof source === 'object' ? source : {};
             const mastery = profile.mastery && typeof profile.mastery === 'object' ? profile.mastery : {};
@@ -254,8 +246,6 @@ internal sealed class TrainingForm : Form
               streak: numberOrDefault(profile.streak, defaultProfile.streak),
               stars: numberOrDefault(profile.stars, defaultProfile.stars),
               xp: numberOrDefault(profile.xp, defaultProfile.xp),
-              avatarReady: profile.avatarReady === true,
-              avatar: normalizeAvatar(profile.avatar),
               color: profile.color || defaultProfile.color,
               mastery: resetToBeginner ? { ...beginnerMastery } : { ...defaultProfile.mastery, ...mastery }
             };

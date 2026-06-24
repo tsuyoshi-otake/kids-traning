@@ -64,7 +64,6 @@ internal static class Program
                 !template.Contains("profiles:[\n", StringComparison.Ordinal) ||
                 !template.Contains($"name:{System.Text.Json.JsonSerializer.Serialize(RuntimeHtmlPreparer.PrimaryProfileName)}", StringComparison.Ordinal) ||
                 !template.Contains("xp:0", StringComparison.Ordinal) ||
-                !template.Contains("avatarReady:false", StringComparison.Ordinal) ||
                 !template.Contains("mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05}", StringComparison.Ordinal) ||
                 !template.Contains("genAdd(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickMul(p)", StringComparison.Ordinal) ||
@@ -72,7 +71,6 @@ internal static class Program
                 !template.Contains("pickMoji(p)", StringComparison.Ordinal) ||
                 !template.Contains("gainXp", StringComparison.Ordinal) ||
                 !template.Contains("xpLevel", StringComparison.Ordinal) ||
-                !template.Contains("avatarParts", StringComparison.Ordinal) ||
                 !template.Contains("fbXp", StringComparison.Ordinal) ||
                 !template.Contains("earnedXp", StringComparison.Ordinal) ||
                 !template.Contains("べんきょうを つづける", StringComparison.Ordinal) ||
@@ -89,6 +87,10 @@ internal static class Program
                 !template.Contains("linear-gradient(135deg,#ffdad4", StringComparison.Ordinal) ||
                 !template.Contains("isMulViz", StringComparison.Ordinal) ||
                 !template.Contains("qs.push(this.genFor(this.weightedPick(p),p))", StringComparison.Ordinal) ||
+                template.Contains("アバター", StringComparison.Ordinal) ||
+                template.Contains("avatarReady", StringComparison.Ordinal) ||
+                template.Contains("avatarParts", StringComparison.Ordinal) ||
+                template.Contains("finishAvatar", StringComparison.Ordinal) ||
                 template.Contains("<div style=\"{{ avatarStyle }}\">{{ profileInitial }}</div>", StringComparison.Ordinal) ||
                 template.Contains("profileInitial:p.name.charAt(0), avatarStyle", StringComparison.Ordinal))
             {
