@@ -222,8 +222,8 @@ internal sealed class TrainingForm : Form
           const masteryKeys = ['add', 'sub', 'mul', 'clock', 'kokugo', 'hissan', 'moji'];
           const beginnerMastery = { add: .05, sub: .05, mul: .05, clock: .05, kokugo: .05, hissan: .05, moji: .05 };
           const beginnerSettings = {
-            count: 10,
-            pass: 8,
+            count: 20,
+            pass: 15,
             topics: { add: true, sub: true, mul: true, clock: true, kokugo: true, hissan: true, moji: true }
           };
           const defaultProfile = {

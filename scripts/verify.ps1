@@ -8,7 +8,7 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.4.4"
+$version = "1.4.5"
 
 $programSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
@@ -53,6 +53,12 @@ if ($programSource -notmatch "ParentControlServer.BuildParentPage" -or $programS
 if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "moji:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "effectiveGrade\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics" -or $runtimeSource -notmatch "profileGrade:this\.gradeLabel") {
     throw "Runtime HTML patch must start beginners at level 1 and stage topic difficulty"
 }
+if ($runtimeSource -notmatch "topicStage\(p,k\)" -or $runtimeSource -notmatch "hissanComplete\(p\)" -or $runtimeSource -notmatch "genHissan\(p\)" -or $runtimeSource -notmatch "!hissanDone\)staged=\['add','sub','clock','kokugo','moji','hissan'\]" -or $runtimeSource -notmatch "else staged=\['add','sub','clock','kokugo','moji','hissan','mul'\]" -or $runtimeSource -notmatch "pairs=\[\[1,2\],\[2,1\],\[2,2\]" -or $runtimeSource -notmatch "stage<=1\?\['hiragana'\]") {
+    throw "Runtime HTML patch must gate multiplication behind hissan completion and stage each topic from easy prompts"
+}
+if ($runtimeSource -notmatch "questionCount\?\?20" -or $runtimeSource -notmatch "passLine\?\?15") {
+    throw "Runtime HTML patch must default to 20 questions and 15 correct answers"
+}
 if ($runtimeSource -notmatch "mentalAddendMax=9" -or $runtimeSource -notmatch "mentalSubtrahendMax=9" -or $runtimeSource -match "b=this\.rand\(11,a-1\)" -or $runtimeSource -match "b=this\.rand\(1,40\)" -or $runtimeSource -match "b=this\.rand\(12,79\)" -or $runtimeSource -match "b=this\.rand\(11,79\)" -or $runtimeSource -match "b=this\.rand\(10,99-a\)" -or $runtimeSource -match "b=this\.rand\(20,a-1\)" -or $runtimeSource -match "Math\.min\(40,a-1\)") {
     throw "Runtime HTML patch must keep non-hissan add/sub from generating two-digit-by-two-digit mental arithmetic"
 }
@@ -71,7 +77,7 @@ if ($runtimeSource -notmatch "PatchRewardSystem" -or $runtimeSource -notmatch "g
 if ($runtimeSource -match "avatarReady" -or $runtimeSource -match "avatarParts" -or $runtimeSource -match "finishAvatar" -or $runtimeSource -match "BuildAvatarPanelMarkup" -or $runtimeSource -match "アバター") {
     throw "Runtime HTML patch must not include avatar setup or customization"
 }
-if ($trainingSource -notmatch "beginnerMastery" -or $trainingSource -notmatch "kt_settings_v1" -or $trainingSource -notmatch "hasMeaningfulProgress" -or $trainingSource -notmatch "pass: 8" -or $trainingSource -notmatch "moji" -or $trainingSource -notmatch "xp") {
+if ($trainingSource -notmatch "beginnerMastery" -or $trainingSource -notmatch "kt_settings_v1" -or $trainingSource -notmatch "hasMeaningfulProgress" -or $trainingSource -notmatch "count: 20" -or $trainingSource -notmatch "pass: 15" -or $trainingSource -notmatch "moji" -or $trainingSource -notmatch "xp") {
     throw "Training storage bootstrap must migrate only unstarted profiles to beginner defaults"
 }
 if ($runtimeSource -notmatch "parentPin\(\)" -or $runtimeSource -notmatch "kt_parent_pin_v1" -or $runtimeSource -notmatch "const ok=np===this.parentPin\(\)") {

@@ -66,7 +66,10 @@ internal static class Program
                 !template.Contains($"name:{System.Text.Json.JsonSerializer.Serialize(RuntimeHtmlPreparer.PrimaryProfileName)}", StringComparison.Ordinal) ||
                 !template.Contains("xp:0", StringComparison.Ordinal) ||
                 !template.Contains("mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05}", StringComparison.Ordinal) ||
+                !template.Contains("count:this.props.questionCount??20", StringComparison.Ordinal) ||
+                !template.Contains("pass:this.props.passLine??15", StringComparison.Ordinal) ||
                 !template.Contains("genAdd(p)", StringComparison.Ordinal) ||
+                !template.Contains("genHissan(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickMul(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickKokugo(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickMoji(p)", StringComparison.Ordinal) ||
@@ -83,8 +86,14 @@ internal static class Program
                 !template.Contains("kokuInstruction", StringComparison.Ordinal) ||
                 !template.Contains("effectiveGrade(p)", StringComparison.Ordinal) ||
                 !template.Contains("learningStage(p)", StringComparison.Ordinal) ||
+                !template.Contains("topicStage(p,k)", StringComparison.Ordinal) ||
+                !template.Contains("hissanComplete(p)", StringComparison.Ordinal) ||
+                !template.Contains("!hissanDone)staged=['add','sub','clock','kokugo','moji','hissan']", StringComparison.Ordinal) ||
+                !template.Contains("else staged=['add','sub','clock','kokugo','moji','hissan','mul']", StringComparison.Ordinal) ||
                 !template.Contains("mentalAddendMax=9", StringComparison.Ordinal) ||
                 !template.Contains("mentalSubtrahendMax=9", StringComparison.Ordinal) ||
+                !template.Contains("pairs=[[1,2],[2,1],[2,2]", StringComparison.Ordinal) ||
+                !template.Contains("stage<=1?['hiragana']", StringComparison.Ordinal) ||
                 !template.Contains("profileGrade:this.gradeLabel(p)", StringComparison.Ordinal) ||
                 !template.Contains("const weakKeys=this.allowedTopics(p).filter", StringComparison.Ordinal) ||
                 !template.Contains("linear-gradient(135deg,#ffdad4", StringComparison.Ordinal) ||
