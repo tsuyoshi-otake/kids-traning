@@ -7,13 +7,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly NotifyIcon notifyIcon;
     private readonly System.Windows.Forms.Timer startupTimer = new();
     private readonly System.Windows.Forms.Timer updateTimer = new();
+    private readonly System.Windows.Forms.Timer autoTrainingTimer = new();
     private readonly UpdateManager updateManager = new();
 
     private TrainingForm? trainingForm;
     private bool checkInProgress;
     private bool exitingForUpdate;
 
-    public TrayApplicationContext()
+    public TrayApplicationContext(bool startTrainingOnLaunch)
     {
         AppPaths.EnsureRuntimeDirectories();
 
@@ -38,6 +39,17 @@ internal sealed class TrayApplicationContext : ApplicationContext
         updateTimer.Interval = (int)CheckInterval.TotalMilliseconds;
         updateTimer.Tick += async (_, _) => await CheckForUpdatesAsync(showNoUpdate: false).ConfigureAwait(true);
         updateTimer.Start();
+
+        if (startTrainingOnLaunch)
+        {
+            autoTrainingTimer.Interval = 1000;
+            autoTrainingTimer.Tick += (_, _) =>
+            {
+                autoTrainingTimer.Stop();
+                StartTraining();
+            };
+            autoTrainingTimer.Start();
+        }
 
         UpdateLogger.Info($"Tray started. Current version: {UpdateManager.CurrentVersion}");
     }
@@ -120,6 +132,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         startupTimer.Stop();
         updateTimer.Stop();
+        autoTrainingTimer.Stop();
         notifyIcon.Visible = false;
         notifyIcon.Dispose();
 

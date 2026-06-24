@@ -21,8 +21,9 @@ The MSI is written to `artifacts\KidsTraining.msi`.
 - The window runs fullscreen, topmost, and blocks normal close shortcuts until completion.
 - Clicking the existing `パソコンを つかう` completion control closes the app.
 - The default executable mode is a task tray resident updater. Use the tray menu or run `KidsTraining.App.exe --training` to start fullscreen learning.
+- Login startup is registered as `KidsTraining.App.exe --auto-training`, so the tray resident app starts and immediately opens fullscreen learning after user login.
 - The tray app checks GitHub Releases once per hour. If a newer `KidsTraining.msi` is attached to the latest non-prerelease release, it downloads the MSI under `%LOCALAPPDATA%\KidsTraining\Updates`, starts a copied update runner, exits, and lets `msiexec` perform a quiet per-user reinstall without update-start notifications.
-- The MSI installs under `%LOCALAPPDATA%\KidsTraining` and registers HKCU login startup for tray residency.
+- The MSI installs under `%LOCALAPPDATA%\KidsTraining` and registers HKCU login startup for tray residency plus automatic fullscreen learning.
 - Start Menu includes a tray shortcut and a direct learning-mode shortcut.
 
 ## Release Updates
@@ -30,11 +31,12 @@ The MSI is written to `artifacts\KidsTraining.msi`.
 Build new releases with a version that matches the release tag:
 
 ```powershell
-rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.1.1
+rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.1.2
 ```
 
-Publish a GitHub Release such as `v1.1.1` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
+Publish a GitHub Release such as `v1.1.2` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
 
 Tracking issues:
 - Initial app and installer: https://github.com/tsuyoshi-otake/kids-traning/issues/1
 - Tray updater: https://github.com/tsuyoshi-otake/kids-traning/issues/2
+- Login fullscreen startup: https://github.com/tsuyoshi-otake/kids-traning/issues/3

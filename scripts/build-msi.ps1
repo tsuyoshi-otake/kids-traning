@@ -1,7 +1,7 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$Version = "1.1.1"
+    [string]$Version = "1.1.2"
 )
 
 $ErrorActionPreference = "Stop"
@@ -167,7 +167,7 @@ $wxsLines.Add("      </Component>")
 $wxsLines.Add("    </DirectoryRef>")
 $wxsLines.Add("    <DirectoryRef Id=`"INSTALLFOLDER`">")
 $wxsLines.Add("      <Component Id=`"StartupComponent`" Guid=`"$startupComponentGuid`">")
-$wxsLines.Add("        <RegistryValue Root=`"HKCU`" Key=`"Software\Microsoft\Windows\CurrentVersion\Run`" Name=`"KidsTraining`" Type=`"string`" Value=`"&quot;[INSTALLFOLDER]KidsTraining.App.exe&quot;`" KeyPath=`"yes`" />")
+$wxsLines.Add("        <RegistryValue Root=`"HKCU`" Key=`"Software\Microsoft\Windows\CurrentVersion\Run`" Name=`"KidsTraining`" Type=`"string`" Value=`"&quot;[INSTALLFOLDER]KidsTraining.App.exe&quot; --auto-training`" KeyPath=`"yes`" />")
 $wxsLines.Add("      </Component>")
 $wxsLines.Add("      <Component Id=`"ProfileCleanupComponent`" Guid=`"$cleanupComponentGuid`">")
 $wxsLines.AddRange($cleanupRemoveFolders)

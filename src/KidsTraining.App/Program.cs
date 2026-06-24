@@ -7,6 +7,7 @@ internal static class Program
     private const string SmokeTestArg = "--smoke-test";
     private const string TrainingArg = "--training";
     private const string LearnArg = "--learn";
+    private const string AutoTrainingArg = "--auto-training";
     private const string ApplyUpdateArg = "--apply-update";
 
     [STAThread]
@@ -31,7 +32,8 @@ internal static class Program
         }
         else
         {
-            Application.Run(new TrayApplicationContext());
+            Application.Run(new TrayApplicationContext(args.Any(static arg =>
+                string.Equals(arg, AutoTrainingArg, StringComparison.OrdinalIgnoreCase))));
         }
 
         return 0;
@@ -79,8 +81,8 @@ internal static class Program
                 return 15;
             }
 
-            if (!UpdateManager.TryGetReleaseVersion("v1.1.1", out var parsedVersion) ||
-                !UpdateManager.IsNewerVersion(parsedVersion, new Version(1, 1, 0, 0)) ||
+            if (!UpdateManager.TryGetReleaseVersion("v1.1.2", out var parsedVersion) ||
+                !UpdateManager.IsNewerVersion(parsedVersion, new Version(1, 1, 1, 0)) ||
                 !UpdateManager.TryGetReleaseVersion("1.1.0", out _))
             {
                 return 16;

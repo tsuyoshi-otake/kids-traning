@@ -8,13 +8,13 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.1.1"
+$version = "1.1.2"
 
 $programSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
 $updateSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\UpdateManager.cs")
 
-if ($programSource -notmatch "TrayApplicationContext" -or $programSource -notmatch "--training" -or $programSource -notmatch "--apply-update") {
+if ($programSource -notmatch "TrayApplicationContext" -or $programSource -notmatch "--training" -or $programSource -notmatch "--auto-training" -or $programSource -notmatch "--apply-update") {
     throw "Program entry point must support tray, training, and update-runner modes"
 }
 if ($traySource -notmatch "TimeSpan.FromHours\(1\)" -or $traySource -notmatch "NotifyIcon") {
@@ -97,6 +97,9 @@ if ($generatedText -notmatch "LocalAppDataFolder") {
 }
 if ($generatedText -notmatch [regex]::Escape("Software\Microsoft\Windows\CurrentVersion\Run")) {
     throw "Generated MSI source must register HKCU Run startup"
+}
+if ($generatedText -notmatch "--auto-training") {
+    throw "Generated MSI source must start fullscreen learning after login"
 }
 if ($generatedText -notmatch "--training") {
     throw "Generated MSI source must include a learning-mode shortcut"
