@@ -275,6 +275,11 @@ internal static class RuntimeHtmlPreparer
             StringComparison.Ordinal);
 
         markup = markup.Replace(
+            "      <div onclick=\"{{ unlockPC }}\" style=\"margin-top:28px; background:#3aa655; color:#fff; border:5px solid #2f8a46; border-radius:28px; padding:20px 64px; font-size:36px; font-weight:900; cursor:pointer; box-shadow:0 8px 0 #2a7d3f;\">🔓 パソコンを つかう</div>",
+            "      <div style=\"display:flex; gap:16px; margin-top:28px; flex-wrap:wrap; justify-content:center;\">\n        <div onclick=\"{{ goStart }}\" style=\"background:#ff8a3d; color:#fff; border:5px solid #e07d2a; border-radius:28px; padding:18px 44px; font-size:30px; font-weight:900; cursor:pointer; box-shadow:0 8px 0 #d96a26; min-width:300px; text-align:center;\">▶ べんきょうを つづける</div>\n        <div onclick=\"{{ unlockPC }}\" style=\"background:#3aa655; color:#fff; border:5px solid #2f8a46; border-radius:28px; padding:18px 44px; font-size:30px; font-weight:900; cursor:pointer; box-shadow:0 8px 0 #2a7d3f; min-width:300px; text-align:center;\">🔓 パソコンを つかう</div>\n      </div>",
+            StringComparison.Ordinal);
+
+        markup = markup.Replace(
             "const sess=S.session||{};\n    const earned=sess.startStars!=null?(p.stars-sess.startStars):0;\n    const fbBgColor=lr.correct?'#eafbe8':'#fdeeee';",
             BuildRewardRenderScript(),
             StringComparison.Ordinal);

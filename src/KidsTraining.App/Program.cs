@@ -75,6 +75,7 @@ internal static class Program
                 !template.Contains("avatarParts", StringComparison.Ordinal) ||
                 !template.Contains("fbXp", StringComparison.Ordinal) ||
                 !template.Contains("earnedXp", StringComparison.Ordinal) ||
+                !template.Contains("べんきょうを つづける", StringComparison.Ordinal) ||
                 !template.Contains("subtype:'alphabet'", StringComparison.Ordinal) ||
                 !template.Contains("subtype:'hiragana'", StringComparison.Ordinal) ||
                 !template.Contains("subtype:'katakana'", StringComparison.Ordinal) ||
