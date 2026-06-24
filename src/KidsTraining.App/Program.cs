@@ -65,12 +65,18 @@ internal static class Program
                 !template.Contains($"name:{System.Text.Json.JsonSerializer.Serialize(RuntimeHtmlPreparer.PrimaryProfileName)}", StringComparison.Ordinal) ||
                 !template.Contains("mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05}", StringComparison.Ordinal) ||
                 !template.Contains("genAdd(p)", StringComparison.Ordinal) ||
-                !template.Contains("pickMul(){", StringComparison.Ordinal) ||
+                !template.Contains("pickMul(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickKokugo(p)", StringComparison.Ordinal) ||
+                !template.Contains("subtype:'kanji-choice'", StringComparison.Ordinal) ||
+                !template.Contains("kokuInstruction", StringComparison.Ordinal) ||
+                !template.Contains("effectiveGrade(p)", StringComparison.Ordinal) ||
                 !template.Contains("learningStage(p)", StringComparison.Ordinal) ||
+                !template.Contains("profileGrade:this.gradeLabel(p)", StringComparison.Ordinal) ||
                 !template.Contains("const weakKeys=this.allowedTopics(p).filter", StringComparison.Ordinal) ||
                 !template.Contains("linear-gradient(135deg,#ffdad4", StringComparison.Ordinal) ||
                 !template.Contains("isMulViz", StringComparison.Ordinal) ||
-                !template.Contains("qs.push(this.genFor(this.weightedPick(p),p))", StringComparison.Ordinal))
+                !template.Contains("qs.push(this.genFor(this.weightedPick(p),p))", StringComparison.Ordinal) ||
+                template.Contains("<div style=\"{{ avatarStyle }}\">{{ profileInitial }}</div>", StringComparison.Ordinal))
             {
                 return 14;
             }
