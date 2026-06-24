@@ -8,7 +8,7 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.2.0"
+$version = "1.3.0"
 
 $programSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
@@ -36,7 +36,7 @@ if ($updateStartedBlock -match "ShowBalloon") {
 if ($updateSource -notmatch "releases/latest" -or $updateSource -notmatch "KidsTraining.msi" -or $updateSource -notmatch "UpdateRunner") {
     throw "Update manager must check GitHub Releases and launch a copied update runner"
 }
-if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "effectiveGrade\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics" -or $runtimeSource -notmatch "profileGrade:this\.gradeLabel") {
+if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "moji:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "effectiveGrade\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics" -or $runtimeSource -notmatch "profileGrade:this\.gradeLabel") {
     throw "Runtime HTML patch must start beginners at level 1 and stage topic difficulty"
 }
 if ($runtimeSource -notmatch "PatchArithmeticVisuals" -or $runtimeSource -notmatch "linear-gradient\(135deg,#ffdad4" -or $runtimeSource -notmatch "isMulViz" -or $runtimeSource -notmatch "pickMul\(p\)" -or $runtimeSource -notmatch "op:'div'") {
@@ -45,7 +45,10 @@ if ($runtimeSource -notmatch "PatchArithmeticVisuals" -or $runtimeSource -notmat
 if ($runtimeSource -notmatch "pickKokugo\(p\)" -or $runtimeSource -notmatch "subtype:'reading'" -or $runtimeSource -notmatch "subtype:'kanji-choice'" -or $runtimeSource -notmatch "kokuInstruction" -or $runtimeSource -notmatch "g:3") {
     throw "Runtime HTML patch must include grade 1-3 kanji reading and correct-kanji choice prompts"
 }
-if ($trainingSource -notmatch "beginnerMastery" -or $trainingSource -notmatch "kt_settings_v1" -or $trainingSource -notmatch "hasMeaningfulProgress" -or $trainingSource -notmatch "pass: 8") {
+if ($runtimeSource -notmatch "pickMoji\(p\)" -or $runtimeSource -notmatch "subtype:'alphabet'" -or $runtimeSource -notmatch "subtype:'hiragana'" -or $runtimeSource -notmatch "subtype:'katakana'" -or $runtimeSource -notmatch "1cm.*10mm" -or $runtimeSource -notmatch "30mm") {
+    throw "Runtime HTML patch must include alphabet, hiragana, katakana, and millimeter questions"
+}
+if ($trainingSource -notmatch "beginnerMastery" -or $trainingSource -notmatch "kt_settings_v1" -or $trainingSource -notmatch "hasMeaningfulProgress" -or $trainingSource -notmatch "pass: 8" -or $trainingSource -notmatch "moji") {
     throw "Training storage bootstrap must migrate only unstarted profiles to beginner defaults"
 }
 

@@ -63,10 +63,15 @@ internal static class Program
                 template.Contains("screen:'profile', profileIdx:0,", StringComparison.Ordinal) ||
                 !template.Contains("profiles:[\n", StringComparison.Ordinal) ||
                 !template.Contains($"name:{System.Text.Json.JsonSerializer.Serialize(RuntimeHtmlPreparer.PrimaryProfileName)}", StringComparison.Ordinal) ||
-                !template.Contains("mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05}", StringComparison.Ordinal) ||
+                !template.Contains("mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05}", StringComparison.Ordinal) ||
                 !template.Contains("genAdd(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickMul(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickKokugo(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickMoji(p)", StringComparison.Ordinal) ||
+                !template.Contains("subtype:'alphabet'", StringComparison.Ordinal) ||
+                !template.Contains("subtype:'hiragana'", StringComparison.Ordinal) ||
+                !template.Contains("subtype:'katakana'", StringComparison.Ordinal) ||
+                !template.Contains("1cm は 何mm？", StringComparison.Ordinal) ||
                 !template.Contains("subtype:'kanji-choice'", StringComparison.Ordinal) ||
                 !template.Contains("kokuInstruction", StringComparison.Ordinal) ||
                 !template.Contains("effectiveGrade(p)", StringComparison.Ordinal) ||

@@ -199,12 +199,12 @@ internal sealed class TrainingForm : Form
           const key = 'kt_profiles_v1';
           const settingsKey = 'kt_settings_v1';
           const profileName = __PROFILE_NAME__;
-          const masteryKeys = ['add', 'sub', 'mul', 'clock', 'kokugo', 'hissan'];
-          const beginnerMastery = { add: .05, sub: .05, mul: .05, clock: .05, kokugo: .05, hissan: .05 };
+          const masteryKeys = ['add', 'sub', 'mul', 'clock', 'kokugo', 'hissan', 'moji'];
+          const beginnerMastery = { add: .05, sub: .05, mul: .05, clock: .05, kokugo: .05, hissan: .05, moji: .05 };
           const beginnerSettings = {
             count: 10,
             pass: 8,
-            topics: { add: true, sub: true, mul: true, clock: true, kokugo: true, hissan: true }
+            topics: { add: true, sub: true, mul: true, clock: true, kokugo: true, hissan: true, moji: true }
           };
           const defaultProfile = {
             name: profileName,
