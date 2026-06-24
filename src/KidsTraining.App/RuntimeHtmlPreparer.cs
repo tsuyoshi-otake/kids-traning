@@ -5,7 +5,7 @@ namespace KidsTraining.App;
 
 internal static class RuntimeHtmlPreparer
 {
-    public const string EmergencyPin = "1234";
+    public const string DefaultEmergencyPin = "1234";
     private const string TemplateOpenTag = "<script type=\"__bundler/template\">";
     private const string TemplateCloseTag = "</script>";
     private const string BeginnerMasteryMarkup = "mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05}";
@@ -27,7 +27,7 @@ internal static class RuntimeHtmlPreparer
         }
 
         var html = File.ReadAllText(AppPaths.HtmlPath, Encoding.UTF8);
-        html = PatchBundledTemplate(html, PrimaryProfileName);
+        html = PatchBundledTemplate(html, PrimaryProfileName, ParentSettings.GetParentPassword());
 
         File.WriteAllText(AppPaths.RuntimeHtmlPath, html, new UTF8Encoding(false));
         File.SetLastWriteTimeUtc(AppPaths.RuntimeHtmlPath, DateTime.UtcNow);
@@ -50,16 +50,16 @@ internal static class RuntimeHtmlPreparer
         return JsonSerializer.Deserialize<string>(encodedTemplate);
     }
 
-    private static string PatchBundledTemplate(string html, string profileName)
+    private static string PatchBundledTemplate(string html, string profileName, string parentPassword)
     {
         if (!TryFindBundledTemplate(html, out var contentStart, out var contentEnd))
         {
-            return PatchLearningMarkup(html, profileName);
+            return PatchLearningMarkup(html, profileName, parentPassword);
         }
 
         var template = ExtractBundledTemplate(html)
             ?? throw new InvalidOperationException("Bundled learning template could not be decoded.");
-        var patchedTemplate = PatchLearningMarkup(template, profileName);
+        var patchedTemplate = PatchLearningMarkup(template, profileName, parentPassword);
         var encodedTemplate = JsonSerializer.Serialize(patchedTemplate);
 
         return html[..contentStart] + Environment.NewLine + encodedTemplate + Environment.NewLine + html[contentEnd..];
@@ -81,7 +81,7 @@ internal static class RuntimeHtmlPreparer
         return contentEnd >= 0;
     }
 
-    private static string PatchLearningMarkup(string markup, string profileName)
+    private static string PatchLearningMarkup(string markup, string profileName, string parentPassword)
     {
         markup = markup.Replace("screen:'profile', profileIdx:0,", "screen:'start', profileIdx:0,", StringComparison.Ordinal);
         markup = markup.Replace(
@@ -89,8 +89,20 @@ internal static class RuntimeHtmlPreparer
             "unlockPC(){this.sfx('unlock');this.setState({screen:'start',session:null,combo:0,pin:'',emergencyDone:false});}",
             StringComparison.Ordinal);
         markup = PatchBeginnerProgression(markup);
+        markup = PatchParentPassword(markup, parentPassword);
 
         return ReplaceBundledProfiles(markup, profileName);
+    }
+
+    private static string PatchParentPassword(string markup, string parentPassword)
+    {
+        var password = ParentSettings.NormalizePassword(parentPassword) ?? DefaultEmergencyPin;
+        markup = markup.Replace(
+            "pinPress(d){if(this.state.emergencyDone||this.state.pin.length>=4)return;",
+            $"parentPin(){{try{{return localStorage.getItem('kt_parent_pin_v1')||'{password}';}}catch{{return '{password}';}}}}\n  pinPress(d){{if(this.state.emergencyDone||this.state.pin.length>=4)return;",
+            StringComparison.Ordinal);
+        markup = markup.Replace("const ok=np==='1234';", "const ok=np===this.parentPin();", StringComparison.Ordinal);
+        return markup;
     }
 
     private static string PatchBeginnerProgression(string markup)

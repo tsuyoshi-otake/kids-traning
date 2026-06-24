@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace KidsTraining.App;
 
 internal sealed class TrayApplicationContext : ApplicationContext
@@ -5,18 +7,24 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(1);
 
     private readonly NotifyIcon notifyIcon;
+    private readonly Control uiDispatcher = new();
     private readonly System.Windows.Forms.Timer startupTimer = new();
     private readonly System.Windows.Forms.Timer updateTimer = new();
     private readonly System.Windows.Forms.Timer autoTrainingTimer = new();
     private readonly UpdateManager updateManager = new();
 
+    private readonly ParentControlServer? parentControlServer;
     private TrainingForm? trainingForm;
     private bool checkInProgress;
     private bool exitingForUpdate;
+    private volatile bool trainingActive;
 
     public TrayApplicationContext(bool startTrainingOnLaunch)
     {
         AppPaths.EnsureRuntimeDirectories();
+        uiDispatcher.CreateControl();
+        _ = uiDispatcher.Handle;
+        parentControlServer = StartParentControlServer();
 
         notifyIcon = new NotifyIcon
         {
@@ -58,6 +66,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         var menu = new ContextMenuStrip();
         menu.Items.Add("学習を開始", null, (_, _) => StartTraining());
+        if (parentControlServer is not null)
+        {
+            menu.Items.Add("保護者画面を開く", null, (_, _) => OpenParentControlPage());
+            menu.Items.Add("保護者画面URLをコピー", null, (_, _) => CopyParentControlUrl());
+        }
+
         menu.Items.Add("更新を確認", null, async (_, _) => await CheckForUpdatesAsync(showNoUpdate: true).ConfigureAwait(true));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("終了", null, (_, _) => ExitTray());
@@ -68,14 +82,134 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         if (trainingForm is { IsDisposed: false })
         {
+            trainingActive = true;
             trainingForm.WindowState = FormWindowState.Maximized;
             trainingForm.Activate();
             return;
         }
 
         trainingForm = new TrainingForm();
-        trainingForm.FormClosed += (_, _) => trainingForm = null;
+        trainingActive = true;
+        trainingForm.FormClosed += (_, _) =>
+        {
+            trainingActive = false;
+            trainingForm = null;
+        };
         trainingForm.Show();
+    }
+
+    private void ReturnToComputer()
+    {
+        if (trainingForm is { IsDisposed: false } form)
+        {
+            form.ReturnToComputer();
+        }
+        else
+        {
+            trainingActive = false;
+        }
+    }
+
+    private ParentControlServer? StartParentControlServer()
+    {
+        try
+        {
+            var server = new ParentControlServer(
+                StartTrainingFromParentControl,
+                ReturnToComputerFromParentControl,
+                () => trainingActive,
+                ChangeParentPasswordFromParentControl);
+            server.Start();
+            UpdateLogger.Info($"Parent control server started: {string.Join(", ", server.NetworkUrls)}");
+            return server;
+        }
+        catch (Exception ex)
+        {
+            UpdateLogger.Error("Parent control server could not start", ex);
+            return null;
+        }
+    }
+
+    private void StartTrainingFromParentControl()
+    {
+        trainingActive = true;
+        InvokeOnUiThread(StartTraining);
+    }
+
+    private void ReturnToComputerFromParentControl()
+    {
+        trainingActive = false;
+        InvokeOnUiThread(ReturnToComputer);
+    }
+
+    private PasswordChangeResult ChangeParentPasswordFromParentControl(string? currentPassword, string? newPassword)
+    {
+        var result = ParentSettings.ChangeParentPassword(currentPassword, newPassword);
+        if (result.Success)
+        {
+            var savedPassword = ParentSettings.GetParentPassword();
+            InvokeOnUiThread(() => trainingForm?.SetParentPassword(savedPassword));
+        }
+
+        return result;
+    }
+
+    private void InvokeOnUiThread(Action action)
+    {
+        if (uiDispatcher.IsDisposed)
+        {
+            return;
+        }
+
+        if (uiDispatcher.InvokeRequired)
+        {
+            uiDispatcher.BeginInvoke(action);
+        }
+        else
+        {
+            action();
+        }
+    }
+
+    private void OpenParentControlPage()
+    {
+        if (parentControlServer is null)
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = parentControlServer.PrimaryUrl,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            UpdateLogger.Error("Could not open parent control page", ex);
+            ShowBalloon("Kids Training", "保護者画面を開けませんでした。", ToolTipIcon.Warning);
+        }
+    }
+
+    private void CopyParentControlUrl()
+    {
+        if (parentControlServer is null)
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(parentControlServer.PrimaryUrl);
+            ShowBalloon("Kids Training", $"保護者画面URLをコピーしました: {parentControlServer.PrimaryUrl}");
+        }
+        catch (Exception ex)
+        {
+            UpdateLogger.Error("Could not copy parent control URL", ex);
+            ShowBalloon("Kids Training", "保護者画面URLをコピーできませんでした。", ToolTipIcon.Warning);
+        }
     }
 
     private async Task CheckForUpdatesAsync(bool showNoUpdate)
@@ -133,8 +267,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
         startupTimer.Stop();
         updateTimer.Stop();
         autoTrainingTimer.Stop();
+        parentControlServer?.Dispose();
         notifyIcon.Visible = false;
         notifyIcon.Dispose();
+        uiDispatcher.Dispose();
 
         if (exitingForUpdate)
         {

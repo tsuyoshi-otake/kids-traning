@@ -8,13 +8,15 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.4.2"
+$version = "1.4.3"
 
 $programSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
 $updateSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\UpdateManager.cs")
 $runtimeSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\RuntimeHtmlPreparer.cs")
 $trainingSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrainingForm.cs")
+$parentSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\ParentControlServer.cs")
+$parentSettingsSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\ParentSettings.cs")
 
 if ($programSource -notmatch "TrayApplicationContext" -or $programSource -notmatch "--training" -or $programSource -notmatch "--auto-training" -or $programSource -notmatch "--apply-update") {
     throw "Program entry point must support tray, training, and update-runner modes"
@@ -36,6 +38,18 @@ if ($updateStartedBlock -match "ShowBalloon") {
 if ($updateSource -notmatch "releases/latest" -or $updateSource -notmatch "KidsTraining.msi" -or $updateSource -notmatch "UpdateRunner") {
     throw "Update manager must check GitHub Releases and launch a copied update runner"
 }
+if ($traySource -notmatch "ParentControlServer" -or $traySource -notmatch "保護者画面URLをコピー" -or $traySource -notmatch "StartTrainingFromParentControl" -or $traySource -notmatch "ReturnToComputerFromParentControl") {
+    throw "Tray application context must expose parent remote controls"
+}
+if ($parentSource -notmatch "TcpListener" -or $parentSource -notmatch "IPAddress.Any" -or $parentSource -notmatch "DefaultPort = 44567" -or $parentSource -notmatch "IsAllowedRemoteAddress" -or $parentSource -notmatch "Kids Training 保護者画面" -or $parentSource -notmatch "/api/start" -or $parentSource -notmatch "/api/return" -or $parentSource -notmatch "/api/password" -or $parentSource -notmatch "パスワードを変更") {
+    throw "Parent control server must listen on LAN and expose start/return/password controls"
+}
+if ($parentSettingsSource -notmatch "parentPassword" -or $parentSettingsSource -notmatch "ChangeParentPassword" -or $parentSettingsSource -notmatch "NormalizePassword" -or $parentSettingsSource -notmatch "File.Move\(tempPath, AppPaths.ParentSettingsPath, overwrite: true\)") {
+    throw "Parent settings must persist a configurable 4-digit parent password"
+}
+if ($programSource -notmatch "ParentControlServer.BuildParentPage" -or $programSource -notmatch "192.168.1.10" -or $programSource -notmatch "8.8.8.8" -or $programSource -notmatch "ParentSettings.NormalizePassword") {
+    throw "Smoke test must validate parent control page, password validation, and LAN address filtering"
+}
 if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "moji:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "effectiveGrade\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics" -or $runtimeSource -notmatch "profileGrade:this\.gradeLabel") {
     throw "Runtime HTML patch must start beginners at level 1 and stage topic difficulty"
 }
@@ -56,6 +70,12 @@ if ($runtimeSource -match "avatarReady" -or $runtimeSource -match "avatarParts" 
 }
 if ($trainingSource -notmatch "beginnerMastery" -or $trainingSource -notmatch "kt_settings_v1" -or $trainingSource -notmatch "hasMeaningfulProgress" -or $trainingSource -notmatch "pass: 8" -or $trainingSource -notmatch "moji" -or $trainingSource -notmatch "xp") {
     throw "Training storage bootstrap must migrate only unstarted profiles to beginner defaults"
+}
+if ($runtimeSource -notmatch "parentPin\(\)" -or $runtimeSource -notmatch "kt_parent_pin_v1" -or $runtimeSource -notmatch "const ok=np===this.parentPin\(\)") {
+    throw "Runtime HTML patch must use the configurable parent password for emergency unlock"
+}
+if ($trainingSource -notmatch "ReturnToComputer\(\)" -or $trainingSource -notmatch "ExitAfterUnlock" -or $trainingSource -notmatch "SetParentPassword" -or $trainingSource -notmatch "kt_parent_pin_v1") {
+    throw "Training form must allow parent control to return to the PC screen and sync parent password changes"
 }
 if ($trainingSource -match "defaultAvatar" -or $trainingSource -match "avatarReady") {
     throw "Training storage bootstrap must not add avatar state"

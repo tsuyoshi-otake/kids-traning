@@ -19,6 +19,9 @@ internal static class AppPaths
     public static string UpdateLogPath =>
         Path.Combine(UpdatesFolder, "updater.log");
 
+    public static string ParentSettingsPath =>
+        Path.Combine(LocalAppDataRoot, "parent-settings.json");
+
     public static string HtmlPath =>
         Path.Combine(AppContext.BaseDirectory, "assets", "kids-training.html");
 

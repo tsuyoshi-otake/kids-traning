@@ -52,6 +52,23 @@ internal sealed class TrainingForm : Form
         EnforceLock();
     }
 
+    public void ReturnToComputer()
+    {
+        ExitAfterUnlock();
+    }
+
+    public void SetParentPassword(string password)
+    {
+        if (webView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        var encodedPassword = System.Text.Json.JsonSerializer.Serialize(password);
+        _ = webView.CoreWebView2.ExecuteScriptAsync(
+            $"try {{ localStorage.setItem('kt_parent_pin_v1', {encodedPassword}); }} catch {{ }}");
+    }
+
     private async Task InitializeWebViewAsync()
     {
         if (webViewInitialized)
@@ -193,12 +210,15 @@ internal sealed class TrainingForm : Form
     private static string BuildProfileStorageScript()
     {
         var profileName = System.Text.Json.JsonSerializer.Serialize(RuntimeHtmlPreparer.PrimaryProfileName);
+        var parentPassword = System.Text.Json.JsonSerializer.Serialize(ParentSettings.GetParentPassword());
         return
             """
         (() => {
           const key = 'kt_profiles_v1';
           const settingsKey = 'kt_settings_v1';
+          const parentPinKey = 'kt_parent_pin_v1';
           const profileName = __PROFILE_NAME__;
+          const parentPassword = __PARENT_PASSWORD__;
           const masteryKeys = ['add', 'sub', 'mul', 'clock', 'kokugo', 'hissan', 'moji'];
           const beginnerMastery = { add: .05, sub: .05, mul: .05, clock: .05, kokugo: .05, hissan: .05, moji: .05 };
           const beginnerSettings = {
@@ -252,6 +272,7 @@ internal sealed class TrainingForm : Form
           };
 
           try {
+            localStorage.setItem(parentPinKey, parentPassword);
             const raw = localStorage.getItem(key);
             const parsed = raw ? JSON.parse(raw) : null;
             const source = Array.isArray(parsed) && parsed.length ? parsed[0] : parsed;
@@ -262,12 +283,15 @@ internal sealed class TrainingForm : Form
             }
           } catch {
             try {
+              localStorage.setItem(parentPinKey, parentPassword);
               localStorage.setItem(key, JSON.stringify([defaultProfile]));
               localStorage.setItem(settingsKey, JSON.stringify(beginnerSettings));
             } catch {}
           }
         })();
-        """.Replace("__PROFILE_NAME__", profileName, StringComparison.Ordinal);
+        """
+            .Replace("__PROFILE_NAME__", profileName, StringComparison.Ordinal)
+            .Replace("__PARENT_PASSWORD__", parentPassword, StringComparison.Ordinal);
     }
 
     private const string CompletionBridgeScript =

@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Web.WebView2.Core;
 
 namespace KidsTraining.App;
@@ -116,6 +117,32 @@ internal static class Program
                 !UpdateManager.TryGetReleaseVersion("1.1.0", out _))
             {
                 return 16;
+            }
+
+            var parentPage = ParentControlServer.BuildParentPage(["http://127.0.0.1:44567/"], trainingActive: false);
+            if (!parentPage.Contains("Kids Training 保護者画面", StringComparison.Ordinal) ||
+                !parentPage.Contains("/api/start", StringComparison.Ordinal) ||
+                !parentPage.Contains("/api/return", StringComparison.Ordinal) ||
+                !parentPage.Contains("/api/password", StringComparison.Ordinal) ||
+                !parentPage.Contains("勉強を開始", StringComparison.Ordinal) ||
+                !parentPage.Contains("パソコンの画面に戻す", StringComparison.Ordinal) ||
+                !parentPage.Contains("パスワードを変更", StringComparison.Ordinal))
+            {
+                return 17;
+            }
+
+            if (!ParentControlServer.IsAllowedRemoteAddress(IPAddress.Parse("192.168.1.10")) ||
+                !ParentControlServer.IsAllowedRemoteAddress(IPAddress.Parse("10.0.0.2")) ||
+                ParentControlServer.IsAllowedRemoteAddress(IPAddress.Parse("8.8.8.8")))
+            {
+                return 18;
+            }
+
+            if (ParentSettings.NormalizePassword("4456") != "4456" ||
+                ParentSettings.NormalizePassword("abcd") is not null ||
+                ParentSettings.NormalizePassword("12345") is not null)
+            {
+                return 19;
             }
 
             _ = CoreWebView2Environment.GetAvailableBrowserVersionString();
