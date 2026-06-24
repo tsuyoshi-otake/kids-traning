@@ -8,11 +8,13 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.1.2"
+$version = "1.1.3"
 
 $programSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
 $updateSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\UpdateManager.cs")
+$runtimeSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\RuntimeHtmlPreparer.cs")
+$trainingSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrainingForm.cs")
 
 if ($programSource -notmatch "TrayApplicationContext" -or $programSource -notmatch "--training" -or $programSource -notmatch "--auto-training" -or $programSource -notmatch "--apply-update") {
     throw "Program entry point must support tray, training, and update-runner modes"
@@ -33,6 +35,15 @@ if ($updateStartedBlock -match "ShowBalloon") {
 
 if ($updateSource -notmatch "releases/latest" -or $updateSource -notmatch "KidsTraining.msi" -or $updateSource -notmatch "UpdateRunner") {
     throw "Update manager must check GitHub Releases and launch a copied update runner"
+}
+if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics") {
+    throw "Runtime HTML patch must start beginners at level 1 and stage topic difficulty"
+}
+if ($runtimeSource -notmatch "PatchArithmeticVisuals" -or $runtimeSource -notmatch "linear-gradient\(135deg,#ffdad4" -or $runtimeSource -notmatch "isMulViz" -or $runtimeSource -notmatch "pickMul\(\)") {
+    throw "Runtime HTML patch must render visual aids for non-hissan arithmetic"
+}
+if ($trainingSource -notmatch "beginnerMastery" -or $trainingSource -notmatch "kt_settings_v1" -or $trainingSource -notmatch "hasMeaningfulProgress" -or $trainingSource -notmatch "pass: 8") {
+    throw "Training storage bootstrap must migrate only unstarted profiles to beginner defaults"
 }
 
 & dotnet publish $project -c Release -r win-x64 --self-contained true /p:Version=$version

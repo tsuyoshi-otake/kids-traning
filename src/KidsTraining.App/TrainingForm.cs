@@ -197,14 +197,22 @@ internal sealed class TrainingForm : Form
             """
         (() => {
           const key = 'kt_profiles_v1';
+          const settingsKey = 'kt_settings_v1';
           const profileName = __PROFILE_NAME__;
+          const masteryKeys = ['add', 'sub', 'mul', 'clock', 'kokugo', 'hissan'];
+          const beginnerMastery = { add: .05, sub: .05, mul: .05, clock: .05, kokugo: .05, hissan: .05 };
+          const beginnerSettings = {
+            count: 10,
+            pass: 8,
+            topics: { add: true, sub: true, mul: true, clock: true, kokugo: true, hissan: true }
+          };
           const defaultProfile = {
             name: profileName,
             grade: 1,
             color: '#4ad991',
             streak: 0,
             stars: 0,
-            mastery: { add: .5, sub: .5, mul: .5, clock: .5, kokugo: .5, hissan: .5 }
+            mastery: { ...beginnerMastery }
           };
 
           const numberOrDefault = (value, fallback) => {
@@ -212,18 +220,31 @@ internal sealed class TrainingForm : Form
             return Number.isFinite(number) ? number : fallback;
           };
 
+          const isDefaultishMastery = mastery => masteryKeys.every(key => {
+            const value = Number(mastery && mastery[key]);
+            return !Number.isFinite(value) ||
+              Math.abs(value - .5) < .001 ||
+              Math.abs(value - beginnerMastery[key]) < .001;
+          });
+
+          const hasMeaningfulProgress = profile =>
+            numberOrDefault(profile.stars, 0) > 0 ||
+            numberOrDefault(profile.streak, 0) > 0 ||
+            !isDefaultishMastery(profile.mastery);
+
           const normalizeProfile = source => {
             const profile = source && typeof source === 'object' ? source : {};
             const mastery = profile.mastery && typeof profile.mastery === 'object' ? profile.mastery : {};
+            const resetToBeginner = !hasMeaningfulProgress(profile);
             return {
               ...defaultProfile,
               ...profile,
               name: profileName,
-              grade: numberOrDefault(profile.grade, defaultProfile.grade),
+              grade: resetToBeginner ? 1 : numberOrDefault(profile.grade, defaultProfile.grade),
               streak: numberOrDefault(profile.streak, defaultProfile.streak),
               stars: numberOrDefault(profile.stars, defaultProfile.stars),
               color: profile.color || defaultProfile.color,
-              mastery: { ...defaultProfile.mastery, ...mastery }
+              mastery: resetToBeginner ? { ...beginnerMastery } : { ...defaultProfile.mastery, ...mastery }
             };
           };
 
@@ -231,10 +252,15 @@ internal sealed class TrainingForm : Form
             const raw = localStorage.getItem(key);
             const parsed = raw ? JSON.parse(raw) : null;
             const source = Array.isArray(parsed) && parsed.length ? parsed[0] : parsed;
-            localStorage.setItem(key, JSON.stringify([normalizeProfile(source)]));
+            const normalized = normalizeProfile(source);
+            localStorage.setItem(key, JSON.stringify([normalized]));
+            if (!localStorage.getItem(settingsKey) || !hasMeaningfulProgress(normalized)) {
+              localStorage.setItem(settingsKey, JSON.stringify(beginnerSettings));
+            }
           } catch {
             try {
               localStorage.setItem(key, JSON.stringify([defaultProfile]));
+              localStorage.setItem(settingsKey, JSON.stringify(beginnerSettings));
             } catch {}
           }
         })();

@@ -62,7 +62,15 @@ internal static class Program
                 !template.Contains("screen:'start', profileIdx:0,", StringComparison.Ordinal) ||
                 template.Contains("screen:'profile', profileIdx:0,", StringComparison.Ordinal) ||
                 !template.Contains("profiles:[\n", StringComparison.Ordinal) ||
-                !template.Contains($"name:{System.Text.Json.JsonSerializer.Serialize(RuntimeHtmlPreparer.PrimaryProfileName)}", StringComparison.Ordinal))
+                !template.Contains($"name:{System.Text.Json.JsonSerializer.Serialize(RuntimeHtmlPreparer.PrimaryProfileName)}", StringComparison.Ordinal) ||
+                !template.Contains("mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05}", StringComparison.Ordinal) ||
+                !template.Contains("genAdd(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickMul(){", StringComparison.Ordinal) ||
+                !template.Contains("learningStage(p)", StringComparison.Ordinal) ||
+                !template.Contains("const weakKeys=this.allowedTopics(p).filter", StringComparison.Ordinal) ||
+                !template.Contains("linear-gradient(135deg,#ffdad4", StringComparison.Ordinal) ||
+                !template.Contains("isMulViz", StringComparison.Ordinal) ||
+                !template.Contains("qs.push(this.genFor(this.weightedPick(p),p))", StringComparison.Ordinal))
             {
                 return 14;
             }
@@ -81,7 +89,7 @@ internal static class Program
                 return 15;
             }
 
-            if (!UpdateManager.TryGetReleaseVersion("v1.1.2", out var parsedVersion) ||
+            if (!UpdateManager.TryGetReleaseVersion("v1.1.3", out var parsedVersion) ||
                 !UpdateManager.IsNewerVersion(parsedVersion, new Version(1, 1, 1, 0)) ||
                 !UpdateManager.TryGetReleaseVersion("1.1.0", out _))
             {
