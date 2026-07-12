@@ -95,6 +95,11 @@ internal static class Program
                 !template.Contains("topicComplete(p,k)", StringComparison.Ordinal) ||
                 !template.Contains("isShapeViz", StringComparison.Ordinal) ||
                 !template.Contains("promptStyle", StringComparison.Ordinal) ||
+                !template.Contains("markCleared", StringComparison.Ordinal) ||
+                !template.Contains("クリア！", StringComparison.Ordinal) ||
+                !template.Contains("なんばんめ", StringComparison.Ordinal) ||
+                !template.Contains("subtype:'kotoba'", StringComparison.Ordinal) ||
+                !template.Contains("isOrder", StringComparison.Ordinal) ||
                 !template.Contains("gainXp", StringComparison.Ordinal) ||
                 !template.Contains("xpLevel", StringComparison.Ordinal) ||
                 !template.Contains("fbXp", StringComparison.Ordinal) ||

@@ -8,7 +8,7 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.5.0"
+$version = "1.5.1"
 
 $programSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
@@ -79,6 +79,9 @@ if ($runtimeSource -notmatch "10のまとまりで かんがえる" -or $runtime
 }
 if ($runtimeSource -notmatch "pickKazu\(p\)" -or $runtimeSource -notmatch "pickShape\(p\)" -or $runtimeSource -notmatch "pickDiv\(p\)" -or $runtimeSource -notmatch "pickFrac\(p\)" -or $runtimeSource -notmatch "pickChart\(p\)" -or $runtimeSource -notmatch "pickStory\(p\)" -or $runtimeSource -notmatch "あまり" -or $runtimeSource -notmatch "正三角形" -or $runtimeSource -notmatch "subtype:'romaji'" -or $runtimeSource -notmatch "isShapeViz" -or $runtimeSource -notmatch "isFracViz" -or $runtimeSource -notmatch "isChart" -or $runtimeSource -notmatch "promptStyle") {
     throw "Runtime HTML patch must cover large numbers, shapes, division with remainders, fractions/decimals, charts, word problems, and romaji"
+}
+if ($runtimeSource -notmatch "なんばんめ" -or $runtimeSource -notmatch "subtype:'kotoba'" -or $runtimeSource -notmatch "markCleared" -or $runtimeSource -notmatch "クリア！" -or $runtimeSource -notmatch "isOrder" -or $runtimeSource -notmatch [regex]::Escape("prompt:x+' + '+y+' + '+z")) {
+    throw "Runtime HTML patch must include ordinal positions, spelling words, three-number calculations, and sticky visible clears"
 }
 if ($trainingSource -notmatch "'kazu'" -or $trainingSource -notmatch "'story'" -or $trainingSource -notmatch "chart: true") {
     throw "Training storage bootstrap must include the full curriculum topic set"
