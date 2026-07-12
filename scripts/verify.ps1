@@ -53,8 +53,8 @@ if ($programSource -notmatch "ParentControlServer.BuildParentPage" -or $programS
 if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "moji:\.05" -or $runtimeSource -notmatch "measure:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "effectiveGrade\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics" -or $runtimeSource -notmatch "profileGrade:this\.gradeLabel") {
     throw "Runtime HTML patch must start beginners at level 1 and stage topic difficulty"
 }
-if ($runtimeSource -notmatch "topicStage\(p,k\)" -or $runtimeSource -notmatch "hissanComplete\(p\)" -or $runtimeSource -notmatch "genHissan\(p\)" -or $runtimeSource -notmatch "!hissanDone\)staged=\['add','sub','clock','kokugo','moji','measure','hissan'\]" -or $runtimeSource -notmatch "else staged=\['add','sub','clock','kokugo','moji','measure','hissan','mul'\]" -or $runtimeSource -notmatch "pairs=\[\[1,2\],\[2,1\],\[2,2\]" -or $runtimeSource -notmatch "stage<=1\?\['hiragana'\]") {
-    throw "Runtime HTML patch must gate multiplication behind hissan completion and stage each topic from easy prompts"
+if ($runtimeSource -notmatch "topicStage\(p,k\)" -or $runtimeSource -notmatch "topicComplete\(p,k\)" -or $runtimeSource -notmatch "hissanComplete\(p\)" -or $runtimeSource -notmatch "genHissan\(p\)" -or $runtimeSource -notmatch [regex]::Escape("if(done('add'))staged.push('sub','moji')") -or $runtimeSource -notmatch [regex]::Escape("if(grade>=2&&done('hissan'))staged.push('mul')") -or $runtimeSource -notmatch [regex]::Escape("if(grade>=3&&done('mul'))staged.push('div')") -or $runtimeSource -notmatch "pairs=\[\[1,2\],\[2,1\],\[2,2\]" -or $runtimeSource -notmatch "stage<=1\?\['hiragana'\]") {
+    throw "Runtime HTML patch must chain topic unlocks behind clearing the prerequisite category"
 }
 if ($runtimeSource -notmatch "questionCount\?\?20" -or $runtimeSource -notmatch "passLine\?\?15") {
     throw "Runtime HTML patch must default to 20 questions and 15 correct answers"
@@ -76,6 +76,12 @@ if ($runtimeSource -notmatch "pickMeasure\(p\)" -or $runtimeSource -notmatch "me
 }
 if ($runtimeSource -notmatch "10のまとまりで かんがえる" -or $runtimeSource -notmatch "tensReady") {
     throw "Runtime HTML patch must generate counting-in-tens addition and subtraction (20+30, 50-20)"
+}
+if ($runtimeSource -notmatch "pickKazu\(p\)" -or $runtimeSource -notmatch "pickShape\(p\)" -or $runtimeSource -notmatch "pickDiv\(p\)" -or $runtimeSource -notmatch "pickFrac\(p\)" -or $runtimeSource -notmatch "pickChart\(p\)" -or $runtimeSource -notmatch "pickStory\(p\)" -or $runtimeSource -notmatch "あまり" -or $runtimeSource -notmatch "正三角形" -or $runtimeSource -notmatch "subtype:'romaji'" -or $runtimeSource -notmatch "isShapeViz" -or $runtimeSource -notmatch "isFracViz" -or $runtimeSource -notmatch "isChart" -or $runtimeSource -notmatch "promptStyle") {
+    throw "Runtime HTML patch must cover large numbers, shapes, division with remainders, fractions/decimals, charts, word problems, and romaji"
+}
+if ($trainingSource -notmatch "'kazu'" -or $trainingSource -notmatch "'story'" -or $trainingSource -notmatch "chart: true") {
+    throw "Training storage bootstrap must include the full curriculum topic set"
 }
 if ($runtimeSource -notmatch "PatchRewardSystem" -or $runtimeSource -notmatch "gainXp" -or $runtimeSource -notmatch "xpLevel" -or $runtimeSource -notmatch "fbXp" -or $runtimeSource -notmatch "earnedXp" -or $runtimeSource -notmatch "べんきょうを つづける") {
     throw "Runtime HTML patch must include XP rewards without avatar customization"

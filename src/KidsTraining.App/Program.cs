@@ -65,7 +65,7 @@ internal static class Program
                 !template.Contains("profiles:[\n", StringComparison.Ordinal) ||
                 !template.Contains($"name:{System.Text.Json.JsonSerializer.Serialize(RuntimeHtmlPreparer.PrimaryProfileName)}", StringComparison.Ordinal) ||
                 !template.Contains("xp:0", StringComparison.Ordinal) ||
-                !template.Contains("mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05,measure:.05}", StringComparison.Ordinal) ||
+                !template.Contains("mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05,measure:.05,kazu:.05,shape:.05,div:.05,frac:.05,chart:.05,story:.05}", StringComparison.Ordinal) ||
                 !template.Contains("count:this.props.questionCount??20", StringComparison.Ordinal) ||
                 !template.Contains("pass:this.props.passLine??15", StringComparison.Ordinal) ||
                 !template.Contains("genAdd(p)", StringComparison.Ordinal) ||
@@ -83,6 +83,18 @@ internal static class Program
                 !template.Contains("pickTimeUnits", StringComparison.Ordinal) ||
                 !template.Contains("measure:{label:'たんい'", StringComparison.Ordinal) ||
                 !template.Contains("isMeasureViz", StringComparison.Ordinal) ||
+                !template.Contains("pickKazu(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickShape(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickDiv(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickFrac(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickChart(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickStory(p)", StringComparison.Ordinal) ||
+                !template.Contains("あまり", StringComparison.Ordinal) ||
+                !template.Contains("正三角形", StringComparison.Ordinal) ||
+                !template.Contains("subtype:'romaji'", StringComparison.Ordinal) ||
+                !template.Contains("topicComplete(p,k)", StringComparison.Ordinal) ||
+                !template.Contains("isShapeViz", StringComparison.Ordinal) ||
+                !template.Contains("promptStyle", StringComparison.Ordinal) ||
                 !template.Contains("gainXp", StringComparison.Ordinal) ||
                 !template.Contains("xpLevel", StringComparison.Ordinal) ||
                 !template.Contains("fbXp", StringComparison.Ordinal) ||
@@ -98,8 +110,9 @@ internal static class Program
                 !template.Contains("learningStage(p)", StringComparison.Ordinal) ||
                 !template.Contains("topicStage(p,k)", StringComparison.Ordinal) ||
                 !template.Contains("hissanComplete(p)", StringComparison.Ordinal) ||
-                !template.Contains("!hissanDone)staged=['add','sub','clock','kokugo','moji','measure','hissan']", StringComparison.Ordinal) ||
-                !template.Contains("else staged=['add','sub','clock','kokugo','moji','measure','hissan','mul']", StringComparison.Ordinal) ||
+                !template.Contains("if(done('add'))staged.push('sub','moji')", StringComparison.Ordinal) ||
+                !template.Contains("if(grade>=2&&done('hissan'))staged.push('mul')", StringComparison.Ordinal) ||
+                !template.Contains("if(grade>=3&&done('mul'))staged.push('div')", StringComparison.Ordinal) ||
                 !template.Contains("mentalAddendMax=9", StringComparison.Ordinal) ||
                 !template.Contains("mentalSubtrahendMax=9", StringComparison.Ordinal) ||
                 !template.Contains("pairs=[[1,2],[2,1],[2,2]", StringComparison.Ordinal) ||
