@@ -8,7 +8,7 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.7.0"
+$version = "1.8.0"
 
 $programSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
@@ -91,6 +91,9 @@ if ($runtimeSource -notmatch "topic:'dokkai'" -or $runtimeSource -notmatch "topi
 }
 if ($runtimeSource -notmatch "pickEigo\(p\)" -or $runtimeSource -notmatch "eigo:\.05" -or $runtimeSource -notmatch "topic:'eigo'" -or $runtimeSource -notmatch [regex]::Escape("if(grade>=3&&done('moji'))staged.push('eigo')")) {
     throw "Runtime HTML patch must include a grade 3+ English topic gated behind moji"
+}
+if ($runtimeSource -notmatch [regex]::Escape("&&this.topicStage(p,q.topic)<=2") -or $runtimeSource -notmatch [regex]::Escape("q.topic==='mul'&&this.topicStage(p,'mul')<=2") -or $runtimeSource -notmatch [regex]::Escape("kokuShowMean=this.topicStage(p,'kokugo')<=2") -or $runtimeSource -notmatch "kokuShowMean:kokuShowMean") {
+    throw "Runtime HTML patch must gate visual hints (add/sub dots, mul groups, kokugo meaning) behind low topic mastery"
 }
 if ($trainingSource -notmatch "'kazu'" -or $trainingSource -notmatch "'story'" -or $trainingSource -notmatch "chart: true" -or $trainingSource -notmatch "'bun'" -or $trainingSource -notmatch "'goi'" -or $trainingSource -notmatch "'dokkai'" -or $trainingSource -notmatch "dokkai: true" -or $trainingSource -notmatch "'eigo'" -or $trainingSource -notmatch "eigo: true") {
     throw "Training storage bootstrap must include the full curriculum topic set"

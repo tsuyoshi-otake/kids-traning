@@ -148,6 +148,11 @@ internal static class Program
                 !template.Contains("const weakKeys=this.allowedTopics(p).filter", StringComparison.Ordinal) ||
                 !template.Contains("linear-gradient(135deg,#ffdad4", StringComparison.Ordinal) ||
                 !template.Contains("isMulViz", StringComparison.Ordinal) ||
+                !template.Contains("&&this.topicStage(p,q.topic)<=2", StringComparison.Ordinal) ||
+                !template.Contains("q.topic==='mul'&&this.topicStage(p,'mul')<=2", StringComparison.Ordinal) ||
+                !template.Contains("kokuShowMean=this.topicStage(p,'kokugo')<=2", StringComparison.Ordinal) ||
+                !template.Contains("<sc-if value=\"{{ kokuShowMean }}\"", StringComparison.Ordinal) ||
+                !template.Contains("kokuShowMean:kokuShowMean", StringComparison.Ordinal) ||
                 !template.Contains("qs.push(this.genFor(this.weightedPick(p),p))", StringComparison.Ordinal) ||
                 template.Contains("b=this.rand(11,a-1)", StringComparison.Ordinal) ||
                 template.Contains("b=this.rand(1,40)", StringComparison.Ordinal) ||
