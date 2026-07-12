@@ -8,7 +8,7 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.6.0"
+$version = "1.7.0"
 
 $programSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
@@ -89,7 +89,10 @@ if ($runtimeSource -notmatch "pickBun\(p\)" -or $runtimeSource -notmatch "pickGo
 if ($runtimeSource -notmatch "topic:'dokkai'" -or $runtimeSource -notmatch "topic:'goi'" -or $runtimeSource -notmatch "topic:'bun'") {
     throw "Runtime HTML patch must generate bun, goi, and dokkai questions"
 }
-if ($trainingSource -notmatch "'kazu'" -or $trainingSource -notmatch "'story'" -or $trainingSource -notmatch "chart: true" -or $trainingSource -notmatch "'bun'" -or $trainingSource -notmatch "'goi'" -or $trainingSource -notmatch "'dokkai'" -or $trainingSource -notmatch "dokkai: true") {
+if ($runtimeSource -notmatch "pickEigo\(p\)" -or $runtimeSource -notmatch "eigo:\.05" -or $runtimeSource -notmatch "topic:'eigo'" -or $runtimeSource -notmatch [regex]::Escape("if(grade>=3&&done('moji'))staged.push('eigo')")) {
+    throw "Runtime HTML patch must include a grade 3+ English topic gated behind moji"
+}
+if ($trainingSource -notmatch "'kazu'" -or $trainingSource -notmatch "'story'" -or $trainingSource -notmatch "chart: true" -or $trainingSource -notmatch "'bun'" -or $trainingSource -notmatch "'goi'" -or $trainingSource -notmatch "'dokkai'" -or $trainingSource -notmatch "dokkai: true" -or $trainingSource -notmatch "'eigo'" -or $trainingSource -notmatch "eigo: true") {
     throw "Training storage bootstrap must include the full curriculum topic set"
 }
 if ($runtimeSource -notmatch "PatchRewardSystem" -or $runtimeSource -notmatch "gainXp" -or $runtimeSource -notmatch "xpLevel" -or $runtimeSource -notmatch "fbXp" -or $runtimeSource -notmatch "earnedXp" -or $runtimeSource -notmatch "べんきょうを つづける") {

@@ -133,6 +133,11 @@ internal static class Program
                 !template.Contains("国語じてんの じゅんに", StringComparison.Ordinal) ||
                 !template.Contains("topic:'dokkai'", StringComparison.Ordinal) ||
                 !template.Contains("あつめた 数は？", StringComparison.Ordinal) ||
+                !template.Contains("pickEigo(p)", StringComparison.Ordinal) ||
+                !template.Contains("topic:'eigo'", StringComparison.Ordinal) ||
+                !template.Contains("if(grade>=3&&done('moji'))staged.push('eigo')", StringComparison.Ordinal) ||
+                !template.Contains("を 英語で いうと？", StringComparison.Ordinal) ||
+                !template.Contains("Good morning.", StringComparison.Ordinal) ||
                 !template.Contains("if(grade>=2&&done('hissan'))staged.push('mul')", StringComparison.Ordinal) ||
                 !template.Contains("if(grade>=3&&done('mul'))staged.push('div')", StringComparison.Ordinal) ||
                 !template.Contains("mentalAddendMax=9", StringComparison.Ordinal) ||

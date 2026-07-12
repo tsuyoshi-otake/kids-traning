@@ -219,12 +219,12 @@ internal sealed class TrainingForm : Form
           const parentPinKey = 'kt_parent_pin_v1';
           const profileName = __PROFILE_NAME__;
           const parentPassword = __PARENT_PASSWORD__;
-          const masteryKeys = ['add', 'sub', 'mul', 'clock', 'kokugo', 'hissan', 'moji', 'measure', 'kazu', 'shape', 'div', 'frac', 'chart', 'story', 'bun', 'goi', 'dokkai'];
-          const beginnerMastery = { add: .05, sub: .05, mul: .05, clock: .05, kokugo: .05, hissan: .05, moji: .05, measure: .05, kazu: .05, shape: .05, div: .05, frac: .05, chart: .05, story: .05, bun: .05, goi: .05, dokkai: .05 };
+          const masteryKeys = ['add', 'sub', 'mul', 'clock', 'kokugo', 'hissan', 'moji', 'measure', 'kazu', 'shape', 'div', 'frac', 'chart', 'story', 'bun', 'goi', 'dokkai', 'eigo'];
+          const beginnerMastery = { add: .05, sub: .05, mul: .05, clock: .05, kokugo: .05, hissan: .05, moji: .05, measure: .05, kazu: .05, shape: .05, div: .05, frac: .05, chart: .05, story: .05, bun: .05, goi: .05, dokkai: .05, eigo: .05 };
           const beginnerSettings = {
             count: 20,
             pass: 15,
-            topics: { add: true, sub: true, mul: true, clock: true, kokugo: true, hissan: true, moji: true, measure: true, kazu: true, shape: true, div: true, frac: true, chart: true, story: true, bun: true, goi: true, dokkai: true }
+            topics: { add: true, sub: true, mul: true, clock: true, kokugo: true, hissan: true, moji: true, measure: true, kazu: true, shape: true, div: true, frac: true, chart: true, story: true, bun: true, goi: true, dokkai: true, eigo: true }
           };
           const defaultProfile = {
             name: profileName,

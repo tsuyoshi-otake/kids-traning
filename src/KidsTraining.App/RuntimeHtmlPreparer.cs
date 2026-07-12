@@ -8,7 +8,7 @@ internal static class RuntimeHtmlPreparer
     public const string DefaultEmergencyPin = "1234";
     private const string TemplateOpenTag = "<script type=\"__bundler/template\">";
     private const string TemplateCloseTag = "</script>";
-    public const string BeginnerMasteryMarkup = "mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05,measure:.05,kazu:.05,shape:.05,div:.05,frac:.05,chart:.05,story:.05,bun:.05,goi:.05,dokkai:.05}";
+    public const string BeginnerMasteryMarkup = "mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05,measure:.05,kazu:.05,shape:.05,div:.05,frac:.05,chart:.05,story:.05,bun:.05,goi:.05,dokkai:.05,eigo:.05}";
 
     public static string PrimaryProfileName
     {
@@ -114,12 +114,12 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true},count:this.props.questionCount??10,pass:this.props.passLine??8};}",
-            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true},count:this.props.questionCount??20,pass:this.props.passLine??15};}",
+            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true,eigo:true},count:this.props.questionCount??20,pass:this.props.passLine??15};}",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
             "    kokugo:{label:'こくご',color:'#d2691e'},\n  };",
-            "    kokugo:{label:'こくご',color:'#d2691e'},\n    moji:{label:'もじ',color:'#4f7edb'},\n    measure:{label:'たんい',color:'#3aa655'},\n    kazu:{label:'かず',color:'#c2891f'},\n    shape:{label:'かたち',color:'#9a4fd6'},\n    div:{label:'わりざん',color:'#0f8fbf'},\n    frac:{label:'ぶんすう',color:'#d64f8e'},\n    chart:{label:'グラフ',color:'#5a8f29'},\n    story:{label:'ぶんしょうだい',color:'#8a6d3b'},\n    bun:{label:'ぶん',color:'#7a5cd6'},\n    goi:{label:'ことば',color:'#2f9e8f'},\n    dokkai:{label:'よみとり',color:'#c2503f'},\n  };",
+            "    kokugo:{label:'こくご',color:'#d2691e'},\n    moji:{label:'もじ',color:'#4f7edb'},\n    measure:{label:'たんい',color:'#3aa655'},\n    kazu:{label:'かず',color:'#c2891f'},\n    shape:{label:'かたち',color:'#9a4fd6'},\n    div:{label:'わりざん',color:'#0f8fbf'},\n    frac:{label:'ぶんすう',color:'#d64f8e'},\n    chart:{label:'グラフ',color:'#5a8f29'},\n    story:{label:'ぶんしょうだい',color:'#8a6d3b'},\n    bun:{label:'ぶん',color:'#7a5cd6'},\n    goi:{label:'ことば',color:'#2f9e8f'},\n    dokkai:{label:'よみとり',color:'#c2503f'},\n    eigo:{label:'えいご',color:'#2563eb'},\n  };",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
@@ -129,7 +129,7 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "['add','sub','hissan','mul','clock','kokugo'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});",
-            "['add','sub','hissan','mul','clock','kokugo','moji','measure','kazu','shape','div','frac','chart','story','bun','goi','dokkai'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});",
+            "['add','sub','hissan','mul','clock','kokugo','moji','measure','kazu','shape','div','frac','chart','story','bun','goi','dokkai','eigo'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});",
             StringComparison.Ordinal);
 
         // pick4 originally padded missing distractors with the answer plus invisible
@@ -180,7 +180,7 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "genFor(k){return k==='add'?this.genAdd():k==='sub'?this.genSub():k==='hissan'?this.genHissan():k==='mul'?this.pickMul():k==='clock'?this.pickClock():this.pickKokugo();}",
-            "genFor(k,p){return k==='add'?this.genAdd(p):k==='sub'?this.genSub(p):k==='hissan'?this.genHissan(p):k==='mul'?this.pickMul(p):k==='clock'?this.pickClock(p):k==='measure'?this.pickMeasure(p):k==='kazu'?this.pickKazu(p):k==='shape'?this.pickShape(p):k==='div'?this.pickDiv(p):k==='frac'?this.pickFrac(p):k==='chart'?this.pickChart(p):k==='story'?this.pickStory(p):k==='kokugo'?this.pickKokugo(p):k==='bun'?this.pickBun(p):k==='goi'?this.pickGoi(p):k==='dokkai'?this.pickDokkai(p):this.pickMoji(p);}",
+            "genFor(k,p){return k==='add'?this.genAdd(p):k==='sub'?this.genSub(p):k==='hissan'?this.genHissan(p):k==='mul'?this.pickMul(p):k==='clock'?this.pickClock(p):k==='measure'?this.pickMeasure(p):k==='kazu'?this.pickKazu(p):k==='shape'?this.pickShape(p):k==='div'?this.pickDiv(p):k==='frac'?this.pickFrac(p):k==='chart'?this.pickChart(p):k==='story'?this.pickStory(p):k==='kokugo'?this.pickKokugo(p):k==='bun'?this.pickBun(p):k==='goi'?this.pickGoi(p):k==='dokkai'?this.pickDokkai(p):k==='eigo'?this.pickEigo(p):this.pickMoji(p);}",
             StringComparison.Ordinal);
 
         markup = ReplaceBlock(
@@ -572,6 +572,28 @@ pickKokugo(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'kokugo');c
     {g:3,t:'あすかは 九時に ねて、六時に おきます。朝ごはんの 前に、なわとびを 五十回 とびます。',q:'あすかが 朝ごはんの 前に する ことは？',a:'なわとび',c:['さんぽ','べんきょう','そうじ'],e:'「朝ごはんの 前に、なわとびを」と あるよ。'},
     {g:3,t:'カブトムシは 夜に なると 木に あつまり、木の しるを なめます。昼の あいだは 土の 中で 休んで います。',q:'カブトムシが 昼に いる ばしょは？',a:'土の 中',c:['木の 上','空','水の 中'],e:'「昼の あいだは 土の 中で 休んで います」と あるよ。'}
   ];const pool=D.filter(x=>x.g<=g);const early=stage<=2?pool.filter(x=>x.g===1):pool;const use=early.length?early:pool;const it=use[this.rand(0,use.length-1)];return{topic:'dokkai',mode:'choices',prompt:it.t+'　◆　'+it.q,answer:it.a,choices:this.pick4(it.a,it.c),explanation:it.e};}
+  pickEigo(p){const stage=this.topicStage(p,'eigo');const mc=(pr,ans,pool,ex)=>({topic:'eigo',mode:'choices',prompt:pr,answer:ans,choices:this.pick4(ans,pool),explanation:ex});const Q=[];
+    const wq=L=>{const it=L[this.rand(0,L.length-1)],others=this.shuffle(L.filter(x=>x[0]!==it[0]));if(Math.random()<0.5)return mc('英語「'+it[0]+'」の いみは？',it[1],others.slice(0,3).map(x=>x[1]),'「'+it[0]+'」は 「'+it[1]+'」だよ。');return mc('「'+it[1]+'」を 英語で いうと？',it[0],others.slice(0,3).map(x=>x[0]),'「'+it[1]+'」は 英語で 「'+it[0]+'」。');};
+    const C=[['red','あか'],['blue','あお'],['yellow','きいろ'],['green','みどり'],['black','くろ'],['white','しろ'],['pink','ピンク'],['orange','オレンジいろ'],['purple','むらさき'],['brown','ちゃいろ']];
+    const NUM=[['one','1'],['two','2'],['three','3'],['four','4'],['five','5'],['six','6'],['seven','7'],['eight','8'],['nine','9'],['ten','10']];
+    Q.push(()=>wq(C));
+    Q.push(()=>wq(NUM));
+    if(stage>=2){
+    const W=[['dog','いぬ'],['cat','ねこ'],['bird','とり'],['fish','さかな'],['rabbit','うさぎ'],['monkey','さる'],['bear','くま'],['horse','うま'],['apple','りんご'],['banana','バナナ'],['milk','ぎゅうにゅう'],['egg','たまご'],['rice','ごはん'],['book','本'],['pen','ペン'],['bag','かばん'],['cap','ぼうし'],['ball','ボール'],['hand','て'],['eye','め']];
+    Q.push(()=>wq(W));
+    Q.push(()=>wq(W));
+    }
+    if(stage>=3){
+    const G=[['あさ 会ったときの あいさつは？','Good morning.',['Good night.','Thank you.','Goodbye.'],'あさの あいさつは Good morning. だよ。'],
+    ['ねる まえの あいさつは？','Good night.',['Good morning.','Hello.','Thank you.'],'ねる まえは Good night. だよ。'],
+    ['「ありがとう」を 英語で いうと？','Thank you.',['Sorry.','Hello.','Goodbye.'],'ありがとうは Thank you. だよ。'],
+    ['わかれる ときの あいさつは？','Goodbye.',['Hello.','Good morning.','Thank you.'],'わかれる ときは Goodbye. だよ。'],
+    ['「こんにちは」に あたる あいさつは？','Hello.',['Goodbye.','Good night.','Sorry.'],'こんにちはは Hello. だよ。'],
+    ['なまえを きく いいかたは？','What is your name?',['How are you?','How old are you?','What color do you like?'],'なまえを きくときは What is your name? だよ。'],
+    ['「げんきですか」と きく いいかたは？','How are you?',['What is your name?','Good night.','See you.'],'げんきかどうかは How are you? と きくよ。']];
+    Q.push(()=>{const it=G[this.rand(0,G.length-1)];return mc(it[0],it[1],it[2],it[3]);});
+    }
+    return Q[this.rand(0,Q.length-1)]();}
 """;
     }
 
@@ -586,7 +608,7 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
   topicComplete(p,k){if(p&&p.cleared&&p.cleared[k])return true;return this.topicStage(p,k)>=4;}
   markCleared(p,k){if(this.topicStage(p,k)>=4)(p.cleared=p.cleared||{})[k]=true;}
   hissanComplete(p){return this.topicComplete(p,'hissan');}
-  allowedTopics(p){const all=Object.keys(this.topics);const cfg=this.state.settings;const en=(cfg&&cfg.topics)?all.filter(k=>cfg.topics[k]):all;const enabled=en.length?en:all;const grade=this.effectiveGrade(p),done=k=>this.topicComplete(p,k);const staged=['add'];if(done('add'))staged.push('sub','moji');if(done('sub'))staged.push('kazu','clock','story');if(done('moji'))staged.push('kokugo','bun');if(done('bun'))staged.push('goi');if(done('kokugo'))staged.push('dokkai');if(done('kazu'))staged.push('measure','chart');if(done('measure'))staged.push('shape');if(grade>=2&&done('kazu'))staged.push('hissan');if(grade>=2&&done('hissan'))staged.push('mul');if(grade>=2&&done('mul'))staged.push('frac');if(grade>=3&&done('mul'))staged.push('div');const allowed=staged.filter(k=>enabled.includes(k));return allowed.length?allowed:staged;}
+  allowedTopics(p){const all=Object.keys(this.topics);const cfg=this.state.settings;const en=(cfg&&cfg.topics)?all.filter(k=>cfg.topics[k]):all;const enabled=en.length?en:all;const grade=this.effectiveGrade(p),done=k=>this.topicComplete(p,k);const staged=['add'];if(done('add'))staged.push('sub','moji');if(done('sub'))staged.push('kazu','clock','story');if(done('moji'))staged.push('kokugo','bun');if(done('bun'))staged.push('goi');if(done('kokugo'))staged.push('dokkai');if(grade>=3&&done('moji'))staged.push('eigo');if(done('kazu'))staged.push('measure','chart');if(done('measure'))staged.push('shape');if(grade>=2&&done('kazu'))staged.push('hissan');if(grade>=2&&done('hissan'))staged.push('mul');if(grade>=2&&done('mul'))staged.push('frac');if(grade>=3&&done('mul'))staged.push('div');const allowed=staged.filter(k=>enabled.includes(k));return allowed.length?allowed:staged;}
   weightedPick(p){const ks=this.allowedTopics(p);const w=ks.map(k=>{let base=0.25+(1-(Number(p.mastery[k])||0.05))*1.7;if(k==='hissan'&&!this.hissanComplete(p))base*=1.25;if(k==='mul'&&this.topicStage(p,'mul')<=1)base*=0.7;return base;});let s=w.reduce((a,b)=>a+b,0),r=Math.random()*s;for(let i=0;i<ks.length;i++){r-=w[i];if(r<=0)return ks[i];}return ks[0];}
 """;
     }
