@@ -180,7 +180,7 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "genFor(k){return k==='add'?this.genAdd():k==='sub'?this.genSub():k==='hissan'?this.genHissan():k==='mul'?this.pickMul():k==='clock'?this.pickClock():this.pickKokugo();}",
-            "genFor(k,p){return k==='add'?this.genAdd(p):k==='sub'?this.genSub(p):k==='hissan'?this.genHissan(p):k==='mul'?this.pickMul(p):k==='clock'?this.pickClock(p):k==='measure'?this.pickMeasure(p):k==='kazu'?this.pickKazu(p):k==='shape'?this.pickShape(p):k==='div'?this.pickDiv(p):k==='frac'?this.pickFrac(p):k==='chart'?this.pickChart(p):k==='story'?this.pickStory(p):k==='kokugo'?this.pickKokugo(p):k==='bun'?this.pickBun(p):k==='goi'?this.pickGoi(p):k==='dokkai'?this.pickDokkai(p):k==='eigo'?this.pickEigo(p):this.pickMoji(p);}",
+            "genFor(k,p){const stage=this.reviewStage(p,k),sp=this.profileAtStage(p,k,stage),q=k==='add'?this.genAdd(sp):k==='sub'?this.genSub(sp):k==='hissan'?this.genHissan(sp):k==='mul'?this.pickMul(sp):k==='clock'?this.pickClock(sp):k==='measure'?this.pickMeasure(sp):k==='kazu'?this.pickKazu(sp):k==='shape'?this.pickShape(sp):k==='div'?this.pickDiv(sp):k==='frac'?this.pickFrac(sp):k==='chart'?this.pickChart(sp):k==='story'?this.pickStory(sp):k==='kokugo'?this.pickKokugo(sp):k==='bun'?this.pickBun(sp):k==='goi'?this.pickGoi(sp):k==='dokkai'?this.pickDokkai(sp):k==='eigo'?this.pickEigo(sp):this.pickMoji(sp);q.difficulty=stage;return q;}",
             StringComparison.Ordinal);
 
         markup = ReplaceBlock(
@@ -241,6 +241,7 @@ internal static class RuntimeHtmlPreparer
             StringComparison.Ordinal);
 
         markup = PatchArithmeticVisuals(markup);
+        markup = PatchEnglishSpeech(markup);
 
         return markup;
     }
@@ -335,28 +336,43 @@ const sess=S.session||{};
     private static string BuildGenAddScript()
     {
         return """
-genAdd(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'add'),m=p&&p.mastery?Number(p.mastery.add):0.05,mentalAddendMax=9;if(stage>=2&&Math.random()<0.18){const x=this.rand(1,9),y=Math.random()<0.5?10-x:this.rand(1,Math.min(9,15-x)),z=this.rand(1,Math.min(9,19-x-y)),s=x+y+z;return{topic:'add',mode:'num',n1:x+y,n2:z,prompt:x+' + '+y+' + '+z,answer:''+s,explanation:'まえから じゅんに。'+x+'+'+y+'='+(x+y)+'、'+(x+y)+'+'+z+'='+s+'。'};}const tensReady=g>=2||(stage>=3&&m>=0.65);if(tensReady&&Math.random()<0.35){const ta=this.rand(1,8),tb=this.rand(1,Math.min(9,10-ta)),ax=ta*10,bx=tb*10,tans=ax+bx;return{topic:'add',mode:'num',n1:ax,n2:bx,prompt:ax+' + '+bx,answer:''+tans,explanation:'10のまとまりで かんがえる。'+ta+' + '+tb+' = '+(ta+tb)+' だから '+ax+' + '+bx+' = '+tans+'。'};}let a,b;if(g<=1){if(stage<=1||m<0.30){a=this.rand(1,5);b=this.rand(1,5);if(a+b>10)b=Math.max(1,10-a);}else if(stage<=2||m<0.65){a=this.rand(2,9);b=this.rand(1,9);if(a+b>18)b=Math.max(1,18-a);}else{a=this.rand(10,29);b=this.rand(1,mentalAddendMax);}}else if(g===2){if(stage<=2||m<0.45){a=this.rand(10,88);if(a%10===9)a--;b=this.rand(1,Math.min(mentalAddendMax,9-(a%10)));}else{a=this.rand(18,89);b=this.rand(1,mentalAddendMax);}}else{if(stage<=3||m<0.55){a=this.rand(25,89);b=this.rand(1,mentalAddendMax);}else{a=this.rand(35,89);b=this.rand(1,mentalAddendMax);}}const ans=a+b;return{topic:'add',mode:'num',n1:a,n2:b,prompt:a+' + '+b,answer:''+ans,explanation:a+' + '+b+' = '+ans};}
+genAdd(p){const stage=this.topicStage(p,'add'),make=(a,b,extra)=>{const ans=a+b;return{topic:'add',mode:'num',n1:a,n2:b,prompt:extra?extra.prompt:a+' + '+b,answer:''+(extra?extra.answer:ans),explanation:extra?extra.explanation:a+' + '+b+' = '+ans};};const buckets=[
+    [()=>{let a=this.rand(1,9),b=this.rand(1,9);if(a+b>10)b=Math.max(1,10-a);return make(a,b);}],
+    [()=>{let a=this.rand(2,9),b=this.rand(1,9);if(a+b>18)b=Math.max(1,18-a);return make(a,b);}],
+    [()=>{const a=this.rand(10,89),max=Math.max(1,9-a%10),b=this.rand(1,max);return make(a,b);},()=>{const a=this.rand(1,8)*10,b=this.rand(1,9-a/10)*10,ans=a+b;return make(a,b,{prompt:a+' + '+b,answer:ans,explanation:'10のまとまりで かんがえる。'+a+' + '+b+' = '+ans+'。'});}],
+    [()=>{const a=this.rand(18,89),b=this.rand(2,9);return make(a,b);},()=>{const x=this.rand(1,9),y=this.rand(1,9),z=this.rand(1,9),s=x+y+z;return make(x+y,z,{prompt:x+' + '+y+' + '+z,answer:s,explanation:'まえから じゅんに。'+x+'+'+y+'='+(x+y)+'、'+(x+y)+'+'+z+'='+s+'。'});}]
+  ];return this.pickStage(stage,buckets,0);}
 """;
     }
 
     private static string BuildGenSubScript()
     {
         return """
-genSub(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'sub'),m=p&&p.mastery?Number(p.mastery.sub):0.05,mentalSubtrahendMax=9;if(stage>=2&&Math.random()<0.18){const x=this.rand(8,18),y=this.rand(1,x-2),z=this.rand(1,x-y-1),s=x-y-z;return{topic:'sub',mode:'num',a:x,b:y+z,prompt:x+' - '+y+' - '+z,answer:''+s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'};}const tensReady=g>=2||(stage>=3&&m>=0.65);if(tensReady&&Math.random()<0.35){const tb=this.rand(1,8),ta=this.rand(tb+1,9),ax=ta*10,bx=tb*10,tans=ax-bx;return{topic:'sub',mode:'num',a:ax,b:bx,prompt:ax+' - '+bx,answer:''+tans,explanation:'10のまとまりで かんがえる。'+ta+' - '+tb+' = '+(ta-tb)+' だから '+ax+' - '+bx+' = '+tans+'。'};}let a,b;if(g<=1){if(stage<=1||m<0.30){a=this.rand(2,10);b=this.rand(1,a-1);}else if(stage<=2||m<0.65){a=this.rand(11,18);b=this.rand(1,Math.max(1,a%10));}else{a=this.rand(11,29);b=this.rand(1,mentalSubtrahendMax);}}else if(g===2){if(stage<=2||m<0.45){a=this.rand(21,89);if(a%10===0)a++;b=this.rand(1,Math.min(mentalSubtrahendMax,a%10));}else{a=this.rand(30,99);b=this.rand(1,mentalSubtrahendMax);}}else{if(stage<=3||m<0.55){a=this.rand(35,99);b=this.rand(1,mentalSubtrahendMax);}else{a=this.rand(50,99);b=this.rand(1,mentalSubtrahendMax);}}const ans=a-b;return{topic:'sub',mode:'num',a:a,b:b,prompt:a+' - '+b,answer:''+ans,explanation:a+' - '+b+' = '+ans};}
+genSub(p){const stage=this.topicStage(p,'sub'),make=(a,b,extra)=>{const ans=a-b;return{topic:'sub',mode:'num',a:a,b:b,prompt:extra?extra.prompt:a+' - '+b,answer:''+(extra?extra.answer:ans),explanation:extra?extra.explanation:a+' - '+b+' = '+ans};};const buckets=[
+    [()=>{const a=this.rand(2,10),b=this.rand(1,a-1);return make(a,b);}],
+    [()=>{const a=this.rand(11,18),b=this.rand(1,Math.max(1,a%10));return make(a,b);}],
+    [()=>{let a=this.rand(21,89);if(a%10===0)a++;const b=this.rand(1,a%10);return make(a,b);},()=>{const a=this.rand(2,9)*10,b=this.rand(1,a/10-1)*10;return make(a,b);}],
+    [()=>{const a=this.rand(30,99),b=this.rand(a%10+1,Math.min(19,a-1));return make(a,b);},()=>{const x=this.rand(12,28),y=this.rand(1,8),z=this.rand(1,Math.max(1,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});}]
+  ];return this.pickStage(stage,buckets,0);}
 """;
     }
 
     private static string BuildGenHissanScript()
     {
         return """
-genHissan(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'hissan');if(stage>=4){const r=Math.random();if(g>=3&&r<0.2){const v=this.rand(0,2);let a,b;if(v===0){a=this.rand(12,89);b=this.rand(2,9);}else if(v===1){a=this.rand(112,489);b=this.rand(2,9);}else{a=this.rand(12,48);b=this.rand(11,29);}const ans=a*b,oa=a%10;return{topic:'hissan',mode:'num',prompt:a+' × '+b,answer:''+ans,explanation:v===0?'ひっ算は 一のくらいから。'+oa+'×'+b+'='+(oa*b)+'、'+Math.floor(a/10)+'0×'+b+'='+(Math.floor(a/10)*10*b)+'。あわせて '+ans+'。':'ひっ算は 一のくらいから じゅんに かける。'+a+' × '+b+' = '+ans+'。'};}if(g>=2&&r>=0.2&&r<0.4){const four=g>=3&&Math.random()<0.4;if(Math.random()<0.5){const a=four?this.rand(1234,8642):this.rand(123,868),b=four?this.rand(1111,9999-a):this.rand(111,999-a),ans=a+b;return{topic:'hissan',mode:'num',prompt:a+' + '+b,answer:''+ans,explanation:'くらいごとに たす。'+a+' + '+b+' = '+ans+'。'};}const a=four?this.rand(3210,9876):this.rand(213,987),b=four?this.rand(1111,a-1000):this.rand(111,a-100),ans=a-b;return{topic:'hissan',mode:'num',prompt:a+' − '+b,answer:''+ans,explanation:'くらいごとに ひく。'+a+' − '+b+' = '+ans+'。'};}}if(stage<=1){let a,b;do{a=this.rand(12,28);b=this.rand(2,9);}while((a%10+b)<10);return this.hissanAdd(a,b);}if(stage===2){if(Math.random()<0.55){let a,b;do{a=this.rand(12,38);b=this.rand(2,9);}while((a%10+b)<10);return this.hissanAdd(a,b);}let a,b;do{a=this.rand(21,58);b=this.rand(2,9);}while(a%10>=b);return this.hissanSub(a,b);}if(stage===3){if(Math.random()<0.5){let a,b;do{a=this.rand(14,48);b=this.rand(12,38);}while((a%10+b%10)<10||a+b>99);return this.hissanAdd(a,b);}let a,b;do{a=this.rand(22,79);b=this.rand(11,Math.min(48,a-1));}while(!(a%10<b%10&&Math.floor(a/10)>=Math.floor(b/10)+1));return this.hissanSub(a,b);}if(Math.random()<0.5){let a,b;do{a=this.rand(14,68);b=this.rand(14,68);}while((a%10+b%10)<10||a+b>99);return this.hissanAdd(a,b);}let a,b;do{a=this.rand(22,99);b=this.rand(13,a-1);}while(!((a%10)<(b%10)&&Math.floor(a/10)>=Math.floor(b/10)+1));return this.hissanSub(a,b);}
+genHissan(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'hissan'),tag=(q,d)=>{q.difficulty=d;return q;};if(stage>=4){const r=Math.random();if(g>=3&&r<0.2){const a=this.rand(12,89),b=this.rand(2,9),ans=a*b;return{topic:'hissan',mode:'num',difficulty:4,prompt:a+' × '+b,answer:''+ans,explanation:a+' × '+b+' = '+ans+'。'};}if(g>=2&&r<0.4){const a=this.rand(123,868),b=this.rand(111,Math.min(999-a,499)),ans=a+b;return{topic:'hissan',mode:'num',difficulty:4,prompt:a+' + '+b,answer:''+ans,explanation:'くらいごとに たす。'+a+' + '+b+' = '+ans+'。'};}}if(stage<=1){let a,b;do{a=this.rand(12,48);b=this.rand(2,9);}while((a%10+b)>=10);return tag(this.hissanAdd(a,b),1);}if(stage===2){let a,b;do{a=this.rand(12,58);b=this.rand(2,9);}while((a%10+b)<10);return tag(this.hissanAdd(a,b),2);}if(stage===3){if(Math.random()<0.5){let a,b;do{a=this.rand(14,48);b=this.rand(12,38);}while((a%10+b%10)<10||a+b>99);return tag(this.hissanAdd(a,b),3);}let a,b;do{a=this.rand(22,79);b=this.rand(11,Math.min(48,a-1));}while(!(a%10<b%10&&Math.floor(a/10)>=Math.floor(b/10)+1));return tag(this.hissanSub(a,b),3);}if(Math.random()<0.5){let a,b;do{a=this.rand(14,68);b=this.rand(14,68);}while((a%10+b%10)<10||a+b>99);return tag(this.hissanAdd(a,b),4);}let a,b;do{a=this.rand(22,99);b=this.rand(13,a-1);}while(!((a%10)<(b%10)&&Math.floor(a/10)>=Math.floor(b/10)+1));return tag(this.hissanSub(a,b),4);}
 """;
     }
 
     private static string BuildPickMulScript()
     {
         return """
-pickMul(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'mul'),m=p&&p.mastery?Number(p.mastery.mul):0.05;let pairs;if(stage<=1||m<0.25){pairs=[[1,2],[2,1],[2,2],[1,3],[3,1]];}else if(stage<=2||m<0.45){pairs=[[1,2],[2,1],[2,2],[1,3],[3,1],[2,3],[3,2],[2,4],[4,2],[5,2],[2,5]];}else if(stage<=3||m<0.65){const tables=[1,2,3,4,5,10];pairs=[];tables.forEach(t=>{for(let x=1;x<=9;x++)pairs.push([t,x]);});}else{const tables=g>=3?[1,2,3,4,5,6,7,8,9]:[1,2,3,4,5,10];pairs=[];tables.forEach(t=>{for(let x=1;x<=9;x++)pairs.push([t,x]);});}const pair=pairs[this.rand(0,pairs.length-1)],a=pair[0],b=pair[1],ans=a*b;return{topic:'mul',mode:'choices',op:'mul',a:a,b:b,prompt:a+' x '+b,answer:''+ans,choices:this.pick4(''+ans,[ans+a,ans-a,ans+b,ans-b,a+b,Math.max(1,ans+a+b)].map(String)),explanation:a+' x '+b+' = '+ans+'。'+a+' こずつが '+b+' つ。'};}
+pickMul(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'mul'),make=(a,b)=>{const ans=a*b;return{topic:'mul',mode:'choices',op:'mul',a:a,b:b,prompt:a+' × '+b,answer:''+ans,choices:this.pick4(''+ans,[ans+a,ans-a,ans+b,ans-b,a+b,Math.max(1,ans+a+b)].map(String)),explanation:a+' × '+b+' = '+ans+'。'+a+' こずつが '+b+' つ。'};},fromPairs=pairs=>()=>{const pair=pairs[this.rand(0,pairs.length-1)];return make(pair[0],pair[1]);},fromTables=tables=>()=>{const a=tables[this.rand(0,tables.length-1)],b=this.rand(1,9);return make(a,b);};const buckets=[
+    [fromPairs([[1,2],[2,1],[2,2],[1,3],[3,1]])],
+    [fromPairs([[2,3],[3,2],[2,4],[4,2],[5,2],[2,5]])],
+    [fromTables([1,2,3,4,5,10])],
+    [fromTables(g>=3?[6,7,8,9]:[3,4,5,10])]
+  ];return this.pickStage(stage,buckets,0);}
 """;
     }
 
@@ -439,7 +455,7 @@ clockExplain(h,m,ask,a){if(ask==='hour')return 'みじかい はり が '+h+' �
     Q.push(()=>sq('この かたちの なまえは？','しかく',['まる','さんかく','ほし'],'かどが 4つ ある かたちは「しかく」。',S.shikaku));
     Q.push(()=>sq('さんかくの かどは いくつ？','3つ',['4つ','2つ','5つ'],'さんかくには かどが 3つ あるよ。',S.sankaku));
     }
-    if(g>=2){
+    if(g>=2&&stage>=2){
     Q.push(()=>sq('この かたちの なまえは？','正方形',['長方形','直角三角形','円'],'4つの へんの 長さが みんな 同じ 四角形は 正方形。',S.shikaku));
     Q.push(()=>sq('この かたちの なまえは？','長方形',['正方形','直角三角形','円'],'かどが みんな 直角で、むかいあう へんの 長さが 同じ 四角形は 長方形。',S.chouhoukei));
     Q.push(()=>sq('この かたちの なまえは？','直角三角形',['正三角形','長方形','円'],'直角の かどが ある 三角形は 直角三角形。',S.chokkaku));
@@ -449,7 +465,7 @@ clockExplain(h,m,ask,a){if(ask==='hour')return 'みじかい はり が '+h+' �
     Q.push(()=>sq('はこの形の ちょう点の 数は？','8',['6','4','12'],'はこの形には ちょう点が 8つ。'));
     Q.push(()=>sq('はこの形の へんの 数は？','12',['6','8','10'],'はこの形には へんが 12本。'));
     }
-    if(g>=3){
+    if(g>=3&&stage>=4){
     Q.push(()=>sq('この 三角形の なまえは？','正三角形',['二等辺三角形','直角三角形','長方形'],'3つの へんが みんな 同じ 長さの 三角形は 正三角形。',S.seisankaku));
     Q.push(()=>sq('この 三角形の なまえは？','二等辺三角形',['正三角形','直角三角形','正方形'],'2つの へんの 長さが 同じ 三角形は 二等辺三角形。',S.nitohen));
     Q.push(()=>{const r=this.rand(2,9);return sq('半径 '+r+'cm の 円の 直径は？',(r*2)+'cm',[r+'cm',(r+2)+'cm',(r*4)+'cm'],'直径は 半径の 2ばい。'+r+'×2='+(r*2)+'cm。',S.maru);});
@@ -459,20 +475,18 @@ clockExplain(h,m,ask,a){if(ask==='hour')return 'みじかい はり が '+h+' �
     Q.push(()=>sq('紙を きちんと 2回 おって できる かどを なんと いう？','直角',['角','半円','正三角形'],'きちんと 2回 おって できる かどが 直角。三角じょうぎにも あるよ。'));
     }
     return Q[this.rand(0,Q.length-1)]();}
-  pickDiv(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'div');if(g>=3&&stage>=3&&Math.random()<0.35){const d=this.rand(2,4),t=this.rand(1,Math.floor(9/d)),o=Math.random()<0.5?0:this.rand(1,Math.floor(9/d)),q1=t*10+o,n=q1*d;return{topic:'div',mode:'choices',op:'div',prompt:n+' ÷ '+d,answer:''+q1,choices:this.pick4(''+q1,[q1+10,Math.max(1,q1-10),q1+d].map(String)),explanation:'わけて 考える。'+(t*10*d)+'÷'+d+'='+(t*10)+(o>0?'、'+(o*d)+'÷'+d+'='+o:'')+'。あわせて '+q1+'。'};}if(stage>=3&&Math.random()<0.5){const d=this.rand(2,9),q0=this.rand(2,9),r=this.rand(1,d-1),n=d*q0+r,ans=q0+' あまり '+r;return{topic:'div',mode:'choices',op:'div',prompt:n+' ÷ '+d,answer:ans,choices:this.pick4(ans,[q0+' あまり '+(r===1?2:r-1),(q0+1)+' あまり '+r,(q0-1)+' あまり '+r]),explanation:d+'×'+q0+'='+(d*q0)+'。'+n+'−'+(d*q0)+'='+r+' だから '+ans+'。'};}const d=this.rand(2,9),q0=this.rand(1,9),n=d*q0;return{topic:'div',mode:'choices',op:'div',prompt:n+' ÷ '+d,answer:''+q0,choices:this.pick4(''+q0,[q0+1,Math.max(1,q0-1),q0+2,q0+3,d,d+1].map(String)),explanation:d+'×'+q0+'='+n+' だから '+n+'÷'+d+'='+q0+'。'};}
-  pickFrac(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'frac');const Q=[];
-    Q.push(()=>{const n=[2,4][this.rand(0,1)];return{topic:'frac',mode:'choices',isFracViz:true,fd:n,fn:1,prompt:'いろの ついた ところは もとの 大きさの どれだけ？',answer:'1/'+n,choices:this.pick4('1/'+n,['1/'+(n===2?4:2),'1/3',n+'/1']),explanation:'同じ 大きさに '+n+'つに 分けた 1つ分は 1/'+n+'（'+(n===2?'二':'四')+'分の一）。'};});
-    if(g>=3){
-    Q.push(()=>{const d=this.rand(3,8),k=this.rand(1,d-1);return{topic:'frac',mode:'choices',isFracViz:true,fd:d,fn:k,prompt:'いろの ついた ところは ぜんたいの どれだけ？',answer:k+'/'+d,choices:this.pick4(k+'/'+d,[(d-k)+'/'+d,k+'/'+(d+1),d+'/'+d]),explanation:'ぜんたいを '+d+'つに 分けた '+k+'つ分で '+k+'/'+d+'。'};});
-    Q.push(()=>{const d=this.rand(4,9),a=this.rand(1,d-2),b=this.rand(1,d-1-a);return{topic:'frac',mode:'choices',prompt:a+'/'+d+' + '+b+'/'+d+' は？',answer:(a+b)+'/'+d,choices:this.pick4((a+b)+'/'+d,[(a+b)+'/'+(d*2),Math.max(1,a+b-1)+'/'+d,(a+b+1)+'/'+d]),explanation:'1/'+d+' が '+(a+b)+'こ分で '+(a+b)+'/'+d+'。'};});
-    Q.push(()=>{const d=this.rand(4,9),s=this.rand(2,d-1),b=this.rand(1,s-1);return{topic:'frac',mode:'choices',prompt:s+'/'+d+' − '+b+'/'+d+' は？',answer:(s-b)+'/'+d,choices:this.pick4((s-b)+'/'+d,[(s-b)+'/'+(d*2),s+'/'+d,(s-b+1)+'/'+d,Math.max(1,s-b-1)+'/'+d,b+'/'+(d*2)]),explanation:'1/'+d+' が '+(s-b)+'こ分で '+(s-b)+'/'+d+'。'};});
-    Q.push(()=>{const a=this.rand(1,8),b=this.rand(1,9-a);return{topic:'frac',mode:'choices',prompt:'0.'+a+' + 0.'+b+' は？',answer:(a+b===10?'1':'0.'+(a+b)),choices:this.pick4(a+b===10?'1':'0.'+(a+b),['0.'+Math.max(1,a+b-1),(a+b)+'',(a+b>=9?'0.1':'0.'+(a+b+1))]),explanation:'0.1が '+(a+b)+'こ分で '+(a+b===10?'1':'0.'+(a+b))+'。'};});
-    Q.push(()=>{const a=this.rand(2,9),b=this.rand(1,a-1);return{topic:'frac',mode:'choices',prompt:'0.'+a+' − 0.'+b+' は？',answer:'0.'+(a-b),choices:this.pick4('0.'+(a-b),['0.'+(a-b+1),(a-b)+'','0.'+Math.min(9,a-b+2)]),explanation:'0.1が '+(a-b)+'こ分で 0.'+(a-b)+'。'};});
-    Q.push(()=>({topic:'frac',mode:'choices',prompt:'1を 10こに 分けた 1こ分を 小数で あらわすと？',answer:'0.1',choices:this.pick4('0.1',['0.01','1.0','10']),explanation:'1の 1/10 は 0.1。'}));
-    Q.push(()=>{const k=this.rand(2,9);return{topic:'frac',mode:'choices',prompt:'0.1を '+k+'こ あつめた 数は？',answer:'0.'+k,choices:this.pick4('0.'+k,[''+k,'0.'+(k===9?8:k+1),k+'.0']),explanation:'0.1が '+k+'こで 0.'+k+'。'};});
-    Q.push(()=>{const k=this.rand(2,9);return{topic:'frac',mode:'choices',prompt:'0.'+k+' は 0.1を なんこ あつめた 数？',answer:k+'こ',choices:this.pick4(k+'こ',[(k+1)+'こ',(k-1)+'こ',(k*10)+'こ']),explanation:'0.'+k+' は 0.1が '+k+'こ あつまった 数だよ。'};});
-    }
-    return Q[this.rand(0,Q.length-1)]();}
+  pickDiv(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'div'),exact=(d,q0)=>{const n=d*q0;return{topic:'div',mode:'choices',op:'div',d:d,q0:q0,n:n,prompt:n+' ÷ '+d,answer:''+q0,choices:this.pick4(''+q0,[q0+1,Math.max(1,q0-1),q0+2,q0+3,d,d+1].map(String)),explanation:d+'×'+q0+'='+n+' だから '+n+'÷'+d+'='+q0+'。'};};const buckets=[
+    [()=>exact(2,1),()=>exact(2,2),()=>exact(2,3)],
+    [()=>exact([2,3,4][this.rand(0,2)],this.rand(1,5))],
+    [()=>exact(this.rand(2,9),this.rand(1,9))],
+    [()=>{const d=this.rand(2,9),q0=this.rand(2,9),r=this.rand(1,d-1),n=d*q0+r,ans=q0+' あまり '+r;return{topic:'div',mode:'choices',op:'div',d:d,q0:q0,n:n,prompt:n+' ÷ '+d,answer:ans,choices:this.pick4(ans,[q0+' あまり '+(r===1?2:r-1),(q0+1)+' あまり '+r,(q0-1)+' あまり '+r]),explanation:d+'×'+q0+'='+(d*q0)+'。'+n+'−'+(d*q0)+'='+r+' だから '+ans+'。'};},()=>{const d=this.rand(2,4),q0=g>=3?this.rand(10,29):this.rand(6,12),n=q0*d;return exact(d,q0);}]
+  ];return this.pickStage(stage,buckets,0);}
+  pickFrac(p){const stage=this.topicStage(p,'frac');const buckets=[
+    [()=>{const d=[2,4][this.rand(0,1)];return{topic:'frac',mode:'choices',isFracViz:true,fd:d,fn:1,prompt:'いろの ついた ところは もとの 大きさの どれだけ？',answer:'1/'+d,choices:this.pick4('1/'+d,['1/'+(d===2?4:2),'1/3',d+'/1']),explanation:'同じ 大きさに '+d+'つに 分けた 1つ分は 1/'+d+'。'};}],
+    [()=>{const d=this.rand(3,8),k=this.rand(1,d-1);return{topic:'frac',mode:'choices',isFracViz:true,fd:d,fn:k,prompt:'いろの ついた ところは ぜんたいの どれだけ？',answer:k+'/'+d,choices:this.pick4(k+'/'+d,[(d-k)+'/'+d,k+'/'+(d+1),d+'/'+d]),explanation:'ぜんたいを '+d+'つに 分けた '+k+'つ分で '+k+'/'+d+'。'};}],
+    [()=>({topic:'frac',mode:'choices',prompt:'1を 10こに 分けた 1こ分を 小数で あらわすと？',answer:'0.1',choices:this.pick4('0.1',['0.01','1.0','10']),explanation:'1の 1/10 は 0.1。'}),()=>{const k=this.rand(2,9);return{topic:'frac',mode:'choices',prompt:'0.1を '+k+'こ あつめた 数は？',answer:'0.'+k,choices:this.pick4('0.'+k,[''+k,'0.'+(k===9?8:k+1),k+'.0']),explanation:'0.1が '+k+'こで 0.'+k+'。'};}],
+    [()=>{const d=this.rand(4,9),a=this.rand(1,d-2),b=this.rand(1,d-1-a);return{topic:'frac',mode:'choices',prompt:a+'/'+d+' + '+b+'/'+d+' は？',answer:(a+b)+'/'+d,choices:this.pick4((a+b)+'/'+d,[(a+b)+'/'+(d*2),Math.max(1,a+b-1)+'/'+d,(a+b+1)+'/'+d]),explanation:'1/'+d+' が '+(a+b)+'こ分で '+(a+b)+'/'+d+'。'};},()=>{const a=this.rand(2,9),b=this.rand(1,a-1);return{topic:'frac',mode:'choices',prompt:'0.'+a+' − 0.'+b+' は？',answer:'0.'+(a-b),choices:this.pick4('0.'+(a-b),['0.'+(a-b+1),(a-b)+'','0.'+Math.min(9,a-b+2)]),explanation:'0.1が '+(a-b)+'こ分で 0.'+(a-b)+'。'};}]
+  ];return this.pickStage(stage,buckets,0);}
   pickChart(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'chart');const items=this.shuffle([['りんご','#e05a4e','#b8443a'],['みかん','#f2a03d','#d18426'],['ばなな','#d4c22f','#b0a020'],['ぶどう','#9a4fd6','#7a3aad']]).slice(0,3);let counts;do{counts=[this.rand(2,9),this.rand(2,9),this.rand(2,9)];}while(new Set(counts).size<3);const scale=(g>=3&&stage>=3)?2:1,unit=scale>1?'人':'こ';const rows=items.map((it,i)=>({label:it[0],color:it[1],border:it[2],count:counts[i]}));const maxI=counts.indexOf(Math.max.apply(null,counts)),minI=counts.indexOf(Math.min.apply(null,counts));const kind=this.rand(0,2);
     if(kind===0)return{topic:'chart',mode:'choices',isChart:true,rows:rows,prompt:'いちばん 多いのは どれ？',answer:items[maxI][0],choices:this.shuffle(items.map(x=>x[0])),explanation:items[maxI][0]+' が '+(counts[maxI]*scale)+unit+' で いちばん 多い。'};
     if(kind===1)return{topic:'chart',mode:'choices',isChart:true,rows:rows,prompt:'いちばん 少ないのは どれ？',answer:items[minI][0],choices:this.shuffle(items.map(x=>x[0])),explanation:items[minI][0]+' が '+(counts[minI]*scale)+unit+' で いちばん 少ない。'};
@@ -482,11 +496,11 @@ clockExplain(h,m,ask,a){if(ask==='hour')return 'みじかい はり が '+h+' �
     Q.push(()=>{const a=this.rand(5,12),b=this.rand(2,a-1);return{topic:'story',mode:'num',prompt:it[0]+'が '+a+it[1]+'。'+b+it[1]+' つかうと のこりは なん'+it[1]+'？',answer:''+(a-b),explanation:'のこりを もとめる ときは ひきざん。'+a+'−'+b+'='+(a-b)+'。'};});
     Q.push(()=>{const a=this.rand(3,9);let b=this.rand(2,9);while(b===a)b=this.rand(2,9);return{topic:'story',mode:'choices',prompt:it[0]+'が '+a+it[1]+'。あと '+b+it[1]+' ふえた。あう しきは？',answer:a+'＋'+b,choices:this.pick4(a+'＋'+b,[a+'−'+b,b+'−'+a,a+'×'+b]),explanation:'ふえる ときは たしざん。しきは '+a+'＋'+b+'。'};});
     Q.push(()=>{const a=this.rand(5,12),b=this.rand(2,a-1);return{topic:'story',mode:'choices',prompt:it[0]+'が '+a+it[1]+'。'+b+it[1]+' あげた。あう しきは？',answer:a+'−'+b,choices:this.pick4(a+'−'+b,[a+'＋'+b,b+'−'+a,a+'×'+b]),explanation:'へる ときは ひきざん。しきは '+a+'−'+b+'。'};});
-    if(g>=2)Q.push(()=>{const a=this.rand(2,9),b=this.rand(2,9);return{topic:'story',mode:'choices',prompt:'1さらに '+it[0]+'が '+a+it[1]+'ずつ、'+b+'さら分。あう しきは？',answer:a+'×'+b,choices:this.pick4(a+'×'+b,[a+'＋'+b,a+'−'+b,a+'÷'+b]),explanation:'同じ数ずつ あるときは かけざん。しきは '+a+'×'+b+'。'};});
-    if(g>=3){
+    if(g>=2&&stage>=3&&this.topicComplete(p,'mul'))Q.push(()=>{const a=this.rand(2,9),b=this.rand(2,9);return{topic:'story',mode:'choices',prompt:'1さらに '+it[0]+'が '+a+it[1]+'ずつ、'+b+'さら分。あう しきは？',answer:a+'×'+b,choices:this.pick4(a+'×'+b,[a+'＋'+b,a+'−'+b,a+'÷'+b]),explanation:'同じ数ずつ あるときは かけざん。しきは '+a+'×'+b+'。'};});
+    if(g>=3&&stage>=4){
     Q.push(()=>{const b=this.rand(2,9),ans=this.rand(2,9);return{topic:'story',mode:'num',prompt:'□ + '+b+' = '+(ans+b)+'　□に あてはまる 数は？',answer:''+ans,explanation:(ans+b)+' から '+b+' を ひくと '+ans+'。'};});
     Q.push(()=>{const b=this.rand(2,9),ans=this.rand(2,9);return{topic:'story',mode:'num',prompt:'□ × '+b+' = '+(ans*b)+'　□に あてはまる 数は？',answer:''+ans,explanation:(ans*b)+' ÷ '+b+' = '+ans+'。'};});
-    Q.push(()=>{const d=this.rand(2,9),q0=this.rand(2,9);return{topic:'story',mode:'num',prompt:(d*q0)+it[1]+'の '+it[0]+'を '+d+'人で 同じ数ずつ 分けると 1人分は なん'+it[1]+'？',answer:''+q0,explanation:'分ける ときは わりざん。'+(d*q0)+'÷'+d+'='+q0+'。'};});
+    if(this.topicComplete(p,'div'))Q.push(()=>{const d=this.rand(2,9),q0=this.rand(2,9);return{topic:'story',mode:'num',prompt:(d*q0)+it[1]+'の '+it[0]+'を '+d+'人で 同じ数ずつ 分けると 1人分は なん'+it[1]+'？',answer:''+q0,explanation:'分ける ときは わりざん。'+(d*q0)+'÷'+d+'='+q0+'。'};});
     }
     return Q[this.rand(0,Q.length-1)]();}
 """;
@@ -572,8 +586,8 @@ pickKokugo(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'kokugo');c
     {g:3,t:'あすかは 九時に ねて、六時に おきます。朝ごはんの 前に、なわとびを 五十回 とびます。',q:'あすかが 朝ごはんの 前に する ことは？',a:'なわとび',c:['さんぽ','べんきょう','そうじ'],e:'「朝ごはんの 前に、なわとびを」と あるよ。'},
     {g:3,t:'カブトムシは 夜に なると 木に あつまり、木の しるを なめます。昼の あいだは 土の 中で 休んで います。',q:'カブトムシが 昼に いる ばしょは？',a:'土の 中',c:['木の 上','空','水の 中'],e:'「昼の あいだは 土の 中で 休んで います」と あるよ。'}
   ];const pool=D.filter(x=>x.g<=g);const early=stage<=2?pool.filter(x=>x.g===1):pool;const use=early.length?early:pool;const it=use[this.rand(0,use.length-1)];return{topic:'dokkai',mode:'choices',prompt:it.t+'　◆　'+it.q,answer:it.a,choices:this.pick4(it.a,it.c),explanation:it.e};}
-  pickEigo(p){const stage=this.topicStage(p,'eigo');const mc=(pr,ans,pool,ex)=>({topic:'eigo',mode:'choices',prompt:pr,answer:ans,choices:this.pick4(ans,pool),explanation:ex});const Q=[];
-    const wq=L=>{const it=L[this.rand(0,L.length-1)],others=this.shuffle(L.filter(x=>x[0]!==it[0]));if(Math.random()<0.5)return mc('英語「'+it[0]+'」の いみは？',it[1],others.slice(0,3).map(x=>x[1]),'「'+it[0]+'」は 「'+it[1]+'」だよ。');return mc('「'+it[1]+'」を 英語で いうと？',it[0],others.slice(0,3).map(x=>x[0]),'「'+it[1]+'」は 英語で 「'+it[0]+'」。');};
+  pickEigo(p){const stage=this.topicStage(p,'eigo');const mc=(pr,ans,pool,ex,speak)=>({topic:'eigo',mode:'choices',prompt:pr,answer:ans,choices:this.pick4(ans,pool),explanation:ex,speakChoices:!!speak});const Q=[];
+    const wq=L=>{const it=L[this.rand(0,L.length-1)],others=this.shuffle(L.filter(x=>x[0]!==it[0]));if(Math.random()<0.5)return mc('英語「'+it[0]+'」の いみは？',it[1],others.slice(0,3).map(x=>x[1]),'「'+it[0]+'」は 「'+it[1]+'」だよ。',false);return mc('「'+it[1]+'」を 英語で いうと？',it[0],others.slice(0,3).map(x=>x[0]),'「'+it[1]+'」は 英語で 「'+it[0]+'」。',true);};
     const C=[['red','あか'],['blue','あお'],['yellow','きいろ'],['green','みどり'],['black','くろ'],['white','しろ'],['pink','ピンク'],['orange','オレンジいろ'],['purple','むらさき'],['brown','ちゃいろ']];
     const NUM=[['one','1'],['two','2'],['three','3'],['four','4'],['five','5'],['six','6'],['seven','7'],['eight','8'],['nine','9'],['ten','10']];
     Q.push(()=>wq(C));
@@ -591,9 +605,9 @@ pickKokugo(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'kokugo');c
     ['「こんにちは」に あたる あいさつは？','Hello.',['Goodbye.','Good night.','Sorry.'],'こんにちはは Hello. だよ。'],
     ['なまえを きく いいかたは？','What is your name?',['How are you?','How old are you?','What color do you like?'],'なまえを きくときは What is your name? だよ。'],
     ['「げんきですか」と きく いいかたは？','How are you?',['What is your name?','Good night.','See you.'],'げんきかどうかは How are you? と きくよ。']];
-    Q.push(()=>{const it=G[this.rand(0,G.length-1)];return mc(it[0],it[1],it[2],it[3]);});
+    Q.push(()=>{const it=G[this.rand(0,G.length-1)];return mc(it[0],it[1],it[2],it[3],true);});
     }
-    return Q[this.rand(0,Q.length-1)]();}
+    const q=Q[this.rand(0,Q.length-1)]();q.difficulty=stage;return q;}
 """;
     }
 
@@ -601,10 +615,13 @@ pickKokugo(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'kokugo');c
     {
         return """
 skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v)).filter(v=>Number.isFinite(v));return values.length?values.reduce((a,b)=>a+b,0)/values.length:0.05;}
+  pickStage(stage,buckets,reviewRate=.25){const top=Math.max(1,Math.min(4,Number(stage)||1));let current=top-1;while(current>0&&!(buckets[current]&&buckets[current].length))current--;const active=(buckets[current]||[]).map(fn=>({fn:fn,difficulty:current+1})),previous=[];for(let i=0;i<current;i++)for(const fn of (buckets[i]||[]))previous.push({fn:fn,difficulty:i+1});const pool=previous.length&&Math.random()<reviewRate?previous:(active.length?active:previous);if(!pool.length)throw new Error('No questions configured for stage '+top);const picked=pool[this.rand(0,pool.length-1)],q=picked.fn();q.difficulty=picked.difficulty;return q;}
   effectiveGrade(p){const base=Math.max(1,Math.min(3,Number(p&&p.grade)||1));const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v)).filter(v=>Number.isFinite(v));const top=values.length?Math.max(...values):0.05,stars=Number(p&&p.stars)||0;const byProgress=stars>=150&&top>=0.65?3:(stars>=55&&top>=0.45?2:1);return Math.max(base,byProgress);}
   gradeLabel(p){const base=Math.max(1,Math.min(3,Number(p&&p.grade)||1)),g=this.effectiveGrade(p);return g+'年生'+(g>base?' 範囲':'');}
   learningStage(p){const level=this.skillLevel(p),stars=Number(p.stars)||0;if(stars<15&&level<=1)return 1;if(stars<45||level<=2)return 2;if(stars<90||level<=3)return 3;return 4;}
   topicStage(p,k){const m=Number((p&&p.mastery&&p.mastery[k])||0.05);if(m<0.25)return 1;if(m<0.45)return 2;if(m<0.65)return 3;return 4;}
+  reviewStage(p,k){const stage=this.topicStage(p,k);return stage>1&&Math.random()<0.25?this.rand(1,stage-1):stage;}
+  profileAtStage(p,k,stage){const levels=[0.05,0.30,0.50,0.70],mastery={...((p&&p.mastery)||{})};mastery[k]=levels[Math.max(1,Math.min(4,stage))-1];return{...p,mastery:mastery};}
   topicComplete(p,k){if(p&&p.cleared&&p.cleared[k])return true;return this.topicStage(p,k)>=4;}
   markCleared(p,k){if(this.topicStage(p,k)>=4)(p.cleared=p.cleared||{})[k]=true;}
   hissanComplete(p){return this.topicComplete(p,'hissan');}
@@ -623,6 +640,11 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
         markup = markup.Replace(
             "if(modeChoices)choices=q.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.submit(c)}));",
             "if(modeChoices)choices=q.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.submit(c)}));\n      if(modeChoices&&q.topic==='mul'&&this.topicStage(p,'mul')<=2){isMulViz=true;const a=Number(q.a)||0,b=Number(q.b)||0;for(let g=0;g<b;g++){const cells=[];for(let i=0;i<a;i++)cells.push({style:'width:16px;height:16px;border-radius:50%;background:#1fa39a;border:2px solid #178a82;'});mulGroups.push({cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+Math.min(a,5)+',16px);gap:4px;padding:8px;border-radius:12px;border:3px solid #b8e8e2;background:#e6fbf7;'});}}\n      if(modeChoices&&q.isMeasure){isMeasureViz=true;[['あか','#e05a4e','#b8443a',Number(q.m1)||0],['あお','#4f7edb','#3a5fb0',Number(q.m2)||0]].forEach(r=>{const cells=[];for(let i=0;i<r[3];i++)cells.push({style:'width:24px;height:24px;border-radius:6px;background:'+r[1]+';border:2px solid '+r[2]+';'});measureRows.push({label:r[0],labelStyle:'font-size:22px;font-weight:900;min-width:56px;color:'+r[1]+';',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+r[3]+',24px);gap:4px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});});}\n      if(modeChoices&&q.isChart){isMeasureViz=true;(q.rows||[]).forEach(r=>{const cells=[];for(let i=0;i<r.count;i++)cells.push({style:'width:24px;height:24px;border-radius:6px;background:'+r.color+';border:2px solid '+r.border+';'});measureRows.push({label:r.label,labelStyle:'font-size:20px;font-weight:900;min-width:76px;color:#5b5040;',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+r.count+',24px);gap:4px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});});}\n      if(modeChoices&&q.isFracViz){isMeasureViz=true;const fd=Number(q.fd)||2,fn=Number(q.fn)||1,cells=[];for(let i=0;i<fd;i++)cells.push({style:'width:34px;height:34px;'+(i<fn?'background:#d64f8e;border:2px solid #b03a72;':'background:#fff;border:2px dashed #d8c4a0;')});measureRows.push({label:'',labelStyle:'display:none;',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+fd+',34px);gap:0px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});}\n      if(modeChoices&&q.isOrder){isMeasureViz=true;const oc=Number(q.oc)||5,op=Number(q.op)||1,cells=[];for(let i=0;i<oc;i++){const idx=q.od==='ひだり'?i+1:oc-i;cells.push({style:'width:36px;height:36px;border-radius:9px;'+(idx===op?'background:#f2a03d;border:3px solid #b07a10;':'background:#cfe3f7;border:2px solid #9db8d4;')});}measureRows.push({label:'',labelStyle:'display:none;',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+oc+',36px);gap:6px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});}\n      if(modeChoices&&q.isShape){isShapeViz=true;shapeStyle=q.shapeStyle||'';}\n      const plen=String(q.prompt||'').length;promptStyle='font-size:'+(plen>16?30:(plen>11?40:54))+'px; font-weight:900; text-align:center; margin-bottom:6px; white-space:'+(plen>16?'normal':'nowrap')+'; max-width:880px; line-height:1.35;';",
+            StringComparison.Ordinal);
+
+        markup = markup.Replace(
+            "\n      if(modeChoices&&q.isMeasure){isMeasureViz=true;",
+            "\n      if(modeChoices&&q.topic==='div'&&this.topicStage(p,'div')<=2){isMulViz=true;const groups=Number(q.d)||0,each=Number(q.q0)||0;for(let g=0;g<groups;g++){const cells=[];for(let i=0;i<each;i++)cells.push({style:'width:16px;height:16px;border-radius:50%;background:#4f7edb;border:2px solid #3a5fb0;'});mulGroups.push({cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+Math.min(each,5)+',16px);gap:4px;padding:8px;border-radius:12px;border:3px solid #b8c9ef;background:#eef3ff;'});}}\n      if(modeChoices&&q.isMeasure){isMeasureViz=true;",
             StringComparison.Ordinal);
 
         markup = ReplaceBlock(
@@ -659,6 +681,51 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
         markup = markup.Replace(
             "kokuPre:kokuPre, kokuWord:kokuWord, kokuPost:kokuPost, kokuMean:kokuMean,",
             "kokuPre:kokuPre, kokuWord:kokuWord, kokuPost:kokuPost, kokuMean:kokuMean, kokuInstruction:kokuInstruction, kokuShowMean:kokuShowMean,",
+            StringComparison.Ordinal);
+
+        return markup;
+    }
+
+    private static string PatchEnglishSpeech(string markup)
+    {
+        markup = markup.Replace(
+            "muted:false, setupName:",
+            "muted:false, speakingEnglish:'', setupName:",
+            StringComparison.Ordinal);
+
+        markup = markup.Replace(
+            "freshQ(){return {hsStep:0,hsOnes:'',hsTens:'',hsCarry:false,hsBorrow:false,hsMistakes:0,hsHint:'',input:'',numMiss:0,numChoices:null,hsStepMiss:0,hsStepChoices:null};}",
+            "englishSpeechAvailable(){return typeof window!=='undefined'&&!!window.speechSynthesis&&typeof window.SpeechSynthesisUtterance==='function';}\n  stopEnglishSpeech(){this._speechToken=(this._speechToken||0)+1;if(this.englishSpeechAvailable())window.speechSynthesis.cancel();if(this.state&&this.state.speakingEnglish)this.setState({speakingEnglish:''});}\n  speakEnglish(text){const value=String(text||'').trim();if(!value||this.state.muted||!this.englishSpeechAvailable())return;const synth=window.speechSynthesis,token=(this._speechToken||0)+1;this._speechToken=token;synth.cancel();const utterance=new window.SpeechSynthesisUtterance(value);utterance.lang='en-US';utterance.rate=.85;const voices=synth.getVoices?synth.getVoices():[];utterance.voice=voices.find(v=>String(v.lang).toLowerCase()==='en-us')||voices.find(v=>String(v.lang).toLowerCase().startsWith('en'))||null;const done=()=>{if(token===this._speechToken){this._speechToken=token+1;if(this.state&&this.state.speakingEnglish===value)this.setState({speakingEnglish:''});}};utterance.onend=done;utterance.onerror=done;this.setState({speakingEnglish:value});synth.speak(utterance);}\n  freshQ(){return {hsStep:0,hsOnes:'',hsTens:'',hsCarry:false,hsBorrow:false,hsMistakes:0,hsHint:'',input:'',numMiss:0,numChoices:null,hsStepMiss:0,hsStepChoices:null};}",
+            StringComparison.Ordinal);
+
+        markup = markup.Replace(
+            "submit(ans){const q=this.cur(),correct=",
+            "submit(ans){this.stopEnglishSpeech();const q=this.cur(),correct=",
+            StringComparison.Ordinal);
+        markup = markup.Replace("next(){this.sfx('select');", "next(){this.stopEnglishSpeech();this.sfx('select');", StringComparison.Ordinal);
+        markup = markup.Replace("quitQuiz(){this.sfx('select');", "quitQuiz(){this.stopEnglishSpeech();this.sfx('select');", StringComparison.Ordinal);
+        markup = markup.Replace(
+            "toggleMute(){const m=!this.state.muted;this.setState({muted:m});",
+            "toggleMute(){const m=!this.state.muted;if(m)this.stopEnglishSpeech();this.setState({muted:m});",
+            StringComparison.Ordinal);
+
+        markup = markup.Replace(
+            "if(modeChoices)choices=q.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.submit(c)}));",
+            "if(modeChoices)choices=q.choices.map(c=>{const showSpeak=!!q.speakChoices,speakEnabled=showSpeak&&!S.muted&&this.englishSpeechAvailable(),speaking=speakEnabled&&S.speakingEnglish===String(c);return{text:c,rowStyle:'display:grid;grid-template-columns:'+(showSpeak?'minmax(0,1fr) 64px':'1fr')+';gap:10px;align-items:stretch;',style:choiceTile+'width:100%;font-family:inherit;padding:10px 14px;',onClick:()=>this.submit(c),showSpeak:showSpeak,speakEnabled:speakEnabled,speakDisabled:showSpeak&&!speakEnabled,speakStyle:'min-width:64px;min-height:64px;border-radius:18px;font-size:28px;font-family:inherit;font-weight:900;cursor:'+(speakEnabled?'pointer':'not-allowed')+';border:3px solid '+(speaking?'#1d4ed8':'#b8c9ef')+';background:'+(speaking?'#2563eb':'#eef3ff')+';color:'+(speaking?'#fff':'#2563eb')+';box-shadow:0 5px 0 '+(speaking?'#1d4ed8':'#cbd7f3')+';',speakLabel:speaking?'🔊':'🔈',speakTitle:S.muted?'音をオンにしてね':(!this.englishSpeechAvailable()?'この端末では発音できません':'「'+c+'」の発音を聞く'),onSpeak:()=>this.speakEnglish(c)};});",
+            StringComparison.Ordinal);
+
+        markup = markup.Replace(
+            "<div style=\"{{ c.style }}\" onclick=\"{{ c.onClick }}\">{{ c.text }}</div>",
+            "<div style=\"{{ c.rowStyle }}\"><button type=\"button\" class=\"kt-choice-button\" style=\"{{ c.style }}\" onclick=\"{{ c.onClick }}\">{{ c.text }}</button><sc-if value=\"{{ c.speakEnabled }}\" hint-placeholder-val=\"{{ false }}\"><button type=\"button\" class=\"kt-speech-button\" style=\"{{ c.speakStyle }}\" onclick=\"{{ c.onSpeak }}\" title=\"{{ c.speakTitle }}\" aria-label=\"{{ c.speakTitle }}\">{{ c.speakLabel }}</button></sc-if><sc-if value=\"{{ c.speakDisabled }}\" hint-placeholder-val=\"{{ false }}\"><button type=\"button\" class=\"kt-speech-button\" style=\"{{ c.speakStyle }}\" disabled title=\"{{ c.speakTitle }}\" aria-label=\"{{ c.speakTitle }}\">{{ c.speakLabel }}</button></sc-if></div>",
+            StringComparison.Ordinal);
+        markup = markup.Replace(
+            "<div onclick=\"{{ c.onClick }}\" style=\"{{ c.style }}\">{{ c.text }}</div>",
+            "<div style=\"{{ c.rowStyle }}\"><button type=\"button\" class=\"kt-choice-button\" style=\"{{ c.style }}\" onclick=\"{{ c.onClick }}\">{{ c.text }}</button><sc-if value=\"{{ c.speakEnabled }}\" hint-placeholder-val=\"{{ false }}\"><button type=\"button\" class=\"kt-speech-button\" style=\"{{ c.speakStyle }}\" onclick=\"{{ c.onSpeak }}\" title=\"{{ c.speakTitle }}\" aria-label=\"{{ c.speakTitle }}\">{{ c.speakLabel }}</button></sc-if><sc-if value=\"{{ c.speakDisabled }}\" hint-placeholder-val=\"{{ false }}\"><button type=\"button\" class=\"kt-speech-button\" style=\"{{ c.speakStyle }}\" disabled title=\"{{ c.speakTitle }}\" aria-label=\"{{ c.speakTitle }}\">{{ c.speakLabel }}</button></sc-if></div>",
+            StringComparison.Ordinal);
+
+        markup = markup.Replace(
+            "</helmet>",
+            "<style>.kt-choice-button,.kt-speech-button{transition:transform .12s ease,filter .12s ease,box-shadow .12s ease}.kt-choice-button:hover,.kt-speech-button:not(:disabled):hover{filter:brightness(.98);transform:translateY(-1px)}.kt-choice-button:active,.kt-speech-button:not(:disabled):active{transform:translateY(3px);box-shadow:0 2px 0 #c9b997!important}.kt-choice-button:focus-visible,.kt-speech-button:focus-visible{outline:5px solid #2563eb;outline-offset:4px}.kt-speech-button:disabled{opacity:.52}@media(prefers-reduced-motion:reduce){.kt-choice-button,.kt-speech-button{transition:none}}</style>\n</helmet>",
             StringComparison.Ordinal);
 
         return markup;

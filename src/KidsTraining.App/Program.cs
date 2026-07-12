@@ -140,9 +140,23 @@ internal static class Program
                 !template.Contains("Good morning.", StringComparison.Ordinal) ||
                 !template.Contains("if(grade>=2&&done('hissan'))staged.push('mul')", StringComparison.Ordinal) ||
                 !template.Contains("if(grade>=3&&done('mul'))staged.push('div')", StringComparison.Ordinal) ||
-                !template.Contains("mentalAddendMax=9", StringComparison.Ordinal) ||
-                !template.Contains("mentalSubtrahendMax=9", StringComparison.Ordinal) ||
-                !template.Contains("pairs=[[1,2],[2,1],[2,2]", StringComparison.Ordinal) ||
+                !template.Contains("pickStage(stage,buckets,reviewRate=.25)", StringComparison.Ordinal) ||
+                !template.Contains("reviewStage(p,k)", StringComparison.Ordinal) ||
+                !template.Contains("profileAtStage(p,k,stage)", StringComparison.Ordinal) ||
+                !template.Contains("fromPairs([[1,2],[2,1],[2,2]", StringComparison.Ordinal) ||
+                !template.Contains("prompt:a+' × '+b", StringComparison.Ordinal) ||
+                template.Contains("prompt:a+' x '+b", StringComparison.Ordinal) ||
+                !template.Contains("[()=>exact(2,1),()=>exact(2,2),()=>exact(2,3)]", StringComparison.Ordinal) ||
+                !template.Contains("q.topic==='div'&&this.topicStage(p,'div')<=2", StringComparison.Ordinal) ||
+                !template.Contains("speakEnglish(text)", StringComparison.Ordinal) ||
+                !template.Contains("if(m)this.stopEnglishSpeech()", StringComparison.Ordinal) ||
+                !template.Contains("SpeechSynthesisUtterance", StringComparison.Ordinal) ||
+                !template.Contains("utterance.lang='en-US'", StringComparison.Ordinal) ||
+                !template.Contains("utterance.rate=.85", StringComparison.Ordinal) ||
+                !template.Contains("speakChoices:!!speak", StringComparison.Ordinal) ||
+                !template.Contains("class=\"kt-speech-button\"", StringComparison.Ordinal) ||
+                !template.Contains("<button type=\"button\" class=\"kt-choice-button\"", StringComparison.Ordinal) ||
+                !template.Contains("disabled title=\"{{ c.speakTitle }}\"", StringComparison.Ordinal) ||
                 !template.Contains("stage<=1?['hiragana']", StringComparison.Ordinal) ||
                 !template.Contains("profileGrade:this.gradeLabel(p)", StringComparison.Ordinal) ||
                 !template.Contains("const weakKeys=this.allowedTopics(p).filter", StringComparison.Ordinal) ||
