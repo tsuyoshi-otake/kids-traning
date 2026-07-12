@@ -8,7 +8,7 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.5.1"
+$version = "1.6.0"
 
 $programSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
@@ -83,7 +83,13 @@ if ($runtimeSource -notmatch "pickKazu\(p\)" -or $runtimeSource -notmatch "pickS
 if ($runtimeSource -notmatch "なんばんめ" -or $runtimeSource -notmatch "subtype:'kotoba'" -or $runtimeSource -notmatch "markCleared" -or $runtimeSource -notmatch "クリア！" -or $runtimeSource -notmatch "isOrder" -or $runtimeSource -notmatch [regex]::Escape("prompt:x+' + '+y+' + '+z")) {
     throw "Runtime HTML patch must include ordinal positions, spelling words, three-number calculations, and sticky visible clears"
 }
-if ($trainingSource -notmatch "'kazu'" -or $trainingSource -notmatch "'story'" -or $trainingSource -notmatch "chart: true") {
+if ($runtimeSource -notmatch "pickBun\(p\)" -or $runtimeSource -notmatch "pickGoi\(p\)" -or $runtimeSource -notmatch "pickDokkai\(p\)" -or $runtimeSource -notmatch "bun:\.05" -or $runtimeSource -notmatch "goi:\.05" -or $runtimeSource -notmatch "dokkai:\.05" -or $runtimeSource -notmatch [regex]::Escape("if(done('moji'))staged.push('kokugo','bun')") -or $runtimeSource -notmatch [regex]::Escape("if(done('bun'))staged.push('goi')") -or $runtimeSource -notmatch [regex]::Escape("if(done('kokugo'))staged.push('dokkai')")) {
+    throw "Runtime HTML patch must include particle/grammar (bun), vocabulary (goi), and reading comprehension (dokkai) topics with clear-gated unlocks"
+}
+if ($runtimeSource -notmatch "topic:'dokkai'" -or $runtimeSource -notmatch "topic:'goi'" -or $runtimeSource -notmatch "topic:'bun'") {
+    throw "Runtime HTML patch must generate bun, goi, and dokkai questions"
+}
+if ($trainingSource -notmatch "'kazu'" -or $trainingSource -notmatch "'story'" -or $trainingSource -notmatch "chart: true" -or $trainingSource -notmatch "'bun'" -or $trainingSource -notmatch "'goi'" -or $trainingSource -notmatch "'dokkai'" -or $trainingSource -notmatch "dokkai: true") {
     throw "Training storage bootstrap must include the full curriculum topic set"
 }
 if ($runtimeSource -notmatch "PatchRewardSystem" -or $runtimeSource -notmatch "gainXp" -or $runtimeSource -notmatch "xpLevel" -or $runtimeSource -notmatch "fbXp" -or $runtimeSource -notmatch "earnedXp" -or $runtimeSource -notmatch "べんきょうを つづける") {

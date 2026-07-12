@@ -65,7 +65,7 @@ internal static class Program
                 !template.Contains("profiles:[\n", StringComparison.Ordinal) ||
                 !template.Contains($"name:{System.Text.Json.JsonSerializer.Serialize(RuntimeHtmlPreparer.PrimaryProfileName)}", StringComparison.Ordinal) ||
                 !template.Contains("xp:0", StringComparison.Ordinal) ||
-                !template.Contains("mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05,measure:.05,kazu:.05,shape:.05,div:.05,frac:.05,chart:.05,story:.05}", StringComparison.Ordinal) ||
+                !template.Contains(RuntimeHtmlPreparer.BeginnerMasteryMarkup, StringComparison.Ordinal) ||
                 !template.Contains("count:this.props.questionCount??20", StringComparison.Ordinal) ||
                 !template.Contains("pass:this.props.passLine??15", StringComparison.Ordinal) ||
                 !template.Contains("genAdd(p)", StringComparison.Ordinal) ||
@@ -116,6 +116,23 @@ internal static class Program
                 !template.Contains("topicStage(p,k)", StringComparison.Ordinal) ||
                 !template.Contains("hissanComplete(p)", StringComparison.Ordinal) ||
                 !template.Contains("if(done('add'))staged.push('sub','moji')", StringComparison.Ordinal) ||
+                !template.Contains("if(done('moji'))staged.push('kokugo','bun')", StringComparison.Ordinal) ||
+                !template.Contains("if(done('bun'))staged.push('goi')", StringComparison.Ordinal) ||
+                !template.Contains("if(done('kokugo'))staged.push('dokkai')", StringComparison.Ordinal) ||
+                !template.Contains("pickBun(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickGoi(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickDokkai(p)", StringComparison.Ordinal) ||
+                !template.Contains("（　）に はいる じは？", StringComparison.Ordinal) ||
+                !template.Contains("かぎかっこ", StringComparison.Ordinal) ||
+                !template.Contains("しゅご（だれが・なにが）", StringComparison.Ordinal) ||
+                !template.Contains("しゅうしょくご", StringComparison.Ordinal) ||
+                !template.Contains("カタカナで 書く ことばは どれ？", StringComparison.Ordinal) ||
+                !template.Contains("はんたいの ことばは？", StringComparison.Ordinal) ||
+                !template.Contains("なかまはずれは どれ？", StringComparison.Ordinal) ||
+                !template.Contains("の いみは？", StringComparison.Ordinal) ||
+                !template.Contains("国語じてんの じゅんに", StringComparison.Ordinal) ||
+                !template.Contains("topic:'dokkai'", StringComparison.Ordinal) ||
+                !template.Contains("あつめた 数は？", StringComparison.Ordinal) ||
                 !template.Contains("if(grade>=2&&done('hissan'))staged.push('mul')", StringComparison.Ordinal) ||
                 !template.Contains("if(grade>=3&&done('mul'))staged.push('div')", StringComparison.Ordinal) ||
                 !template.Contains("mentalAddendMax=9", StringComparison.Ordinal) ||

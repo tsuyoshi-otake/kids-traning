@@ -8,7 +8,7 @@ internal static class RuntimeHtmlPreparer
     public const string DefaultEmergencyPin = "1234";
     private const string TemplateOpenTag = "<script type=\"__bundler/template\">";
     private const string TemplateCloseTag = "</script>";
-    private const string BeginnerMasteryMarkup = "mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05,measure:.05,kazu:.05,shape:.05,div:.05,frac:.05,chart:.05,story:.05}";
+    public const string BeginnerMasteryMarkup = "mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05,measure:.05,kazu:.05,shape:.05,div:.05,frac:.05,chart:.05,story:.05,bun:.05,goi:.05,dokkai:.05}";
 
     public static string PrimaryProfileName
     {
@@ -114,12 +114,12 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true},count:this.props.questionCount??10,pass:this.props.passLine??8};}",
-            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true},count:this.props.questionCount??20,pass:this.props.passLine??15};}",
+            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true},count:this.props.questionCount??20,pass:this.props.passLine??15};}",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
             "    kokugo:{label:'こくご',color:'#d2691e'},\n  };",
-            "    kokugo:{label:'こくご',color:'#d2691e'},\n    moji:{label:'もじ',color:'#4f7edb'},\n    measure:{label:'たんい',color:'#3aa655'},\n    kazu:{label:'かず',color:'#c2891f'},\n    shape:{label:'かたち',color:'#9a4fd6'},\n    div:{label:'わりざん',color:'#0f8fbf'},\n    frac:{label:'ぶんすう',color:'#d64f8e'},\n    chart:{label:'グラフ',color:'#5a8f29'},\n    story:{label:'ぶんしょうだい',color:'#8a6d3b'},\n  };",
+            "    kokugo:{label:'こくご',color:'#d2691e'},\n    moji:{label:'もじ',color:'#4f7edb'},\n    measure:{label:'たんい',color:'#3aa655'},\n    kazu:{label:'かず',color:'#c2891f'},\n    shape:{label:'かたち',color:'#9a4fd6'},\n    div:{label:'わりざん',color:'#0f8fbf'},\n    frac:{label:'ぶんすう',color:'#d64f8e'},\n    chart:{label:'グラフ',color:'#5a8f29'},\n    story:{label:'ぶんしょうだい',color:'#8a6d3b'},\n    bun:{label:'ぶん',color:'#7a5cd6'},\n    goi:{label:'ことば',color:'#2f9e8f'},\n    dokkai:{label:'よみとり',color:'#c2503f'},\n  };",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
@@ -129,7 +129,7 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "['add','sub','hissan','mul','clock','kokugo'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});",
-            "['add','sub','hissan','mul','clock','kokugo','moji','measure','kazu','shape','div','frac','chart','story'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});",
+            "['add','sub','hissan','mul','clock','kokugo','moji','measure','kazu','shape','div','frac','chart','story','bun','goi','dokkai'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});",
             StringComparison.Ordinal);
 
         // pick4 originally padded missing distractors with the answer plus invisible
@@ -180,7 +180,7 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "genFor(k){return k==='add'?this.genAdd():k==='sub'?this.genSub():k==='hissan'?this.genHissan():k==='mul'?this.pickMul():k==='clock'?this.pickClock():this.pickKokugo();}",
-            "genFor(k,p){return k==='add'?this.genAdd(p):k==='sub'?this.genSub(p):k==='hissan'?this.genHissan(p):k==='mul'?this.pickMul(p):k==='clock'?this.pickClock(p):k==='measure'?this.pickMeasure(p):k==='kazu'?this.pickKazu(p):k==='shape'?this.pickShape(p):k==='div'?this.pickDiv(p):k==='frac'?this.pickFrac(p):k==='chart'?this.pickChart(p):k==='story'?this.pickStory(p):k==='kokugo'?this.pickKokugo(p):this.pickMoji(p);}",
+            "genFor(k,p){return k==='add'?this.genAdd(p):k==='sub'?this.genSub(p):k==='hissan'?this.genHissan(p):k==='mul'?this.pickMul(p):k==='clock'?this.pickClock(p):k==='measure'?this.pickMeasure(p):k==='kazu'?this.pickKazu(p):k==='shape'?this.pickShape(p):k==='div'?this.pickDiv(p):k==='frac'?this.pickFrac(p):k==='chart'?this.pickChart(p):k==='story'?this.pickStory(p):k==='kokugo'?this.pickKokugo(p):k==='bun'?this.pickBun(p):k==='goi'?this.pickGoi(p):k==='dokkai'?this.pickDokkai(p):this.pickMoji(p);}",
             StringComparison.Ordinal);
 
         markup = ReplaceBlock(
@@ -469,6 +469,8 @@ clockExplain(h,m,ask,a){if(ask==='hour')return 'みじかい はり が '+h+' �
     Q.push(()=>{const a=this.rand(1,8),b=this.rand(1,9-a);return{topic:'frac',mode:'choices',prompt:'0.'+a+' + 0.'+b+' は？',answer:(a+b===10?'1':'0.'+(a+b)),choices:this.pick4(a+b===10?'1':'0.'+(a+b),['0.'+Math.max(1,a+b-1),(a+b)+'',(a+b>=9?'0.1':'0.'+(a+b+1))]),explanation:'0.1が '+(a+b)+'こ分で '+(a+b===10?'1':'0.'+(a+b))+'。'};});
     Q.push(()=>{const a=this.rand(2,9),b=this.rand(1,a-1);return{topic:'frac',mode:'choices',prompt:'0.'+a+' − 0.'+b+' は？',answer:'0.'+(a-b),choices:this.pick4('0.'+(a-b),['0.'+(a-b+1),(a-b)+'','0.'+Math.min(9,a-b+2)]),explanation:'0.1が '+(a-b)+'こ分で 0.'+(a-b)+'。'};});
     Q.push(()=>({topic:'frac',mode:'choices',prompt:'1を 10こに 分けた 1こ分を 小数で あらわすと？',answer:'0.1',choices:this.pick4('0.1',['0.01','1.0','10']),explanation:'1の 1/10 は 0.1。'}));
+    Q.push(()=>{const k=this.rand(2,9);return{topic:'frac',mode:'choices',prompt:'0.1を '+k+'こ あつめた 数は？',answer:'0.'+k,choices:this.pick4('0.'+k,[''+k,'0.'+(k===9?8:k+1),k+'.0']),explanation:'0.1が '+k+'こで 0.'+k+'。'};});
+    Q.push(()=>{const k=this.rand(2,9);return{topic:'frac',mode:'choices',prompt:'0.'+k+' は 0.1を なんこ あつめた 数？',answer:k+'こ',choices:this.pick4(k+'こ',[(k+1)+'こ',(k-1)+'こ',(k*10)+'こ']),explanation:'0.'+k+' は 0.1が '+k+'こ あつまった 数だよ。'};});
     }
     return Q[this.rand(0,Q.length-1)]();}
   pickChart(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'chart');const items=this.shuffle([['りんご','#e05a4e','#b8443a'],['みかん','#f2a03d','#d18426'],['ばなな','#d4c22f','#b0a020'],['ぶどう','#9a4fd6','#7a3aad']]).slice(0,3);let counts;do{counts=[this.rand(2,9),this.rand(2,9),this.rand(2,9)];}while(new Set(counts).size<3);const scale=(g>=3&&stage>=3)?2:1,unit=scale>1?'人':'こ';const rows=items.map((it,i)=>({label:it[0],color:it[1],border:it[2],count:counts[i]}));const maxI=counts.indexOf(Math.max.apply(null,counts)),minI=counts.indexOf(Math.min.apply(null,counts));const kind=this.rand(0,2);
@@ -518,6 +520,58 @@ pickKokugo(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'kokugo');c
     ['しゃしん','しやしん','さしん','しゃっしん','カメラで とる もの'],
     ['ぎゅうにゅう','ぎゆうにゆう','ぎゅうにゅ','ぎゅーにゅー','うしから とれる のみもの']
   ];const it=W[this.rand(0,W.length-1)];return{topic:'moji',mode:'choices',subtype:'kotoba',prompt:it[4]+'。ただしい かきかたは どれ？',answer:it[0],choices:this.shuffle(it.slice(0,4)),explanation:'ただしくは 「'+it[0]+'」と かくよ。'};}if(subtype==='romaji'){const it=romaji[this.rand(0,romaji.length-1)],others=this.shuffle(romaji.filter(x=>x[1]!==it[1]));return{topic:'moji',mode:'choices',subtype:'romaji',prompt:'ローマ字「'+it[0]+'」は ひらがなで？',answer:it[1],choices:this.shuffle([it[1]].concat(others.slice(0,3).map(x=>x[1]))),explanation:'ローマ字「'+it[0]+'」は 「'+it[1]+'」と よむよ。'};}if(subtype==='alphabet'){const it=alphabet[this.rand(0,alphabet.length-1)],others=this.shuffle(alphabet.filter(x=>x[0]!==it[0]));return{topic:'moji',mode:'choices',subtype:'alphabet',prompt:'アルファベット「'+it[0]+'」の よみは？',answer:it[1],choices:this.shuffle([it[1]].concat(others.slice(0,3).map(x=>x[1]))),explanation:'「'+it[0]+'」は 「'+it[1]+'」と よむよ。'};}const it=hira[this.rand(0,hira.length-1)],others=this.shuffle(hira.filter(x=>x[0]!==it[0]));if(subtype==='katakana'){return{topic:'moji',mode:'choices',subtype:'katakana',prompt:'ひらがな「'+it[0]+'」と おなじ カタカナは？',answer:it[1],choices:this.shuffle([it[1]].concat(others.slice(0,3).map(x=>x[1]))),explanation:'「'+it[0]+'」は カタカナで 「'+it[1]+'」。'};}return{topic:'moji',mode:'choices',subtype:'hiragana',prompt:'カタカナ「'+it[1]+'」と おなじ ひらがなは？',answer:it[0],choices:this.shuffle([it[0]].concat(others.slice(0,3).map(x=>x[0]))),explanation:'「'+it[1]+'」は ひらがなで 「'+it[0]+'」。'};}
+  pickBun(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'bun');const mc=(pr,ans,pool,ex)=>({topic:'bun',mode:'choices',prompt:pr,answer:ans,choices:this.pick4(ans,pool),explanation:ex});const Q=[];
+    const J=[['わたし（　）えほんを よむ','は','くっつきの「は」。「わ」と よむけど 「は」と 書くよ。'],['ぼく（　）一ねんせいです','は','くっつきの「は」。「わ」と よむけど 「は」と 書くよ。'],['おかあさん（　）やさしい','は','くっつきの「は」。「わ」と よむけど 「は」と 書くよ。'],['りんご（　）たべる','を','「なにを」の ときは 「を」を つかうよ。'],['みず（　）のむ','を','「なにを」の ときは 「を」を つかうよ。'],['えほん（　）よむ','を','「なにを」の ときは 「を」を つかうよ。'],['ボール（　）なげる','を','「なにを」の ときは 「を」を つかうよ。'],['がっこう（　）いく','へ','いく ばしょには 「へ」。「え」と よむけど 「へ」と 書くよ。'],['こうえん（　）いく','へ','いく ばしょには 「へ」。「え」と よむけど 「へ」と 書くよ。'],['おばあさんの いえ（　）いく','へ','いく ばしょには 「へ」。「え」と よむけど 「へ」と 書くよ。']];
+    Q.push(()=>{const it=J[this.rand(0,J.length-1)];const wrong={'は':'わ','を':'お','へ':'え'}[it[1]];return mc(it[0]+'　（　）に はいる じは？',it[1],['は','を','へ'].filter(x=>x!==it[1]).concat([wrong]),it[2]);});
+    if(stage>=2||g>=2){
+    Q.push(()=>mc('ぶんの おわりに つける 「。」の なまえは？','まる（くてん）',['てん（とうてん）','かぎかっこ','なかてん'],'ぶんの おわりには 「。」（まる）を つけるよ。'));
+    Q.push(()=>mc('ぶんの とちゅうの くぎりに つける 「、」の なまえは？','てん（とうてん）',['まる（くてん）','かぎかっこ','はてな'],'ぶんの とちゅうには 「、」（てん）を つけるよ。'));
+    Q.push(()=>mc('はなした ことばに つける しるしは？','「　」（かぎかっこ）',['。（まる）','、（てん）','・（なかてん）'],'はなした ことばは 「　」（かぎかっこ）で かこむよ。'));
+    Q.push(()=>mc('ただしい ぶんは どれ？','「おはよう。」と いった。',['おはよう。と いった。','「おはよう」。と いった','おはよう と。いった。'],'はなした ことばは 「　」で かこんで、おわりに 「。」を つけるよ。'));
+    }
+    if(g>=2){
+    const K=[['ぱん','パン','がいこくから きた ことば'],['けーき','ケーキ','がいこくから きた ことば'],['ばす','バス','がいこくから きた ことば'],['てれび','テレビ','がいこくから きた ことば'],['じゅーす','ジュース','がいこくから きた ことば'],['ぴあの','ピアノ','がいこくから きた ことば'],['わんわん','ワンワン','どうぶつの なきごえ'],['にゃーにゃー','ニャーニャー','どうぶつの なきごえ'],['がちゃん','ガチャン','ものの 音'],['あめりか','アメリカ','がいこくの 国や 土地の 名前']];
+    Q.push(()=>{const it=K[this.rand(0,K.length-1)];return mc('「'+it[0]+'」の ただしい 書きかたは？',it[1],[it[0]],it[2]+'だから カタカナで 「'+it[1]+'」と 書くよ。');});
+    Q.push(()=>{const it=K[this.rand(0,K.length-1)];const native=this.shuffle(['やま','かわ','はな','そら','うみ','いし']).slice(0,3);return mc('カタカナで 書く ことばは どれ？',it[0],native,'「'+it[0]+'」は '+it[2]+'だから カタカナで 「'+it[1]+'」と 書くよ。');});
+    const SJ=[['犬が','走る','元気に','犬が 元気に 走る。'],['花が','さく','庭で','庭で 花が さく。'],['雨が','ふる','朝から','朝から 雨が ふる。'],['鳥が','とぶ','空を','空を 鳥が とぶ。'],['弟が','わらう','にこにこ','弟が にこにこ わらう。'],['先生が','話す','しずかに','先生が しずかに 話す。'],['ねこが','ねる','まどべで','ねこが まどべで ねる。']];
+    Q.push(()=>{const it=SJ[this.rand(0,SJ.length-1)];const isShu=Math.random()<0.5;const ans=isShu?it[0]:it[1];return mc('「'+it[3]+'」の '+(isShu?'しゅご（だれが・なにが）':'じゅつご（どうする）')+'は？',ans,[isShu?it[1]:it[0],it[2]],isShu?'「だれが・なにが」に あたる ことばが しゅご。「'+it[0]+'」だね。':'「どうする」に あたる ことばが じゅつご。「'+it[1]+'」だね。');});
+    }
+    if(g>=3){
+    const SH=[['大きな','犬',['歩く','ゆっくり'],'大きな 犬が ゆっくり 歩く。'],['白い','花',['さいた','庭に'],'庭に 白い 花が さいた。'],['ゆっくり','歩く',['犬が','大きな'],'大きな 犬が ゆっくり 歩く。'],['きれいな','声',['うたう','姉が'],'姉が きれいな 声で うたう。'],['あまい','ケーキ',['食べた','おやつに'],'おやつに あまい ケーキを 食べた。'],['はやく','走る',['うさぎが','野原を'],'うさぎが 野原を はやく 走る。']];
+    Q.push(()=>{const it=SH[this.rand(0,SH.length-1)];return mc('「'+it[3]+'」で 「'+it[0]+'」が くわしく して いる ことばは？',it[1],it[2],'「'+it[0]+'」は 「'+it[1]+'」を くわしく する ことば（しゅうしょくご）だよ。');});
+    }
+    return Q[this.rand(0,Q.length-1)]();}
+  pickGoi(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'goi');const mc=(pr,ans,pool,ex)=>({topic:'goi',mode:'choices',prompt:pr,answer:ans,choices:this.pick4(ans,pool),explanation:ex});const Q=[];
+    const H=[['大きい','小さい'],['たかい','ひくい'],['ながい','みじかい'],['あつい','さむい'],['はやい','おそい'],['あかるい','くらい'],['おもい','かるい'],['つよい','よわい'],['ひろい','せまい'],['あたらしい','ふるい'],['うえ','した'],['まえ','うしろ'],['みぎ','ひだり'],['あさ','よる'],['いく','くる'],['あける','しめる']];
+    Q.push(()=>{const it=H[this.rand(0,H.length-1)];const flip=Math.random()<0.5;const w=flip?it[1]:it[0],ans=flip?it[0]:it[1];const others=this.shuffle(H.filter(x=>x!==it)).slice(0,3).map(x=>x[this.rand(0,1)]);return mc('「'+w+'」の はんたいの ことばは？',ans,others,'「'+w+'」の はんたいは 「'+ans+'」だよ。');});
+    const N=[['くだもの',['りんご','みかん','ばなな','ぶどう']],['どうぶつ',['いぬ','ねこ','うま','ぞう']],['のりもの',['バス','でんしゃ','ふね','ひこうき']],['やさい',['にんじん','だいこん','きゅうり','なす']],['いろ',['あか','あお','しろ','きいろ']],['てんき',['はれ','あめ','くもり','ゆき']]];
+    Q.push(()=>{const it=N[this.rand(0,N.length-1)];const members=this.shuffle(it[1].slice()).slice(0,3);const others=this.shuffle(N.filter(x=>x!==it)).slice(0,3).map(x=>x[0]);return mc(members.join('・')+' は なんの なかま？',it[0],others,members.join('・')+' は みんな '+it[0]+' の なかまだよ。');});
+    Q.push(()=>{const it=N[this.rand(0,N.length-1)];const other=this.shuffle(N.filter(x=>x!==it))[0];const odd=other[1][this.rand(0,other[1].length-1)];const members=this.shuffle(it[1].slice()).slice(0,3);return mc('なかまはずれは どれ？',odd,members,'「'+odd+'」は '+other[0]+'。ほかは みんな '+it[0]+' の なかまだよ。');});
+    if(g>=3){
+    const KW=[['さるも木から落ちる','じょうずな 人でも しっぱいする ことが ある'],['犬も歩けばぼうに当たる','出歩くと 思いがけない ことに 出会う'],['石の上にも三年','がまんして つづければ うまくいく'],['ねこの手もかりたい','とても いそがしい'],['花よりだんご','見た目より 役に立つ ものが よい'],['口がかるい','ひみつを すぐ 話して しまう'],['頭をひねる','いっしょうけんめい 考える'],['耳にたこができる','同じ 話を なんども 聞かされる'],['馬が合う','気が 合う'],['手をかす','手つだう']];
+    Q.push(()=>{const it=KW[this.rand(0,KW.length-1)];const others=this.shuffle(KW.filter(x=>x!==it)).slice(0,3).map(x=>x[1]);return mc('「'+it[0]+'」の いみは？',it[1],others,'「'+it[0]+'」は 「'+it[1]+'」と いう いみだよ。');});
+    const JW=['あき','あさ','あめ','いえ','いぬ','いす','うた','うみ','えき','かい','かき','かさ','きた','くも','さかな','しか','すいか','そら','たけ','つき','ねこ','はし','はな','ふね','ほし','みかん','むし','やま','ゆき'];
+    Q.push(()=>{const ws=this.shuffle(JW.slice()).slice(0,3);const sorted=ws.slice().sort();const first=Math.random()<0.5;const ans=first?sorted[0]:sorted[2];return{topic:'goi',mode:'choices',prompt:ws.join('・')+' を 国語じてんの じゅんに ならべると、いちばん '+(first?'はじめ':'あと')+'に 出てくるのは？',answer:ans,choices:this.shuffle(ws.slice()),explanation:'五十音じゅんに ならべると '+sorted.join('→')+' だよ。'};});
+    }
+    return Q[this.rand(0,Q.length-1)]();}
+  pickDokkai(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'dokkai');const D=[
+    {g:1,t:'ねこが にわで ねて います。いぬが その よこで あそんで います。',q:'ねこは どこに いますか？',a:'にわ',c:['いえの 中','こうえん','やねの 上'],e:'「ねこが にわで ねて います」と 書いて あるよ。'},
+    {g:1,t:'たろうは あさ パンを たべました。それから がっこうへ いきました。',q:'たろうが たべた ものは？',a:'パン',c:['ごはん','みかん','たまご'],e:'はじめの ぶんに 「パンを たべました」と あるよ。'},
+    {g:1,t:'はなこは あかい ぼうしを かぶって、こうえんへ いきました。',q:'ぼうしの いろは？',a:'あか',c:['あお','しろ','きいろ'],e:'「あかい ぼうし」と 書いて あるよ。'},
+    {g:1,t:'きのうは あめが ふりました。きょうは はれて います。',q:'きょうの てんきは？',a:'はれ',c:['あめ','ゆき','くもり'],e:'「きょうは はれて います」と あるよ。'},
+    {g:1,t:'みかんが 3こ、りんごが 2こ あります。',q:'おおい くだものは どっち？',a:'みかん',c:['りんご'],e:'みかんは 3こ、りんごは 2こ。3こ の ほうが おおいね。'},
+    {g:1,t:'ゆうとは いぬと いっしょに かわへ いきました。',q:'ゆうとは どこへ いった？',a:'かわ',c:['うみ','やま','がっこう'],e:'「かわへ いきました」と 書いて あるよ。'},
+    {g:2,t:'日曜日、かなは 家ぞくと 海へ 行きました。かなは きれいな 貝を 三つ ひろいました。',q:'かなが ひろった ものは？',a:'貝',c:['石','花','魚'],e:'「貝を 三つ ひろいました」と あるよ。'},
+    {g:2,t:'けんたは 朝 早く おきて、犬の さんぽに 行きました。とちゅうで 友だちの ゆきさんに 会いました。',q:'けんたが 会ったのは だれ？',a:'ゆきさん',c:['先生','お母さん','おじいさん'],e:'「友だちの ゆきさんに 会いました」と あるよ。'},
+    {g:2,t:'学校の 帰りに 雨が ふって きました。ぼくは かさが なかったので、走って 家に 帰りました。',q:'ぼくが 走った わけは？',a:'かさが なかったから',c:['あそびたかったから','おなかが すいたから','さむかったから'],e:'「かさが なかったので、走って」と あるよ。'},
+    {g:2,t:'みほは 花だんに 花の たねを まきました。まい日 水を やると、小さな めが 出ました。',q:'めが 出るまで みほが まい日 した ことは？',a:'水を やった',c:['たねを まいた','花を つんだ','土を ほった'],e:'「まい日 水を やると、めが 出ました」と あるよ。'},
+    {g:2,t:'たけしは 本が すきです。としょかんで 毎週 二さつ かりて、ねる 前に 読みます。',q:'たけしが 本を 読むのは いつ？',a:'ねる 前',c:['朝ごはんの 前','学校の 帰り','昼休み'],e:'「ねる 前に 読みます」と あるよ。'},
+    {g:3,t:'図書館で 本を かりるには、カードが いります。カードは うけつけで 作って もらえます。',q:'カードを 作れる ばしょは？',a:'うけつけ',c:['学校','ゆうびんきょく','本だな'],e:'「カードは うけつけで 作って もらえます」と あるよ。'},
+    {g:3,t:'ひまわりは 夏に さく 花です。せが 高く のびて、太陽の ほうを むいて さきます。',q:'ひまわりが さく きせつは？',a:'夏',c:['春','秋','冬'],e:'「ひまわりは 夏に さく 花です」と あるよ。'},
+    {g:3,t:'ペンギンは 鳥の なかまですが、空を とぶ ことは できません。そのかわり、海の 中を じょうずに およぎます。',q:'ペンギンが じょうずに できる ことは？',a:'およぐ こと',c:['とぶ こと','木に のぼる こと','あなを ほる こと'],e:'「海の 中を じょうずに およぎます」と あるよ。'},
+    {g:3,t:'あすかは 九時に ねて、六時に おきます。朝ごはんの 前に、なわとびを 五十回 とびます。',q:'あすかが 朝ごはんの 前に する ことは？',a:'なわとび',c:['さんぽ','べんきょう','そうじ'],e:'「朝ごはんの 前に、なわとびを」と あるよ。'},
+    {g:3,t:'カブトムシは 夜に なると 木に あつまり、木の しるを なめます。昼の あいだは 土の 中で 休んで います。',q:'カブトムシが 昼に いる ばしょは？',a:'土の 中',c:['木の 上','空','水の 中'],e:'「昼の あいだは 土の 中で 休んで います」と あるよ。'}
+  ];const pool=D.filter(x=>x.g<=g);const early=stage<=2?pool.filter(x=>x.g===1):pool;const use=early.length?early:pool;const it=use[this.rand(0,use.length-1)];return{topic:'dokkai',mode:'choices',prompt:it.t+'　◆　'+it.q,answer:it.a,choices:this.pick4(it.a,it.c),explanation:it.e};}
 """;
     }
 
@@ -532,7 +586,7 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
   topicComplete(p,k){if(p&&p.cleared&&p.cleared[k])return true;return this.topicStage(p,k)>=4;}
   markCleared(p,k){if(this.topicStage(p,k)>=4)(p.cleared=p.cleared||{})[k]=true;}
   hissanComplete(p){return this.topicComplete(p,'hissan');}
-  allowedTopics(p){const all=Object.keys(this.topics);const cfg=this.state.settings;const en=(cfg&&cfg.topics)?all.filter(k=>cfg.topics[k]):all;const enabled=en.length?en:all;const grade=this.effectiveGrade(p),done=k=>this.topicComplete(p,k);const staged=['add'];if(done('add'))staged.push('sub','moji');if(done('sub'))staged.push('kazu','clock','story');if(done('moji'))staged.push('kokugo');if(done('kazu'))staged.push('measure','chart');if(done('measure'))staged.push('shape');if(grade>=2&&done('kazu'))staged.push('hissan');if(grade>=2&&done('hissan'))staged.push('mul');if(grade>=2&&done('mul'))staged.push('frac');if(grade>=3&&done('mul'))staged.push('div');const allowed=staged.filter(k=>enabled.includes(k));return allowed.length?allowed:staged;}
+  allowedTopics(p){const all=Object.keys(this.topics);const cfg=this.state.settings;const en=(cfg&&cfg.topics)?all.filter(k=>cfg.topics[k]):all;const enabled=en.length?en:all;const grade=this.effectiveGrade(p),done=k=>this.topicComplete(p,k);const staged=['add'];if(done('add'))staged.push('sub','moji');if(done('sub'))staged.push('kazu','clock','story');if(done('moji'))staged.push('kokugo','bun');if(done('bun'))staged.push('goi');if(done('kokugo'))staged.push('dokkai');if(done('kazu'))staged.push('measure','chart');if(done('measure'))staged.push('shape');if(grade>=2&&done('kazu'))staged.push('hissan');if(grade>=2&&done('hissan'))staged.push('mul');if(grade>=2&&done('mul'))staged.push('frac');if(grade>=3&&done('mul'))staged.push('div');const allowed=staged.filter(k=>enabled.includes(k));return allowed.length?allowed:staged;}
   weightedPick(p){const ks=this.allowedTopics(p);const w=ks.map(k=>{let base=0.25+(1-(Number(p.mastery[k])||0.05))*1.7;if(k==='hissan'&&!this.hissanComplete(p))base*=1.25;if(k==='mul'&&this.topicStage(p,'mul')<=1)base*=0.7;return base;});let s=w.reduce((a,b)=>a+b,0),r=Math.random()*s;for(let i=0;i<ks.length;i++){r-=w[i];if(r<=0)return ks[i];}return ks[0];}
 """;
     }
@@ -541,12 +595,12 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
     {
         markup = markup.Replace(
             "let isAddViz=false,addFrames=[],isKokugo=false,isNotKokugo=false,kokuPre='',kokuWord='',kokuPost='',kokuMean='',clockMarks=[],clockAskLabel='',showNumChoices=false,numChoiceTiles=[],showHsChoices=false,hsChoiceTiles=[];",
-            "let isAddViz=false,addFrames=[],isMulViz=false,mulGroups=[],isMeasureViz=false,measureRows=[],isShapeViz=false,shapeStyle='',isKokugo=false,isNotKokugo=false,kokuPre='',kokuWord='',kokuPost='',kokuMean='',kokuInstruction='',clockMarks=[],clockAskLabel='',showNumChoices=false,numChoiceTiles=[],showHsChoices=false,hsChoiceTiles=[];",
+            "let isAddViz=false,addFrames=[],isMulViz=false,mulGroups=[],isMeasureViz=false,measureRows=[],isShapeViz=false,shapeStyle='',promptStyle='',isKokugo=false,isNotKokugo=false,kokuPre='',kokuWord='',kokuPost='',kokuMean='',kokuInstruction='',clockMarks=[],clockAskLabel='',showNumChoices=false,numChoiceTiles=[],showHsChoices=false,hsChoiceTiles=[];",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
             "if(modeChoices)choices=q.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.submit(c)}));",
-            "if(modeChoices)choices=q.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.submit(c)}));\n      if(modeChoices&&q.topic==='mul'){isMulViz=true;const a=Number(q.a)||0,b=Number(q.b)||0;for(let g=0;g<b;g++){const cells=[];for(let i=0;i<a;i++)cells.push({style:'width:16px;height:16px;border-radius:50%;background:#1fa39a;border:2px solid #178a82;'});mulGroups.push({cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+Math.min(a,5)+',16px);gap:4px;padding:8px;border-radius:12px;border:3px solid #b8e8e2;background:#e6fbf7;'});}}\n      if(modeChoices&&q.isMeasure){isMeasureViz=true;[['あか','#e05a4e','#b8443a',Number(q.m1)||0],['あお','#4f7edb','#3a5fb0',Number(q.m2)||0]].forEach(r=>{const cells=[];for(let i=0;i<r[3];i++)cells.push({style:'width:24px;height:24px;border-radius:6px;background:'+r[1]+';border:2px solid '+r[2]+';'});measureRows.push({label:r[0],labelStyle:'font-size:22px;font-weight:900;min-width:56px;color:'+r[1]+';',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+r[3]+',24px);gap:4px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});});}\n      if(modeChoices&&q.isChart){isMeasureViz=true;(q.rows||[]).forEach(r=>{const cells=[];for(let i=0;i<r.count;i++)cells.push({style:'width:24px;height:24px;border-radius:6px;background:'+r.color+';border:2px solid '+r.border+';'});measureRows.push({label:r.label,labelStyle:'font-size:20px;font-weight:900;min-width:76px;color:#5b5040;',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+r.count+',24px);gap:4px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});});}\n      if(modeChoices&&q.isFracViz){isMeasureViz=true;const fd=Number(q.fd)||2,fn=Number(q.fn)||1,cells=[];for(let i=0;i<fd;i++)cells.push({style:'width:34px;height:34px;'+(i<fn?'background:#d64f8e;border:2px solid #b03a72;':'background:#fff;border:2px dashed #d8c4a0;')});measureRows.push({label:'',labelStyle:'display:none;',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+fd+',34px);gap:0px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});}\n      if(modeChoices&&q.isOrder){isMeasureViz=true;const oc=Number(q.oc)||5,op=Number(q.op)||1,cells=[];for(let i=0;i<oc;i++){const idx=q.od==='ひだり'?i+1:oc-i;cells.push({style:'width:36px;height:36px;border-radius:9px;'+(idx===op?'background:#f2a03d;border:3px solid #b07a10;':'background:#cfe3f7;border:2px solid #9db8d4;')});}measureRows.push({label:'',labelStyle:'display:none;',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+oc+',36px);gap:6px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});}\n      if(modeChoices&&q.isShape){isShapeViz=true;shapeStyle=q.shapeStyle||'';}\n      const plen=String(q.prompt||'').length,promptStyle='font-size:'+(plen>16?30:(plen>11?40:54))+'px; font-weight:900; text-align:center; margin-bottom:6px; white-space:'+(plen>16?'normal':'nowrap')+'; max-width:880px; line-height:1.35;';",
+            "if(modeChoices)choices=q.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.submit(c)}));\n      if(modeChoices&&q.topic==='mul'){isMulViz=true;const a=Number(q.a)||0,b=Number(q.b)||0;for(let g=0;g<b;g++){const cells=[];for(let i=0;i<a;i++)cells.push({style:'width:16px;height:16px;border-radius:50%;background:#1fa39a;border:2px solid #178a82;'});mulGroups.push({cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+Math.min(a,5)+',16px);gap:4px;padding:8px;border-radius:12px;border:3px solid #b8e8e2;background:#e6fbf7;'});}}\n      if(modeChoices&&q.isMeasure){isMeasureViz=true;[['あか','#e05a4e','#b8443a',Number(q.m1)||0],['あお','#4f7edb','#3a5fb0',Number(q.m2)||0]].forEach(r=>{const cells=[];for(let i=0;i<r[3];i++)cells.push({style:'width:24px;height:24px;border-radius:6px;background:'+r[1]+';border:2px solid '+r[2]+';'});measureRows.push({label:r[0],labelStyle:'font-size:22px;font-weight:900;min-width:56px;color:'+r[1]+';',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+r[3]+',24px);gap:4px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});});}\n      if(modeChoices&&q.isChart){isMeasureViz=true;(q.rows||[]).forEach(r=>{const cells=[];for(let i=0;i<r.count;i++)cells.push({style:'width:24px;height:24px;border-radius:6px;background:'+r.color+';border:2px solid '+r.border+';'});measureRows.push({label:r.label,labelStyle:'font-size:20px;font-weight:900;min-width:76px;color:#5b5040;',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+r.count+',24px);gap:4px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});});}\n      if(modeChoices&&q.isFracViz){isMeasureViz=true;const fd=Number(q.fd)||2,fn=Number(q.fn)||1,cells=[];for(let i=0;i<fd;i++)cells.push({style:'width:34px;height:34px;'+(i<fn?'background:#d64f8e;border:2px solid #b03a72;':'background:#fff;border:2px dashed #d8c4a0;')});measureRows.push({label:'',labelStyle:'display:none;',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+fd+',34px);gap:0px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});}\n      if(modeChoices&&q.isOrder){isMeasureViz=true;const oc=Number(q.oc)||5,op=Number(q.op)||1,cells=[];for(let i=0;i<oc;i++){const idx=q.od==='ひだり'?i+1:oc-i;cells.push({style:'width:36px;height:36px;border-radius:9px;'+(idx===op?'background:#f2a03d;border:3px solid #b07a10;':'background:#cfe3f7;border:2px solid #9db8d4;')});}measureRows.push({label:'',labelStyle:'display:none;',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+oc+',36px);gap:6px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});}\n      if(modeChoices&&q.isShape){isShapeViz=true;shapeStyle=q.shapeStyle||'';}\n      const plen=String(q.prompt||'').length;promptStyle='font-size:'+(plen>16?30:(plen>11?40:54))+'px; font-weight:900; text-align:center; margin-bottom:6px; white-space:'+(plen>16?'normal':'nowrap')+'; max-width:880px; line-height:1.35;';",
             StringComparison.Ordinal);
 
         markup = ReplaceBlock(
