@@ -219,12 +219,12 @@ internal sealed class TrainingForm : Form
           const parentPinKey = 'kt_parent_pin_v1';
           const profileName = __PROFILE_NAME__;
           const parentPassword = __PARENT_PASSWORD__;
-          const masteryKeys = ['add', 'sub', 'mul', 'clock', 'kokugo', 'hissan', 'moji'];
-          const beginnerMastery = { add: .05, sub: .05, mul: .05, clock: .05, kokugo: .05, hissan: .05, moji: .05 };
+          const masteryKeys = ['add', 'sub', 'mul', 'clock', 'kokugo', 'hissan', 'moji', 'measure'];
+          const beginnerMastery = { add: .05, sub: .05, mul: .05, clock: .05, kokugo: .05, hissan: .05, moji: .05, measure: .05 };
           const beginnerSettings = {
             count: 20,
             pass: 15,
-            topics: { add: true, sub: true, mul: true, clock: true, kokugo: true, hissan: true, moji: true }
+            topics: { add: true, sub: true, mul: true, clock: true, kokugo: true, hissan: true, moji: true, measure: true }
           };
           const defaultProfile = {
             name: profileName,

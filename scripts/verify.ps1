@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root "src\KidsTraining.App\KidsTraining.App.csproj"
@@ -10,13 +10,13 @@ $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
 $version = "1.4.5"
 
-$programSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\Program.cs")
-$traySource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
-$updateSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\UpdateManager.cs")
-$runtimeSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\RuntimeHtmlPreparer.cs")
-$trainingSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\TrainingForm.cs")
-$parentSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\ParentControlServer.cs")
-$parentSettingsSource = Get-Content -Raw (Join-Path $root "src\KidsTraining.App\ParentSettings.cs")
+$programSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Program.cs")
+$traySource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
+$updateSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\UpdateManager.cs")
+$runtimeSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\RuntimeHtmlPreparer.cs")
+$trainingSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\TrainingForm.cs")
+$parentSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\ParentControlServer.cs")
+$parentSettingsSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\ParentSettings.cs")
 
 if ($programSource -notmatch "TrayApplicationContext" -or $programSource -notmatch "--training" -or $programSource -notmatch "--auto-training" -or $programSource -notmatch "--apply-update") {
     throw "Program entry point must support tray, training, and update-runner modes"
@@ -50,10 +50,10 @@ if ($parentSettingsSource -notmatch "parentPassword" -or $parentSettingsSource -
 if ($programSource -notmatch "ParentControlServer.BuildParentPage" -or $programSource -notmatch "192.168.1.10" -or $programSource -notmatch "8.8.8.8" -or $programSource -notmatch "ParentSettings.NormalizePassword") {
     throw "Smoke test must validate parent control page, password validation, and LAN address filtering"
 }
-if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "moji:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "effectiveGrade\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics" -or $runtimeSource -notmatch "profileGrade:this\.gradeLabel") {
+if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "moji:\.05" -or $runtimeSource -notmatch "measure:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "effectiveGrade\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics" -or $runtimeSource -notmatch "profileGrade:this\.gradeLabel") {
     throw "Runtime HTML patch must start beginners at level 1 and stage topic difficulty"
 }
-if ($runtimeSource -notmatch "topicStage\(p,k\)" -or $runtimeSource -notmatch "hissanComplete\(p\)" -or $runtimeSource -notmatch "genHissan\(p\)" -or $runtimeSource -notmatch "!hissanDone\)staged=\['add','sub','clock','kokugo','moji','hissan'\]" -or $runtimeSource -notmatch "else staged=\['add','sub','clock','kokugo','moji','hissan','mul'\]" -or $runtimeSource -notmatch "pairs=\[\[1,2\],\[2,1\],\[2,2\]" -or $runtimeSource -notmatch "stage<=1\?\['hiragana'\]") {
+if ($runtimeSource -notmatch "topicStage\(p,k\)" -or $runtimeSource -notmatch "hissanComplete\(p\)" -or $runtimeSource -notmatch "genHissan\(p\)" -or $runtimeSource -notmatch "!hissanDone\)staged=\['add','sub','clock','kokugo','moji','measure','hissan'\]" -or $runtimeSource -notmatch "else staged=\['add','sub','clock','kokugo','moji','measure','hissan','mul'\]" -or $runtimeSource -notmatch "pairs=\[\[1,2\],\[2,1\],\[2,2\]" -or $runtimeSource -notmatch "stage<=1\?\['hiragana'\]") {
     throw "Runtime HTML patch must gate multiplication behind hissan completion and stage each topic from easy prompts"
 }
 if ($runtimeSource -notmatch "questionCount\?\?20" -or $runtimeSource -notmatch "passLine\?\?15") {
@@ -68,8 +68,14 @@ if ($runtimeSource -notmatch "PatchArithmeticVisuals" -or $runtimeSource -notmat
 if ($runtimeSource -notmatch "pickKokugo\(p\)" -or $runtimeSource -notmatch "subtype:'reading'" -or $runtimeSource -notmatch "subtype:'kanji-choice'" -or $runtimeSource -notmatch "kokuInstruction" -or $runtimeSource -notmatch "g:3") {
     throw "Runtime HTML patch must include grade 1-3 kanji reading and correct-kanji choice prompts"
 }
-if ($runtimeSource -notmatch "pickMoji\(p\)" -or $runtimeSource -notmatch "subtype:'alphabet'" -or $runtimeSource -notmatch "subtype:'hiragana'" -or $runtimeSource -notmatch "subtype:'katakana'" -or $runtimeSource -notmatch "1cm.*10mm" -or $runtimeSource -notmatch "30mm") {
+if ($runtimeSource -notmatch "pickMoji\(p\)" -or $runtimeSource -notmatch "subtype:'alphabet'" -or $runtimeSource -notmatch "subtype:'hiragana'" -or $runtimeSource -notmatch "subtype:'katakana'" -or $runtimeSource -notmatch "1cm.*10mm") {
     throw "Runtime HTML patch must include alphabet, hiragana, katakana, and millimeter questions"
+}
+if ($runtimeSource -notmatch "pickMeasure\(p\)" -or $runtimeSource -notmatch "measureCompare\(\)" -or $runtimeSource -notmatch "どちらが ながい？" -or $runtimeSource -notmatch "1kg は 何g？" -or $runtimeSource -notmatch "1km は 何m？" -or $runtimeSource -notmatch "1L は 何dL？" -or $runtimeSource -notmatch "measure:\{label:'たんい'" -or $runtimeSource -notmatch "isMeasureViz" -or $runtimeSource -notmatch "pickTimeUnits") {
+    throw "Runtime HTML patch must include a curriculum-aligned measurement topic and keep time units in the clock topic"
+}
+if ($runtimeSource -notmatch "10のまとまりで かんがえる" -or $runtimeSource -notmatch "tensReady") {
+    throw "Runtime HTML patch must generate counting-in-tens addition and subtraction (20+30, 50-20)"
 }
 if ($runtimeSource -notmatch "PatchRewardSystem" -or $runtimeSource -notmatch "gainXp" -or $runtimeSource -notmatch "xpLevel" -or $runtimeSource -notmatch "fbXp" -or $runtimeSource -notmatch "earnedXp" -or $runtimeSource -notmatch "べんきょうを つづける") {
     throw "Runtime HTML patch must include XP rewards without avatar customization"
@@ -143,7 +149,7 @@ if ($artifactsSmoke.ExitCode -ne 0) {
     throw "Artifacts smoke test failed with exit code $($artifactsSmoke.ExitCode)"
 }
 
-$generatedText = Get-Content -Raw $generatedWxs
+$generatedText = Get-Content -Raw -Encoding UTF8 $generatedWxs
 if ($generatedText -match "ProgramFilesFolder") {
     throw "Generated MSI source must not reference ProgramFilesFolder"
 }

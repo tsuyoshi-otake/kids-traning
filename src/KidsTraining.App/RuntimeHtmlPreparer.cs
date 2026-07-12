@@ -8,7 +8,7 @@ internal static class RuntimeHtmlPreparer
     public const string DefaultEmergencyPin = "1234";
     private const string TemplateOpenTag = "<script type=\"__bundler/template\">";
     private const string TemplateCloseTag = "</script>";
-    private const string BeginnerMasteryMarkup = "mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05}";
+    private const string BeginnerMasteryMarkup = "mastery:{add:.05,sub:.05,mul:.05,clock:.05,kokugo:.05,hissan:.05,moji:.05,measure:.05}";
 
     public static string PrimaryProfileName
     {
@@ -114,12 +114,12 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true},count:this.props.questionCount??10,pass:this.props.passLine??8};}",
-            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true},count:this.props.questionCount??20,pass:this.props.passLine??15};}",
+            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true},count:this.props.questionCount??20,pass:this.props.passLine??15};}",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
             "    kokugo:{label:'こくご',color:'#d2691e'},\n  };",
-            "    kokugo:{label:'こくご',color:'#d2691e'},\n    moji:{label:'もじ',color:'#4f7edb'},\n  };",
+            "    kokugo:{label:'こくご',color:'#d2691e'},\n    moji:{label:'もじ',color:'#4f7edb'},\n    measure:{label:'たんい',color:'#3aa655'},\n  };",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
@@ -129,7 +129,7 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "['add','sub','hissan','mul','clock','kokugo'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});",
-            "['add','sub','hissan','mul','clock','kokugo','moji'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});",
+            "['add','sub','hissan','mul','clock','kokugo','moji','measure'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});",
             StringComparison.Ordinal);
 
         markup = PatchRewardSystem(markup);
@@ -172,7 +172,7 @@ internal static class RuntimeHtmlPreparer
 
         markup = markup.Replace(
             "genFor(k){return k==='add'?this.genAdd():k==='sub'?this.genSub():k==='hissan'?this.genHissan():k==='mul'?this.pickMul():k==='clock'?this.pickClock():this.pickKokugo();}",
-            "genFor(k,p){return k==='add'?this.genAdd(p):k==='sub'?this.genSub(p):k==='hissan'?this.genHissan(p):k==='mul'?this.pickMul(p):k==='clock'?this.pickClock(p):k==='kokugo'?this.pickKokugo(p):this.pickMoji(p);}",
+            "genFor(k,p){return k==='add'?this.genAdd(p):k==='sub'?this.genSub(p):k==='hissan'?this.genHissan(p):k==='mul'?this.pickMul(p):k==='clock'?this.pickClock(p):k==='measure'?this.pickMeasure(p):k==='kokugo'?this.pickKokugo(p):this.pickMoji(p);}",
             StringComparison.Ordinal);
 
         markup = ReplaceBlock(
@@ -327,14 +327,14 @@ const sess=S.session||{};
     private static string BuildGenAddScript()
     {
         return """
-genAdd(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'add'),m=p&&p.mastery?Number(p.mastery.add):0.05,mentalAddendMax=9;let a,b;if(g<=1){if(stage<=1||m<0.30){a=this.rand(1,5);b=this.rand(1,5);if(a+b>10)b=Math.max(1,10-a);}else if(stage<=2||m<0.65){a=this.rand(2,9);b=this.rand(1,9);if(a+b>18)b=Math.max(1,18-a);}else{a=this.rand(10,29);b=this.rand(1,mentalAddendMax);}}else if(g===2){if(stage<=2||m<0.45){a=this.rand(10,88);if(a%10===9)a--;b=this.rand(1,Math.min(mentalAddendMax,9-(a%10)));}else{a=this.rand(18,89);b=this.rand(1,mentalAddendMax);}}else{if(stage<=3||m<0.55){a=this.rand(25,89);b=this.rand(1,mentalAddendMax);}else{a=this.rand(35,89);b=this.rand(1,mentalAddendMax);}}const ans=a+b;return{topic:'add',mode:'num',n1:a,n2:b,prompt:a+' + '+b,answer:''+ans,explanation:a+' + '+b+' = '+ans};}
+genAdd(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'add'),m=p&&p.mastery?Number(p.mastery.add):0.05,mentalAddendMax=9;const tensReady=g>=2||(stage>=3&&m>=0.65);if(tensReady&&Math.random()<0.35){const ta=this.rand(1,8),tb=this.rand(1,Math.min(9,10-ta)),ax=ta*10,bx=tb*10,tans=ax+bx;return{topic:'add',mode:'num',n1:ax,n2:bx,prompt:ax+' + '+bx,answer:''+tans,explanation:'10のまとまりで かんがえる。'+ta+' + '+tb+' = '+(ta+tb)+' だから '+ax+' + '+bx+' = '+tans+'。'};}let a,b;if(g<=1){if(stage<=1||m<0.30){a=this.rand(1,5);b=this.rand(1,5);if(a+b>10)b=Math.max(1,10-a);}else if(stage<=2||m<0.65){a=this.rand(2,9);b=this.rand(1,9);if(a+b>18)b=Math.max(1,18-a);}else{a=this.rand(10,29);b=this.rand(1,mentalAddendMax);}}else if(g===2){if(stage<=2||m<0.45){a=this.rand(10,88);if(a%10===9)a--;b=this.rand(1,Math.min(mentalAddendMax,9-(a%10)));}else{a=this.rand(18,89);b=this.rand(1,mentalAddendMax);}}else{if(stage<=3||m<0.55){a=this.rand(25,89);b=this.rand(1,mentalAddendMax);}else{a=this.rand(35,89);b=this.rand(1,mentalAddendMax);}}const ans=a+b;return{topic:'add',mode:'num',n1:a,n2:b,prompt:a+' + '+b,answer:''+ans,explanation:a+' + '+b+' = '+ans};}
 """;
     }
 
     private static string BuildGenSubScript()
     {
         return """
-genSub(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'sub'),m=p&&p.mastery?Number(p.mastery.sub):0.05,mentalSubtrahendMax=9;let a,b;if(g<=1){if(stage<=1||m<0.30){a=this.rand(2,10);b=this.rand(1,a-1);}else if(stage<=2||m<0.65){a=this.rand(11,18);b=this.rand(1,Math.max(1,a%10));}else{a=this.rand(11,29);b=this.rand(1,mentalSubtrahendMax);}}else if(g===2){if(stage<=2||m<0.45){a=this.rand(21,89);if(a%10===0)a++;b=this.rand(1,Math.min(mentalSubtrahendMax,a%10));}else{a=this.rand(30,99);b=this.rand(1,mentalSubtrahendMax);}}else{if(stage<=3||m<0.55){a=this.rand(35,99);b=this.rand(1,mentalSubtrahendMax);}else{a=this.rand(50,99);b=this.rand(1,mentalSubtrahendMax);}}const ans=a-b;return{topic:'sub',mode:'num',a:a,b:b,prompt:a+' - '+b,answer:''+ans,explanation:a+' - '+b+' = '+ans};}
+genSub(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'sub'),m=p&&p.mastery?Number(p.mastery.sub):0.05,mentalSubtrahendMax=9;const tensReady=g>=2||(stage>=3&&m>=0.65);if(tensReady&&Math.random()<0.35){const tb=this.rand(1,8),ta=this.rand(tb+1,9),ax=ta*10,bx=tb*10,tans=ax-bx;return{topic:'sub',mode:'num',a:ax,b:bx,prompt:ax+' - '+bx,answer:''+tans,explanation:'10のまとまりで かんがえる。'+ta+' - '+tb+' = '+(ta-tb)+' だから '+ax+' - '+bx+' = '+tans+'。'};}let a,b;if(g<=1){if(stage<=1||m<0.30){a=this.rand(2,10);b=this.rand(1,a-1);}else if(stage<=2||m<0.65){a=this.rand(11,18);b=this.rand(1,Math.max(1,a%10));}else{a=this.rand(11,29);b=this.rand(1,mentalSubtrahendMax);}}else if(g===2){if(stage<=2||m<0.45){a=this.rand(21,89);if(a%10===0)a++;b=this.rand(1,Math.min(mentalSubtrahendMax,a%10));}else{a=this.rand(30,99);b=this.rand(1,mentalSubtrahendMax);}}else{if(stage<=3||m<0.55){a=this.rand(35,99);b=this.rand(1,mentalSubtrahendMax);}else{a=this.rand(50,99);b=this.rand(1,mentalSubtrahendMax);}}const ans=a-b;return{topic:'sub',mode:'num',a:a,b:b,prompt:a+' - '+b,answer:''+ans,explanation:a+' - '+b+' = '+ans};}
 """;
     }
 
@@ -356,25 +356,49 @@ pickMul(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'mul'),m=p&&p.
     {
         return """
 clockExplain(h,m,ask,a){if(ask==='hour')return 'みじかい はり が '+h+' を さして いるね。こたえは '+a+'。';if(ask==='minute')return 'ながい はり が さす すうじ ×5 が ふん。'+(m/5)+'×5='+m+'ふん。こたえは '+a+'。';return 'みじかい はり＝じ、ながい はり＝ふん。こたえは '+a+'。';}
-  pickMeasure(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'clock');const L=g>=3&&stage>=4?[
-    ['1kg は 何g？','1000g',['100g','10g','10000g'],'1kg = 1000g。'],
+  pickTimeUnits(g){const eh=this.rand(1,10),em=[5,10,15,20][this.rand(0,3)],ed=[10,20,30][this.rand(0,2)];const elapsed=[eh+'時'+em+'分 の '+ed+'分後は？',eh+'時'+(em+ed)+'分',[eh+'時'+em+'分',(eh+1)+'時'+em+'分',eh+'時'+(em+ed-5)+'分'],em+'分に '+ed+'分を たすと '+(em+ed)+'分。'];const L=g>=3?[
     ['1分 は 何秒？','60秒',['30秒','100秒','10秒'],'1分 = 60秒。'],
-    ['1km は 何m？','1000m',['100m','10m','10000m'],'1km = 1000m。'],
-    ['3時10分 の 20分後は？','3時30分',['3時20分','4時10分','2時50分'],'10分に20分を足すと30分。']
-  ]:[
-    ['1m は 何cm？','100cm',['10cm','1000cm','1cm'],'1m = 100cm。'],
-    ['1cm は 何mm？','10mm',['1mm','100mm','5mm'],'1cm = 10mm。'],
-    ['30mm は 何cm？','3cm',['30cm','10cm','1cm'],'10mm = 1cm。30mm = 3cm。'],
-    ['1L は 何dL？','10dL',['100dL','1dL','5dL'],'1L = 10dL。'],
+    ['2分 は 何秒？','120秒',['60秒','100秒','200秒'],'1分=60秒 だから 2分=120秒。'],
     ['1時間 は 何分？','60分',['30分','100分','10分'],'1時間 = 60分。'],
-    ['10cm と 30cm を あわせると？','40cm',['20cm','30cm','50cm'],'10cm + 30cm = 40cm。']
+    ['1日 は 何時間？','24時間',['12時間','20時間','10時間'],'1日 = 24時間。'],
+    elapsed
+  ]:[
+    ['1時間 は 何分？','60分',['30分','100分','10分'],'1時間 = 60分。'],
+    ['1日 は 何時間？','24時間',['12時間','20時間','10時間'],'1日 = 24時間。'],
+    ['ごぜん は 何時間？','12時間',['10時間','24時間','6時間'],'ごぜんは 12時間、ごごも 12時間。'],
+    elapsed
   ];const it=L[this.rand(0,L.length-1)];return{topic:'clock',mode:'choices',prompt:it[0],answer:it[1],choices:this.pick4(it[1],it[2]),explanation:it[3]};}
-  pickClock(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'clock');if(g>=2&&stage>=4&&Math.random()<0.35)return this.pickMeasure(p);const hourStr=x=>((x-1+12)%12+1)+'じ';const kinds=stage<=1?['hour','hour']:stage===2?['hour','hour','half']:stage===3?['hour','half','minute']:(g>=2?['hour','half','minute','both']:['hour','hour','half','minute']);const k=kinds[this.rand(0,kinds.length-1)];let h=this.rand(1,12),m=0,ask='hour',prompt='なんじ？',a='',pool=[];
+  pickClock(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'clock');if(g>=2&&stage>=4&&Math.random()<0.3)return this.pickTimeUnits(g);const hourStr=x=>((x-1+12)%12+1)+'じ';const kinds=stage<=1?['hour','hour']:stage===2?['hour','hour','half']:stage===3?['hour','half','minute']:(g>=2?['hour','half','minute','both']:['hour','hour','half','minute']);const k=kinds[this.rand(0,kinds.length-1)];let h=this.rand(1,12),m=0,ask='hour',prompt='なんじ？',a='',pool=[];
     if(k==='hour'){m=0;ask='hour';prompt='とけいを よもう ・ なんじ？';a=h+'じ';pool=[hourStr(h+1),hourStr(h-1),hourStr(h+2),hourStr(h+3)];}
     else if(k==='half'){m=30;ask='both';prompt='とけいを よもう ・ なんじ なんぷん？';a=h+'じ30ぷん';pool=[hourStr(h+1).replace('じ','じ30ぷん'),h+'じ',hourStr(h-1).replace('じ','じ30ぷん'),hourStr(h+2).replace('じ','じ30ぷん')];}
     else if(k==='minute'){const mins=[5,10,15,20,25,35,40,45,50,55];m=mins[this.rand(0,mins.length-1)];ask='minute';prompt='ながい はりを よもう ・ なんぷん？';a=m+'ふん';pool=[5,10,15,20,25,30,35,40,45,50,55].filter(x=>x!==m).map(x=>x+'ふん');}
     else{const mins=[10,15,20,40,45,50];m=mins[this.rand(0,mins.length-1)];ask='both';prompt='とけいを よもう ・ なんじ なんぷん？';a=h+'じ'+m+'ふん';pool=[hourStr(h+1).replace('じ','じ'+m+'ふん'),h+'じ'+(m===15?45:15)+'ふん',hourStr(h-1).replace('じ','じ'+m+'ふん'),h+'じ'];}
     return{topic:'clock',mode:'choices',isClock:true,h:h,m:m,ask:ask,prompt:prompt,answer:a,choices:this.pick4(a,pool),explanation:this.clockExplain(h,m,ask,a)};}
+  measureCompare(){const kinds=[['length','どちらが ながい？','ながい','ます','こぶん'],['volume','どちらが たくさん はいる？','たくさん はいる','コップ','はいぶん'],['area','どちらが ひろい？','ひろい','ます','こぶん']];const kk=kinds[this.rand(0,2)];let n1=this.rand(3,9),n2=this.rand(3,9);while(n2===n1)n2=this.rand(3,9);const win=n1>n2?'あか':'あお';return{topic:'measure',mode:'choices',isMeasure:true,mkind:kk[0],m1:n1,m2:n2,prompt:kk[1],answer:win,choices:this.shuffle(['あか','あお']),explanation:'あかは '+kk[3]+' '+n1+kk[4]+'、あおは '+kk[3]+' '+n2+kk[4]+'。'+win+'の ほうが '+kk[2]+'。'};}
+  pickMeasure(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'measure');if(g<=1)return this.measureCompare();const mc=(pr,ans,pool,ex)=>({topic:'measure',mode:'choices',prompt:pr,answer:ans,choices:this.pick4(ans,pool),explanation:ex});const Q=[];
+    Q.push(()=>mc('1cm は 何mm？','10mm',['1mm','100mm','5mm'],'1cm = 10mm。'));
+    Q.push(()=>{const k=this.rand(2,9);return mc(k+'cm は 何mm？',(k*10)+'mm',[k+'mm',(k*100)+'mm',(k*10+5)+'mm'],'1cm = 10mm。'+k+'cm = '+(k*10)+'mm。');});
+    Q.push(()=>{const k=this.rand(2,9);return mc((k*10)+'mm は 何cm？',k+'cm',[(k*10)+'cm',(k+1)+'cm',(k*100)+'cm'],'10mm = 1cm。'+(k*10)+'mm = '+k+'cm。');});
+    Q.push(()=>{const k=this.rand(1,9);return mc(k+'m は 何cm？',(k*100)+'cm',[(k*10)+'cm',(k*1000)+'cm',(k*100+10)+'cm'],'1m = 100cm。'+k+'m = '+(k*100)+'cm。');});
+    Q.push(()=>mc('1L は 何dL？','10dL',['100dL','1dL','5dL'],'1L = 10dL。'));
+    Q.push(()=>{const k=this.rand(2,9);return mc(k+'L は 何dL？',(k*10)+'dL',[k+'dL',(k*100)+'dL',(k*10+5)+'dL'],'1L = 10dL。'+k+'L = '+(k*10)+'dL。'); });
+    Q.push(()=>mc('1L は 何mL？','1000mL',['100mL','10mL','500mL'],'1L = 1000mL。'));
+    Q.push(()=>mc('1dL は 何mL？','100mL',['10mL','1000mL','50mL'],'1dL = 100mL。'));
+    Q.push(()=>{const its=[['えんぴつの ながさ','cm',['mm','m','L']],['プールの たての ながさ','m',['cm','mm','dL']],['ありの おおきさ','mm',['cm','m','kg']],['ぎゅうにゅうパックの かさ','L',['cm','m','g']]];const it=its[this.rand(0,its.length-1)];return mc(it[0]+' に あう たんいは？',it[1],it[2],it[0]+' は '+it[1]+' が ぴったり。');});
+    if(stage>=3){
+    Q.push(()=>{const x=this.rand(1,6)*10,y=this.rand(1,Math.min(6,Math.floor((90-x)/10)))*10;return mc(x+'cm + '+y+'cm は？',(x+y)+'cm',[(x+y-10)+'cm',(x+y+10)+'cm',(x+y)+'mm'],x+'cm + '+y+'cm = '+(x+y)+'cm。');});
+    Q.push(()=>{const a2=this.rand(2,4),b2=this.rand(1,5);return mc(a2+'L'+b2+'dL は 何dL？',(a2*10+b2)+'dL',[(a2+b2)+'dL',(a2*10)+'dL',(a2*100+b2)+'dL'],a2+'L = '+(a2*10)+'dL。あわせて '+(a2*10+b2)+'dL。');});
+    Q.push(()=>{const c=this.rand(2,8),d=this.rand(1,9);return mc(c+'cm'+d+'mm は 何mm？',(c*10+d)+'mm',[(c+d)+'mm',(c*10)+'mm',(c*100+d)+'mm'],c+'cm = '+(c*10)+'mm。あわせて '+(c*10+d)+'mm。');});
+    }
+    if(g>=3){
+    Q.push(()=>mc('1km は 何m？','1000m',['100m','10m','10000m'],'1km = 1000m。'));
+    Q.push(()=>{const k=this.rand(2,9);return mc(k+'km は 何m？',(k*1000)+'m',[(k*100)+'m',(k*10)+'m',(k*10000)+'m'],'1km = 1000m。'+k+'km = '+(k*1000)+'m。');});
+    Q.push(()=>mc('1kg は 何g？','1000g',['100g','10g','10000g'],'1kg = 1000g。'));
+    Q.push(()=>{const k=this.rand(2,9);return mc(k+'kg は 何g？',(k*1000)+'g',[(k*100)+'g',(k*10)+'g',k+'g'],'1kg = 1000g。'+k+'kg = '+(k*1000)+'g。');});
+    Q.push(()=>{const k=this.rand(1,9);return mc('1kg'+(k*100)+'g は 何g？',(1000+k*100)+'g',[(100+k*100)+'g',(k*100)+'g',(1000+k*10)+'g'],'1kg = 1000g。あわせて '+(1000+k*100)+'g。');});
+    Q.push(()=>{const x=this.rand(2,7)*100,y=1000-x;return mc(x+'g + '+y+'g は 何kg？','1kg',['2kg','10kg','100g'],x+'g + '+y+'g = 1000g = 1kg。');});
+    }
+    return Q[this.rand(0,Q.length-1)]();}
 """;
     }
 
@@ -403,7 +427,7 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
   learningStage(p){const level=this.skillLevel(p),stars=Number(p.stars)||0;if(stars<15&&level<=1)return 1;if(stars<45||level<=2)return 2;if(stars<90||level<=3)return 3;return 4;}
   topicStage(p,k){const m=Number((p&&p.mastery&&p.mastery[k])||0.05);if(m<0.25)return 1;if(m<0.45)return 2;if(m<0.65)return 3;return 4;}
   hissanComplete(p){return this.topicStage(p,'hissan')>=4;}
-  allowedTopics(p){const all=Object.keys(this.topics);const cfg=this.state.settings;const en=(cfg&&cfg.topics)?all.filter(k=>cfg.topics[k]):all;const enabled=en.length?en:all;const stage=this.learningStage(p),grade=this.effectiveGrade(p),hissanDone=this.hissanComplete(p);let staged;if(stage<=1)staged=['add'];else if(stage===2)staged=['add','sub','moji'];else if(grade<=1)staged=['add','sub','clock','kokugo','moji'];else if(!hissanDone)staged=['add','sub','clock','kokugo','moji','hissan'];else staged=['add','sub','clock','kokugo','moji','hissan','mul'];const allowed=staged.filter(k=>enabled.includes(k));return allowed.length?allowed:staged;}
+  allowedTopics(p){const all=Object.keys(this.topics);const cfg=this.state.settings;const en=(cfg&&cfg.topics)?all.filter(k=>cfg.topics[k]):all;const enabled=en.length?en:all;const stage=this.learningStage(p),grade=this.effectiveGrade(p),hissanDone=this.hissanComplete(p);let staged;if(stage<=1)staged=['add'];else if(stage===2)staged=['add','sub','moji'];else if(grade<=1)staged=['add','sub','clock','kokugo','moji','measure'];else if(!hissanDone)staged=['add','sub','clock','kokugo','moji','measure','hissan'];else staged=['add','sub','clock','kokugo','moji','measure','hissan','mul'];const allowed=staged.filter(k=>enabled.includes(k));return allowed.length?allowed:staged;}
   weightedPick(p){const ks=this.allowedTopics(p);const w=ks.map(k=>{let base=0.25+(1-(Number(p.mastery[k])||0.05))*1.7;if(k==='hissan'&&!this.hissanComplete(p))base*=1.25;if(k==='mul'&&this.topicStage(p,'mul')<=1)base*=0.7;return base;});let s=w.reduce((a,b)=>a+b,0),r=Math.random()*s;for(let i=0;i<ks.length;i++){r-=w[i];if(r<=0)return ks[i];}return ks[0];}
 """;
     }
@@ -412,12 +436,12 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
     {
         markup = markup.Replace(
             "let isAddViz=false,addFrames=[],isKokugo=false,isNotKokugo=false,kokuPre='',kokuWord='',kokuPost='',kokuMean='',clockMarks=[],clockAskLabel='',showNumChoices=false,numChoiceTiles=[],showHsChoices=false,hsChoiceTiles=[];",
-            "let isAddViz=false,addFrames=[],isMulViz=false,mulGroups=[],isKokugo=false,isNotKokugo=false,kokuPre='',kokuWord='',kokuPost='',kokuMean='',kokuInstruction='',clockMarks=[],clockAskLabel='',showNumChoices=false,numChoiceTiles=[],showHsChoices=false,hsChoiceTiles=[];",
+            "let isAddViz=false,addFrames=[],isMulViz=false,mulGroups=[],isMeasureViz=false,measureRows=[],isKokugo=false,isNotKokugo=false,kokuPre='',kokuWord='',kokuPost='',kokuMean='',kokuInstruction='',clockMarks=[],clockAskLabel='',showNumChoices=false,numChoiceTiles=[],showHsChoices=false,hsChoiceTiles=[];",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
             "if(modeChoices)choices=q.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.submit(c)}));",
-            "if(modeChoices)choices=q.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.submit(c)}));\n      if(modeChoices&&q.topic==='mul'){isMulViz=true;const a=Number(q.a)||0,b=Number(q.b)||0;for(let g=0;g<b;g++){const cells=[];for(let i=0;i<a;i++)cells.push({style:'width:16px;height:16px;border-radius:50%;background:#1fa39a;border:2px solid #178a82;'});mulGroups.push({cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+Math.min(a,5)+',16px);gap:4px;padding:8px;border-radius:12px;border:3px solid #b8e8e2;background:#e6fbf7;'});}}",
+            "if(modeChoices)choices=q.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.submit(c)}));\n      if(modeChoices&&q.topic==='mul'){isMulViz=true;const a=Number(q.a)||0,b=Number(q.b)||0;for(let g=0;g<b;g++){const cells=[];for(let i=0;i<a;i++)cells.push({style:'width:16px;height:16px;border-radius:50%;background:#1fa39a;border:2px solid #178a82;'});mulGroups.push({cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+Math.min(a,5)+',16px);gap:4px;padding:8px;border-radius:12px;border:3px solid #b8e8e2;background:#e6fbf7;'});}}\n      if(modeChoices&&q.isMeasure){isMeasureViz=true;[['あか','#e05a4e','#b8443a',Number(q.m1)||0],['あお','#4f7edb','#3a5fb0',Number(q.m2)||0]].forEach(r=>{const cells=[];for(let i=0;i<r[3];i++)cells.push({style:'width:24px;height:24px;border-radius:6px;background:'+r[1]+';border:2px solid '+r[2]+';'});measureRows.push({label:r[0],labelStyle:'font-size:22px;font-weight:900;min-width:56px;color:'+r[1]+';',cells:cells,style:'display:inline-grid;grid-template-columns:repeat('+r[3]+',24px);gap:4px;padding:8px;border-radius:12px;border:3px solid #f0e2c8;background:#fff;'});});}",
             StringComparison.Ordinal);
 
         markup = ReplaceBlock(
@@ -428,7 +452,7 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
 
         markup = markup.Replace(
             "<div style=\"font-size:54px; font-weight:900; text-align:center; margin-bottom:6px; white-space:nowrap;\">{{ prompt }}</div>",
-            "<div style=\"font-size:54px; font-weight:900; text-align:center; margin-bottom:6px; white-space:nowrap;\">{{ prompt }}</div>\n            <sc-if value=\"{{ isMulViz }}\" hint-placeholder-val=\"{{ false }}\">\n              <div style=\"display:flex; flex-wrap:wrap; gap:10px; justify-content:center; align-items:center; margin:8px 0 10px; max-width:720px;\">\n                <sc-for list=\"{{ mulGroups }}\" as=\"grp\" hint-placeholder-count=\"6\">\n                  <div style=\"{{ grp.style }}\">\n                    <sc-for list=\"{{ grp.cells }}\" as=\"cell\" hint-placeholder-count=\"8\"><div style=\"{{ cell.style }}\"></div></sc-for>\n                  </div>\n                </sc-for>\n              </div>\n            </sc-if>",
+            "<div style=\"font-size:54px; font-weight:900; text-align:center; margin-bottom:6px; white-space:nowrap;\">{{ prompt }}</div>\n            <sc-if value=\"{{ isMulViz }}\" hint-placeholder-val=\"{{ false }}\">\n              <div style=\"display:flex; flex-wrap:wrap; gap:10px; justify-content:center; align-items:center; margin:8px 0 10px; max-width:720px;\">\n                <sc-for list=\"{{ mulGroups }}\" as=\"grp\" hint-placeholder-count=\"6\">\n                  <div style=\"{{ grp.style }}\">\n                    <sc-for list=\"{{ grp.cells }}\" as=\"cell\" hint-placeholder-count=\"8\"><div style=\"{{ cell.style }}\"></div></sc-for>\n                  </div>\n                </sc-for>\n              </div>\n            </sc-if>\n            <sc-if value=\"{{ isMeasureViz }}\" hint-placeholder-val=\"{{ false }}\">\n              <div style=\"display:flex; flex-direction:column; gap:10px; align-items:flex-start; margin:8px auto 10px; width:max-content;\">\n                <sc-for list=\"{{ measureRows }}\" as=\"mrow\" hint-placeholder-count=\"2\">\n                  <div style=\"display:flex; align-items:center; gap:10px;\">\n                    <div style=\"{{ mrow.labelStyle }}\">{{ mrow.label }}</div>\n                    <div style=\"{{ mrow.style }}\">\n                      <sc-for list=\"{{ mrow.cells }}\" as=\"mcell\" hint-placeholder-count=\"6\"><div style=\"{{ mcell.style }}\"></div></sc-for>\n                    </div>\n                  </div>\n                </sc-for>\n              </div>\n            </sc-if>",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
@@ -443,7 +467,7 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
 
         markup = markup.Replace(
             "isAddViz:isAddViz, addFrames:addFrames,\n      isKokugo:isKokugo",
-            "isAddViz:isAddViz, addFrames:addFrames, isMulViz:isMulViz, mulGroups:mulGroups,\n      isKokugo:isKokugo",
+            "isAddViz:isAddViz, addFrames:addFrames, isMulViz:isMulViz, mulGroups:mulGroups, isMeasureViz:isMeasureViz, measureRows:measureRows,\n      isKokugo:isKokugo",
             StringComparison.Ordinal);
 
         markup = markup.Replace(

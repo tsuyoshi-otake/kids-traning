@@ -20,7 +20,8 @@ The MSI is written to `artifacts\KidsTraining.msi`.
 - New or unstarted profiles start at grade 1, level 1, and beginner mastery (`.05`). Real progress is kept when stars, streaks, or mastery have changed.
 - Difficulty is staged from easiest first-grade addition, then subtraction, then clock/kokugo, then hissan, and only after hissan mastery reaches the completion threshold does multiplication unlock.
 - Each learning session asks 20 questions and requires 15 correct answers to pass.
-- Non-hissan addition and subtraction never generate two-digit-by-two-digit mental arithmetic; those larger written-calculation shapes belong to the hissan topic.
+- Non-hissan addition and subtraction never generate two-digit-by-two-digit mental arithmetic, with one curriculum-mandated exception: counting-in-tens problems (何十±何十 such as 20+30 or 50-20) appear from late grade-1 stages, matching the MEXT grade 1-2 mental arithmetic scope. Other larger written-calculation shapes belong to the hissan topic.
+- A dedicated たんい (measurement) topic follows the MEXT curriculum: grade 1 gets visual direct comparison (which is longer / holds more / is wider, counted in arbitrary units), grade 2 gets mm/cm/m and mL/dL/L conversions plus same-unit arithmetic, and grade 3 adds g/kg, km, and composite conversions. Time units (hour/minute/second, elapsed time, 1 day = 24 hours) stay inside the clock topic.
 - Non-hissan arithmetic shows level-aligned visual aids under the question: concrete/ten-frame dots for addition, crossed-out dots for subtraction, and equal groups for multiplication.
 - Initial emergency unlock password is `1234`. It can be changed from the parent control page.
 - The window runs fullscreen, topmost, and blocks normal close shortcuts until completion.
