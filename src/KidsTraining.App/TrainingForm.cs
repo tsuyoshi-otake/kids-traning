@@ -278,9 +278,24 @@ internal sealed class TrainingForm : Form
             const source = Array.isArray(parsed) && parsed.length ? parsed[0] : parsed;
             const normalized = normalizeProfile(source);
             localStorage.setItem(key, JSON.stringify([normalized]));
-            if (!localStorage.getItem(settingsKey) || !hasMeaningfulProgress(normalized)) {
-              localStorage.setItem(settingsKey, JSON.stringify(beginnerSettings));
+            const rawSettings = localStorage.getItem(settingsKey);
+            let parsedSettings = null;
+            try { parsedSettings = rawSettings ? JSON.parse(rawSettings) : null; } catch {}
+            const sourceSettings = parsedSettings && typeof parsedSettings === 'object' ? parsedSettings : {};
+            const previousCount = numberOrDefault(sourceSettings.count, beginnerSettings.count);
+            const migratedFromTen = previousCount <= 10;
+            const normalizedSettings = {
+              ...beginnerSettings,
+              ...sourceSettings,
+              topics: { ...beginnerSettings.topics, ...(sourceSettings.topics || {}) },
+              count: Math.max(20, Math.min(40, previousCount)),
+              pass: migratedFromTen ? 15 : Math.max(1, Math.min(numberOrDefault(sourceSettings.pass, 15), Math.max(20, previousCount)))
+            };
+            if (!hasMeaningfulProgress(normalized)) {
+              normalizedSettings.count = beginnerSettings.count;
+              normalizedSettings.pass = beginnerSettings.pass;
             }
+            localStorage.setItem(settingsKey, JSON.stringify(normalizedSettings));
           } catch {
             try {
               localStorage.setItem(parentPinKey, parentPassword);

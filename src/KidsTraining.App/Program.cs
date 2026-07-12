@@ -96,7 +96,7 @@ internal static class Program
                 !template.Contains("isShapeViz", StringComparison.Ordinal) ||
                 !template.Contains("promptStyle", StringComparison.Ordinal) ||
                 !template.Contains("markCleared", StringComparison.Ordinal) ||
-                !template.Contains("クリア！", StringComparison.Ordinal) ||
+                !template.Contains("'Lv.'+masteryLevel+'/5'", StringComparison.Ordinal) ||
                 !template.Contains("なんばんめ", StringComparison.Ordinal) ||
                 !template.Contains("subtype:'kotoba'", StringComparison.Ordinal) ||
                 !template.Contains("isOrder", StringComparison.Ordinal) ||
@@ -143,6 +143,9 @@ internal static class Program
                 !template.Contains("pickStage(stage,buckets,reviewRate=.25)", StringComparison.Ordinal) ||
                 !template.Contains("reviewStage(p,k)", StringComparison.Ordinal) ||
                 !template.Contains("profileAtStage(p,k,stage)", StringComparison.Ordinal) ||
+                !template.Contains("if(m<0.20)return 1;if(m<0.40)return 2;if(m<0.60)return 3;if(m<0.80)return 4;return 5", StringComparison.Ordinal) ||
+                !template.Contains("Math.min(5,Number(stage)||1)", StringComparison.Ordinal) ||
+                !template.Contains("this.topicStage(p,k)>=5", StringComparison.Ordinal) ||
                 !template.Contains("fromPairs([[1,2],[2,1],[2,2]", StringComparison.Ordinal) ||
                 !template.Contains("prompt:a+' × '+b", StringComparison.Ordinal) ||
                 template.Contains("prompt:a+' x '+b", StringComparison.Ordinal) ||

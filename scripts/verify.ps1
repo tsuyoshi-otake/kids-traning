@@ -8,7 +8,7 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.8.0"
+$version = "1.9.0"
 
 $programSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Program.cs")
 $traySource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
@@ -59,6 +59,12 @@ if ($runtimeSource -notmatch "topicStage\(p,k\)" -or $runtimeSource -notmatch "t
 if ($runtimeSource -notmatch "questionCount\?\?20" -or $runtimeSource -notmatch "passLine\?\?15") {
     throw "Runtime HTML patch must default to 20 questions and 15 correct answers"
 }
+if ($trainingSource -notmatch "previousCount <= 10" -or $trainingSource -notmatch "Math\.max\(20, Math\.min\(40, previousCount\)\)" -or $runtimeSource -notmatch "this\.clamp\(\(Number\(s\.count\)\|\|20\)\+d,20,40\)") {
+    throw "Legacy 10-question settings must migrate to a minimum of 20 questions"
+}
+if ($runtimeSource -notmatch "if\(m<0\.20\)return 1" -or $runtimeSource -notmatch "if\(m<0\.40\)return 2" -or $runtimeSource -notmatch "if\(m<0\.60\)return 3" -or $runtimeSource -notmatch "if\(m<0\.80\)return 4" -or $runtimeSource -notmatch "Math\.min\(5,Number\(stage\)\|\|1\)" -or $runtimeSource -notmatch "'Lv\.'\+masteryLevel\+'/5'" -or $runtimeSource -notmatch "topicStage\(p,k\)>=5") {
+    throw "Every topic must use and display the shared five-level mastery scale"
+}
 if ($runtimeSource -notmatch "pickStage\(stage,buckets,reviewRate=\.25\)" -or $runtimeSource -notmatch "reviewStage\(p,k\)" -or $runtimeSource -notmatch "profileAtStage\(p,k,stage\)" -or $runtimeSource -notmatch [regex]::Escape("[()=>exact(2,1),()=>exact(2,2),()=>exact(2,3)]") -or $runtimeSource -match [regex]::Escape("prompt:a+' x '+b") -or $runtimeSource -match "b=this\.rand\(11,a-1\)" -or $runtimeSource -match "b=this\.rand\(1,40\)" -or $runtimeSource -match "b=this\.rand\(12,79\)" -or $runtimeSource -match "b=this\.rand\(11,79\)" -or $runtimeSource -match "b=this\.rand\(10,99-a\)" -or $runtimeSource -match "b=this\.rand\(20,a-1\)" -or $runtimeSource -match "Math\.min\(40,a-1\)") {
     throw "Runtime HTML patch must keep non-hissan add/sub from generating two-digit-by-two-digit mental arithmetic"
 }
@@ -80,7 +86,7 @@ if ($runtimeSource -notmatch "10のまとまりで かんがえる" -or $runtime
 if ($runtimeSource -notmatch "pickKazu\(p\)" -or $runtimeSource -notmatch "pickShape\(p\)" -or $runtimeSource -notmatch "pickDiv\(p\)" -or $runtimeSource -notmatch "pickFrac\(p\)" -or $runtimeSource -notmatch "pickChart\(p\)" -or $runtimeSource -notmatch "pickStory\(p\)" -or $runtimeSource -notmatch "あまり" -or $runtimeSource -notmatch "正三角形" -or $runtimeSource -notmatch "subtype:'romaji'" -or $runtimeSource -notmatch "isShapeViz" -or $runtimeSource -notmatch "isFracViz" -or $runtimeSource -notmatch "isChart" -or $runtimeSource -notmatch "promptStyle") {
     throw "Runtime HTML patch must cover large numbers, shapes, division with remainders, fractions/decimals, charts, word problems, and romaji"
 }
-if ($runtimeSource -notmatch "なんばんめ" -or $runtimeSource -notmatch "subtype:'kotoba'" -or $runtimeSource -notmatch "markCleared" -or $runtimeSource -notmatch "クリア！" -or $runtimeSource -notmatch "isOrder" -or $runtimeSource -notmatch [regex]::Escape("prompt:x+' + '+y+' + '+z")) {
+if ($runtimeSource -notmatch "なんばんめ" -or $runtimeSource -notmatch "subtype:'kotoba'" -or $runtimeSource -notmatch "markCleared" -or $runtimeSource -notmatch "masteryLevel" -or $runtimeSource -notmatch "isOrder" -or $runtimeSource -notmatch [regex]::Escape("prompt:x+' + '+y+' + '+z")) {
     throw "Runtime HTML patch must include ordinal positions, spelling words, three-number calculations, and sticky visible clears"
 }
 if ($runtimeSource -notmatch "pickBun\(p\)" -or $runtimeSource -notmatch "pickGoi\(p\)" -or $runtimeSource -notmatch "pickDokkai\(p\)" -or $runtimeSource -notmatch "bun:\.05" -or $runtimeSource -notmatch "goi:\.05" -or $runtimeSource -notmatch "dokkai:\.05" -or $runtimeSource -notmatch [regex]::Escape("if(done('moji'))staged.push('kokugo','bun')") -or $runtimeSource -notmatch [regex]::Escape("if(done('bun'))staged.push('goi')") -or $runtimeSource -notmatch [regex]::Escape("if(done('kokugo'))staged.push('dokkai')")) {
