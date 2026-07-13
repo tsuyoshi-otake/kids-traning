@@ -120,7 +120,7 @@ internal static class Program
                 !template.Contains("isShapeViz", StringComparison.Ordinal) ||
                 !template.Contains("promptStyle", StringComparison.Ordinal) ||
                 !template.Contains("markCleared", StringComparison.Ordinal) ||
-                !template.Contains("'Lv.'+masteryLevel+'/5'", StringComparison.Ordinal) ||
+                !template.Contains("topicReady(p,k", StringComparison.Ordinal) ||
                 !template.Contains("なんばんめ", StringComparison.Ordinal) ||
                 !template.Contains("subtype:'kotoba'", StringComparison.Ordinal) ||
                 !template.Contains("isOrder", StringComparison.Ordinal) ||
@@ -139,10 +139,10 @@ internal static class Program
                 !template.Contains("learningStage(p)", StringComparison.Ordinal) ||
                 !template.Contains("topicStage(p,k)", StringComparison.Ordinal) ||
                 !template.Contains("hissanComplete(p)", StringComparison.Ordinal) ||
-                !template.Contains("if(done('add'))staged.push('sub','moji')", StringComparison.Ordinal) ||
-                !template.Contains("if(done('moji'))staged.push('kokugo','bun')", StringComparison.Ordinal) ||
-                !template.Contains("if(done('bun'))staged.push('goi')", StringComparison.Ordinal) ||
-                !template.Contains("if(done('kokugo'))staged.push('dokkai')", StringComparison.Ordinal) ||
+                !template.Contains("gradeTopics(p)", StringComparison.Ordinal) ||
+                !template.Contains("s.independent>=8", StringComparison.Ordinal) ||
+                !template.Contains("s.attempts>=10", StringComparison.Ordinal) ||
+                template.Contains("if(done('add'))staged.push", StringComparison.Ordinal) ||
                 !template.Contains("pickBun(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickGoi(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickDokkai(p)", StringComparison.Ordinal) ||
@@ -159,17 +159,17 @@ internal static class Program
                 !template.Contains("あつめた 数は？", StringComparison.Ordinal) ||
                 !template.Contains("pickEigo(p)", StringComparison.Ordinal) ||
                 !template.Contains("topic:'eigo'", StringComparison.Ordinal) ||
-                !template.Contains("if(grade>=3&&done('moji'))staged.push('eigo')", StringComparison.Ordinal) ||
+                !template.Contains("g3=['div','eigo']", StringComparison.Ordinal) ||
                 !template.Contains("を 英語で いうと？", StringComparison.Ordinal) ||
                 !template.Contains("Good morning.", StringComparison.Ordinal) ||
-                !template.Contains("if(grade>=2&&done('hissan'))staged.push('mul')", StringComparison.Ordinal) ||
-                !template.Contains("if(grade>=3&&done('mul'))staged.push('div')", StringComparison.Ordinal) ||
+                !template.Contains("q.sessionRole=role", StringComparison.Ordinal) ||
+                !template.Contains("globalPass&&targetPass", StringComparison.Ordinal) ||
                 !template.Contains("pickStage(stage,buckets,reviewRate=.25)", StringComparison.Ordinal) ||
                 !template.Contains("reviewStage(p,k)", StringComparison.Ordinal) ||
                 !template.Contains("profileAtStage(p,k,stage)", StringComparison.Ordinal) ||
                 !template.Contains("if(m<0.20)return 1;if(m<0.40)return 2;if(m<0.60)return 3;if(m<0.80)return 4;return 5", StringComparison.Ordinal) ||
                 !template.Contains("Math.min(5,Number(stage)||1)", StringComparison.Ordinal) ||
-                !template.Contains("this.topicStage(p,k)>=5", StringComparison.Ordinal) ||
+                !template.Contains("masteredAt", StringComparison.Ordinal) ||
                 !template.Contains("fromPairs([[1,2],[2,1],[2,2]", StringComparison.Ordinal) ||
                 !template.Contains("prompt:a+' × '+b", StringComparison.Ordinal) ||
                 template.Contains("prompt:a+' x '+b", StringComparison.Ordinal) ||
@@ -194,7 +194,7 @@ internal static class Program
                 !template.Contains("kokuShowMean=this.topicStage(p,'kokugo')<=2", StringComparison.Ordinal) ||
                 !template.Contains("<sc-if value=\"{{ kokuShowMean }}\"", StringComparison.Ordinal) ||
                 !template.Contains("kokuShowMean:kokuShowMean", StringComparison.Ordinal) ||
-                !template.Contains("qs.push(this.genFor(this.weightedPick(p),p))", StringComparison.Ordinal) ||
+                !template.Contains("migrateProfiles(profiles)", StringComparison.Ordinal) ||
                 template.Contains("b=this.rand(11,a-1)", StringComparison.Ordinal) ||
                 template.Contains("b=this.rand(1,40)", StringComparison.Ordinal) ||
                 template.Contains("b=this.rand(12,79)", StringComparison.Ordinal) ||

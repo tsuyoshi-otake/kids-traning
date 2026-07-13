@@ -117,8 +117,8 @@ if ($programSource -notmatch "ParentControlServer.BuildParentPage" -or $programS
 if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "moji:\.05" -or $runtimeSource -notmatch "measure:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "effectiveGrade\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics" -or $runtimeSource -notmatch "profileGrade:this\.gradeLabel") {
     throw "Runtime HTML patch must start beginners at level 1 and stage topic difficulty"
 }
-if ($runtimeSource -notmatch "topicStage\(p,k\)" -or $runtimeSource -notmatch "topicComplete\(p,k\)" -or $runtimeSource -notmatch "hissanComplete\(p\)" -or $runtimeSource -notmatch "genHissan\(p\)" -or $runtimeSource -notmatch [regex]::Escape("if(done('add'))staged.push('sub','moji')") -or $runtimeSource -notmatch [regex]::Escape("if(grade>=2&&done('hissan'))staged.push('mul')") -or $runtimeSource -notmatch [regex]::Escape("if(grade>=3&&done('mul'))staged.push('div')") -or $runtimeSource -notmatch "fromPairs\(\[\[1,2\],\[2,1\],\[2,2\]" -or $runtimeSource -notmatch "stage<=1\?\['hiragana'\]") {
-    throw "Runtime HTML patch must chain topic unlocks behind clearing the prerequisite category"
+if ($runtimeSource -notmatch "topicStage\(p,k\)" -or $runtimeSource -notmatch "topicComplete\(p,k\)" -or $runtimeSource -notmatch "topicReady\(p,k" -or $runtimeSource -notmatch "ensureLearningProfile\(p\)" -or $runtimeSource -notmatch "gradeTopics\(p\)" -or $runtimeSource -notmatch "CurriculumPolicy\.TopicsForGrade" -or $runtimeSource -notmatch "genHissan\(p\)" -or $runtimeSource -notmatch "fromPairs\(\[\[1,2\],\[2,1\],\[2,2\]" -or $runtimeSource -notmatch "stage<=1\?\['hiragana'\]" -or $runtimeSource -match [regex]::Escape("if(done('add'))staged.push")) {
+    throw "Runtime HTML patch must use independent grade-scoped curriculum lanes and evidence readiness"
 }
 if ($runtimeSource -notmatch "questionCount\?\?20" -or $runtimeSource -notmatch "passLine\?\?15") {
     throw "Runtime HTML patch must default to 20 questions and 15 correct answers"
@@ -126,8 +126,8 @@ if ($runtimeSource -notmatch "questionCount\?\?20" -or $runtimeSource -notmatch 
 if ($trainingSource -notmatch "previousCount <= 10" -or $trainingSource -notmatch "Math\.max\(20, Math\.min\(40, previousCount\)\)" -or $runtimeSource -notmatch "this\.clamp\(\(Number\(s\.count\)\|\|20\)\+d,20,40\)") {
     throw "Legacy 10-question settings must migrate to a minimum of 20 questions"
 }
-if ($runtimeSource -notmatch "if\(m<0\.20\)return 1" -or $runtimeSource -notmatch "if\(m<0\.40\)return 2" -or $runtimeSource -notmatch "if\(m<0\.60\)return 3" -or $runtimeSource -notmatch "if\(m<0\.80\)return 4" -or $runtimeSource -notmatch "Math\.min\(5,Number\(stage\)\|\|1\)" -or $runtimeSource -notmatch "'Lv\.'\+masteryLevel\+'/5'" -or $runtimeSource -notmatch "topicStage\(p,k\)>=5") {
-    throw "Every topic must use and display the shared five-level mastery scale"
+if ($runtimeSource -notmatch "if\(m<0\.20\)return 1" -or $runtimeSource -notmatch "if\(m<0\.40\)return 2" -or $runtimeSource -notmatch "if\(m<0\.60\)return 3" -or $runtimeSource -notmatch "if\(m<0\.80\)return 4" -or $runtimeSource -notmatch "Math\.min\(5,Number\(stage\)\|\|1\)" -or $runtimeSource -notmatch "SkillEvidence\.RequiredIndependentCorrect" -or $runtimeSource -notmatch "SkillEvidence\.RequiredAttempts" -or $runtimeSource -notmatch "SkillEvidence\.RequiredIndependentAccuracy") {
+    throw "Every topic must stage difficulty while requiring sufficient independent evidence for readiness"
 }
 if ($runtimeSource -notmatch "pickStage\(stage,buckets,reviewRate=\.25\)" -or $runtimeSource -notmatch "reviewStage\(p,k\)" -or $runtimeSource -notmatch "profileAtStage\(p,k,stage\)" -or $runtimeSource -notmatch [regex]::Escape("[()=>exact(2,1),()=>exact(2,2),()=>exact(2,3)]") -or $runtimeSource -match [regex]::Escape("prompt:a+' x '+b") -or $runtimeSource -match "b=this\.rand\(11,a-1\)" -or $runtimeSource -match "b=this\.rand\(1,40\)" -or $runtimeSource -match "b=this\.rand\(12,79\)" -or $runtimeSource -match "b=this\.rand\(11,79\)" -or $runtimeSource -match "b=this\.rand\(10,99-a\)" -or $runtimeSource -match "b=this\.rand\(20,a-1\)" -or $runtimeSource -match "Math\.min\(40,a-1\)") {
     throw "Runtime HTML patch must keep non-hissan add/sub from generating two-digit-by-two-digit mental arithmetic"
@@ -153,14 +153,14 @@ if ($runtimeSource -notmatch "pickKazu\(p\)" -or $runtimeSource -notmatch "pickS
 if ($runtimeSource -notmatch "なんばんめ" -or $runtimeSource -notmatch "subtype:'kotoba'" -or $runtimeSource -notmatch "markCleared" -or $runtimeSource -notmatch "masteryLevel" -or $runtimeSource -notmatch "isOrder" -or $runtimeSource -notmatch [regex]::Escape("prompt:x+' + '+y+' + '+z")) {
     throw "Runtime HTML patch must include ordinal positions, spelling words, three-number calculations, and sticky visible clears"
 }
-if ($runtimeSource -notmatch "pickBun\(p\)" -or $runtimeSource -notmatch "pickGoi\(p\)" -or $runtimeSource -notmatch "pickDokkai\(p\)" -or $runtimeSource -notmatch "bun:\.05" -or $runtimeSource -notmatch "goi:\.05" -or $runtimeSource -notmatch "dokkai:\.05" -or $runtimeSource -notmatch [regex]::Escape("if(done('moji'))staged.push('kokugo','bun')") -or $runtimeSource -notmatch [regex]::Escape("if(done('bun'))staged.push('goi')") -or $runtimeSource -notmatch [regex]::Escape("if(done('kokugo'))staged.push('dokkai')")) {
-    throw "Runtime HTML patch must include particle/grammar (bun), vocabulary (goi), and reading comprehension (dokkai) topics with clear-gated unlocks"
+if ($runtimeSource -notmatch "pickBun\(p\)" -or $runtimeSource -notmatch "pickGoi\(p\)" -or $runtimeSource -notmatch "pickDokkai\(p\)" -or $runtimeSource -notmatch "bun:\.05" -or $runtimeSource -notmatch "goi:\.05" -or $runtimeSource -notmatch "dokkai:\.05" -or $runtimeSource -match [regex]::Escape("if(done('moji'))staged.push('kokugo','bun')")) {
+    throw "Runtime HTML patch must include independent particle/grammar, vocabulary, and reading-comprehension topics"
 }
 if ($runtimeSource -notmatch "topic:'dokkai'" -or $runtimeSource -notmatch "topic:'goi'" -or $runtimeSource -notmatch "topic:'bun'") {
     throw "Runtime HTML patch must generate bun, goi, and dokkai questions"
 }
-if ($runtimeSource -notmatch "pickEigo\(p\)" -or $runtimeSource -notmatch "eigo:\.05" -or $runtimeSource -notmatch "topic:'eigo'" -or $runtimeSource -notmatch [regex]::Escape("if(grade>=3&&done('moji'))staged.push('eigo')")) {
-    throw "Runtime HTML patch must include a grade 3+ English topic gated behind moji"
+if ($runtimeSource -notmatch "pickEigo\(p\)" -or $runtimeSource -notmatch "eigo:\.05" -or $runtimeSource -notmatch "topic:'eigo'" -or $runtimeSource -notmatch "CurriculumPolicy\.TopicsForGrade\(3\)" -or $runtimeSource -notmatch "補助活動：音声を聞き") {
+    throw "Runtime HTML patch must include independent supplementary English practice at grade 3"
 }
 if ($runtimeSource -notmatch "PatchEnglishSpeech" -or $runtimeSource -notmatch "speakEnglish\(text\)" -or $runtimeSource -notmatch [regex]::Escape("if(m)this.stopEnglishSpeech()") -or $runtimeSource -notmatch "SpeechSynthesisUtterance" -or $runtimeSource -notmatch "utterance\.lang='en-US'" -or $runtimeSource -notmatch "utterance\.rate=\.85" -or $runtimeSource -notmatch "speakChoices:!!speak" -or $runtimeSource -notmatch "kt-speech-button" -or $runtimeSource -notmatch "kt-choice-button") {
     throw "English pronunciation controls are incomplete."

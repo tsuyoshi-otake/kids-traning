@@ -58,13 +58,14 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "buildCalib(){const order=['add','sub','hissan','mul','kokugo'];return order.map(t=>{const q=this.genFor(t);return{q:q,choices:this.calibChoicesFor(q)};});}",
-            "buildCalib(){const order=['add','sub','hissan','mul','kokugo','moji'];return order.map(t=>{const q=this.genFor(t);return{q:q,choices:this.calibChoicesFor(q)};});}",
+            "buildCalib(){const core=this.state.setupGrade>=2?['add','sub','hissan','mul','kokugo','moji']:['add','sub','clock','kokugo','moji','kazu'],order=[];for(let round=0;round<3;round++)for(const topic of core)order.push(topic);const p={grade:this.state.setupGrade," + BeginnerMasteryMarkup + "};return order.map(t=>{const q=this.genFor(t,p);return{q:q,choices:this.calibChoicesFor(q)};});}",
             StringComparison.Ordinal);
 
-        markup = ReplaceRequired(markup,
-            "['add','sub','hissan','mul','clock','kokugo'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});",
-            "['add','sub','hissan','mul','clock','kokugo','moji','measure','kazu','shape','div','frac','chart','story','bun','goi','dokkai','eigo'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});",
-            StringComparison.Ordinal);
+        markup = ReplaceBlock(
+            markup,
+            "calibAnswer(c){",
+            "\n\n  genAdd(){",
+            BuildCalibrationAnswerScript());
 
         // pick4 originally padded missing distractors with the answer plus invisible
         // ideographic spaces, producing a choice that looks identical to the correct
@@ -125,8 +126,14 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "buildSession(p,attempt){const n=this.total(),qs=[];for(let i=0;i<n;i++)qs.push(this.genFor(this.weightedPick(p)));return{questions:qs,idx:0,correct:0,attempt:attempt,startStars:p.stars};}",
-            "buildSession(p,attempt){const n=this.total(),qs=[];for(let i=0;i<n;i++)qs.push(this.genFor(this.weightedPick(p),p));return{questions:qs,idx:0,correct:0,attempt:attempt,startStars:p.stars,startXp:Number(p.xp)||0};}",
+            BuildSessionScript(),
             StringComparison.Ordinal);
+
+        markup = ReplaceBlock(
+            markup,
+            "next(){",
+            "\n  retry(){",
+            "next(){this.sfx('select');const s=this.state.session;if(s.idx>=s.questions.length-1){const globalPass=s.correct>=this.passLine(),targetPass=s.targetAsked>=4&&s.targetIndependent/s.targetAsked>=.7,pass=globalPass&&targetPass;if(pass)setTimeout(()=>this.sfx('clear'),280);this.setState({screen:pass?'clear':'retry'});}else{s.idx++;this.setState({screen:'quiz',...this.freshQ()});}}");
 
         markup = ReplaceBlock(
             markup,
@@ -141,8 +148,15 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "const m=p.mastery[k];const pct=Math.round(m*100);const weak=m<0.5;const status=m>=0.75?'とくい':m>=0.5?'ふつう':'にがて';const bc=m>=0.75?'#3aa655':m>=0.5?'#9fd17a':'#ff8a8a';const sc2=m<0.5?'#d2503f':'#6b5e45';",
-            "const m=Number(p.mastery[k])||0.05;const pct=Math.round(m*100);const masteryLevel=this.topicStage(p,k);const weak=masteryLevel<=2;const unlocked=this.allowedTopics(p).includes(k);const cleared=this.topicComplete(p,k);const status=(!unlocked?'🔒 ':'')+'Lv.'+masteryLevel+'/5'+(cleared?' ★':'');const levelColors=['#ff8a8a','#f2a03d','#e0c13d','#79b85a','#3aa655'];const bc=levelColors[masteryLevel-1];const sc2=!unlocked?'#b7a98a':masteryLevel===5?'#2f7d44':'#6b5e45';",
+            "const m=Number(p.mastery[k])||0.05;const pct=Math.round(m*100);const masteryLevel=this.topicStage(p,k);const weak=masteryLevel<=2;const available=this.allowedTopics(p).includes(k);const achieved=this.topicComplete(p,k),ready=this.topicReady(p,k),due=this.topicDue(p,k);const status=(!available?'対象外':ready?'じりつ':due?'ふくしゅう':achieved?'さいかくにん':'れんしゅう')+(achieved?' ★':'');const levelColors=['#ff8a8a','#f2a03d','#e0c13d','#79b85a','#3aa655'];const bc=available?levelColors[masteryLevel-1]:'#d8d1c4';const sc2=!available?'#9a9388':ready?'#2f7d44':'#6b5e45';",
             StringComparison.Ordinal);
+
+        markup = ReplaceRequired(markup,
+            "const gradeOpts=[1,2,3,4,5,6].map(g=>",
+            "const gradeOpts=[1,2,3].map(g=>",
+            StringComparison.Ordinal);
+
+        markup = PatchEducationalPersistence(markup);
 
         markup = ReplaceRequired(markup,
             "gradeLabel:pr.grade+'年生'",
@@ -161,8 +175,32 @@ internal static partial class LearningMarkupPatcher
 
         markup = PatchArithmeticVisuals(markup);
         markup = PatchEnglishSpeech(markup);
+        markup = PatchLearningAccessibility(markup);
 
         return markup;
+    }
+
+    private static string BuildCalibrationAnswerScript()
+    {
+        return """
+calibAnswer(c){const cb=this.state.calib,it=cb.items[cb.idx],ok=String(c)===String(it.q.answer);this.sfx(ok?'correct':'wrong');const results={...cb.results},prior=results[it.q.topic]||{attempts:0,correct:0};results[it.q.topic]={attempts:prior.attempts+1,correct:prior.correct+(ok?1:0)};const ni=cb.idx+1;if(ni>=cb.items.length){const mastery={},skillStats={},topics=Object.keys(this.topics),now=Date.now();for(const t of topics){const r=results[t],score=(!r||!r.attempts)?0.05:(r.correct===3?0.55:r.correct===2?0.35:0.12);mastery[t]=score;skillStats[t]={attempts:r?r.attempts:0,independent:r?r.correct:0,assisted:0,revealed:0,errors:r?r.attempts-r.correct:0,confidence:score,reviewStep:0,lastAttemptAt:r?now:null,nextReviewAt:null,masteredAt:null};}const ps=this.state.profiles.slice(),colors=['#4ad991','#f0883e','#6aa0ff','#d96ad9','#23b5a8'];ps.push({name:this.state.setupName.trim(),grade:this.state.setupGrade,color:colors[ps.length%colors.length],streak:0,stars:0,xp:0,mastery:mastery,skillStats:skillStats,cleared:{}});this.setState({profiles:ps,profileIdx:ps.length-1,screen:'start',calib:null});}else{this.setState({calib:{...cb,idx:ni,results:results}});}}
+""";
+    }
+
+    private static string BuildSessionScript()
+    {
+        return """
+buildSession(p,attempt){this.ensureLearningProfile(p);const n=this.total(),allowed=this.allowedTopics(p),due=this.dueTopics(p),target=this.weakestTopic(p,allowed),reviewCount=Math.max(2,Math.floor(n*.2)),mixedCount=Math.max(2,Math.floor(n*.15)),exitCount=1,targetCount=n-reviewCount-mixedCount-exitCount,planned=[],add=(topic,role)=>{const q=this.genFor(topic,p);q.sessionRole=role;planned.push(q);};for(let i=0;i<reviewCount;i++)add(this.weightedPick(p,due.length?due:allowed),'review');for(let i=0;i<targetCount;i++)add(target,'target');for(let i=0;i<mixedCount;i++)add(this.weightedPick(p,allowed.filter(k=>k!==target)),'mixed');this.shuffle(planned);add(target,'exit');return{questions:planned,idx:0,correct:0,targetTopic:target,targetAsked:0,targetIndependent:0,attempt:attempt,startStars:p.stars,startXp:Number(p.xp)||0};}
+""";
+    }
+
+    private static string PatchEducationalPersistence(string markup)
+    {
+        return ReplaceBlock(
+            markup,
+            "componentDidMount(){",
+            "\n  setSettings(",
+            "componentDidMount(){let profiles=this.state.profiles;try{const raw=localStorage.getItem('kt_profiles_v1');if(raw){const saved=JSON.parse(raw);if(Array.isArray(saved)&&saved.length)profiles=saved;}profiles=this.migrateProfiles(profiles);const migrated=JSON.stringify(profiles);this._lastSaved=migrated;localStorage.setItem('kt_profiles_v1',migrated);const m=localStorage.getItem('kt_muted_v1');if(m!=null)this.setState({muted:m==='1'});}catch(e){profiles=this.migrateProfiles(profiles);}let st=null;try{const r=localStorage.getItem('kt_settings_v1');if(r)st=JSON.parse(r);}catch(e){}const def=this.defaultSettings();this.setState({profiles:profiles,settings:st&&st.topics?{topics:{...def.topics,...st.topics},count:st.count||def.count,pass:st.pass||def.pass}:def});}");
     }
 
 

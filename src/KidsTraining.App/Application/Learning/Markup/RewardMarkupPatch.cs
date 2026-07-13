@@ -13,19 +13,19 @@ internal static partial class LearningMarkupPatcher
             markup,
             "finishNumeric(){",
             "\n  submit(ans){",
-            "finishNumeric(){const q=this.cur(),p=this.curP();const perfect=(this.state.numMiss||0)===0;p.mastery[q.topic]=this.clamp((Number(p.mastery[q.topic])||0.05)+(perfect?0.12:-0.08),0.05,0.99);this.markCleared(p,q.topic);const combo=perfect?this.state.combo+1:0;const stars=perfect?(combo>=3?2:1):1,xpInfo=this.gainXp(p,perfect?(combo>=3?18:12):6);p.stars+=stars;if(perfect)this.state.session.correct++;this.sfx(perfect&&combo>=3?'combo':'correct');this.setState({screen:'feedback',combo:combo,lastResult:{correct:true,q:q,userAns:q.answer,stars:stars,combo:combo,helped:!perfect,xp:xpInfo.amount,levelUp:xpInfo.levelUp},input:'',numChoices:null});}");
+            "finishNumeric(){const q=this.cur(),p=this.curP(),perfect=(this.state.numMiss||0)===0;this.recordEvidence(p,q,perfect?'independent':'assisted');const combo=perfect?this.state.combo+1:0,stars=perfect?(combo>=3?2:1):1,xpInfo=this.gainXp(p,perfect?(combo>=3?18:12):6);p.stars+=stars;this.sfx(perfect&&combo>=3?'combo':'correct');this.setState({screen:'feedback',combo:combo,lastResult:{correct:true,q:q,userAns:q.answer,stars:stars,combo:combo,helped:!perfect,xp:xpInfo.amount,levelUp:xpInfo.levelUp},input:'',numChoices:null});}");
 
         markup = ReplaceBlock(
             markup,
             "submit(ans){",
             "\n  next(){",
-            "submit(ans){const q=this.cur(),correct=String(ans)===String(q.answer),p=this.curP();p.mastery[q.topic]=this.clamp((Number(p.mastery[q.topic])||0.05)+(correct?0.12:-0.16),0.05,0.99);this.markCleared(p,q.topic);const combo=correct?this.state.combo+1:0,stars=correct?(combo>=3?2:1):0,xpInfo=correct?this.gainXp(p,combo>=3?18:12):{amount:0,levelUp:false};if(correct){p.stars+=stars;this.state.session.correct++;this.sfx(combo>=3?'combo':'correct');}else{this.sfx('wrong');}this.setState({screen:'feedback',combo:combo,lastResult:{correct:correct,q:q,userAns:ans,stars:stars,combo:combo,xp:xpInfo.amount,levelUp:xpInfo.levelUp},input:''});}");
+            "submit(ans){const q=this.cur(),correct=String(ans)===String(q.answer),p=this.curP();this.recordEvidence(p,q,correct?'independent':'incorrect');const combo=correct?this.state.combo+1:0,stars=correct?(combo>=3?2:1):0,xpInfo=correct?this.gainXp(p,combo>=3?18:12):{amount:0,levelUp:false};if(correct){p.stars+=stars;this.sfx(combo>=3?'combo':'correct');}else{this.sfx('wrong');}this.setState({screen:'feedback',combo:combo,lastResult:{correct:correct,q:q,userAns:ans,stars:stars,combo:combo,xp:xpInfo.amount,levelUp:xpInfo.levelUp},input:''});}");
 
         markup = ReplaceBlock(
             markup,
             "submitHissanStep(val){",
             "\n  unlockPC(){",
-            "submitHissanStep(val){const q=this.cur(),st=q.steps[this.state.hsStep];const v=val!=null?val:this.state.input;if(v!==st.expect){this.sfx('wrong');const sm=(this.state.hsStepMiss||0)+1;const upd={hsHint:st.explain,input:'',hsMistakes:(this.state.hsMistakes||0)+1,hsStepMiss:sm};if(sm>=2)upd.hsStepChoices=this.numChoicesFor(st.expect);this.setState(upd);return;}const ns={input:'',hsHint:'',hsStepMiss:0,hsStepChoices:null};if(st.place==='ones'){ns.hsOnes=st.writeOnes;if(st.carry)ns.hsCarry=true;if(st.borrow)ns.hsBorrow=true;}else ns.hsTens=st.writeTens;const last=this.state.hsStep>=q.steps.length-1;if(last){const p=this.curP();const perfect=(this.state.hsMistakes||0)===0;p.mastery[q.topic]=this.clamp((Number(p.mastery[q.topic])||0.05)+(perfect?0.12:-0.05),0.05,0.99);this.markCleared(p,q.topic);const combo=perfect?this.state.combo+1:0;const stars=perfect?(combo>=3?2:1):1,xpInfo=this.gainXp(p,perfect?(combo>=3?20:14):8);p.stars+=stars;this.state.session.correct++;this.sfx(perfect&&combo>=3?'combo':'correct');this.setState({...ns,screen:'feedback',combo:combo,lastResult:{correct:true,q:q,userAns:q.answer,stars:stars,combo:combo,viaSteps:true,perfect:perfect,xp:xpInfo.amount,levelUp:xpInfo.levelUp}});}else{this.sfx('step');this.setState({...ns,hsStep:this.state.hsStep+1});}}");
+            "submitHissanStep(val){const q=this.cur(),st=q.steps[this.state.hsStep];const v=val!=null?val:this.state.input;if(v!==st.expect){this.sfx('wrong');const sm=(this.state.hsStepMiss||0)+1,upd={hsHint:st.explain,input:'',hsMistakes:(this.state.hsMistakes||0)+1,hsStepMiss:sm};if(sm>=2)upd.hsStepChoices=this.numChoicesFor(st.expect);this.setState(upd);return;}const ns={input:'',hsHint:'',hsStepMiss:0,hsStepChoices:null};if(st.place==='ones'){ns.hsOnes=st.writeOnes;if(st.carry)ns.hsCarry=true;if(st.borrow)ns.hsBorrow=true;}else ns.hsTens=st.writeTens;const last=this.state.hsStep>=q.steps.length-1;if(last){const p=this.curP(),perfect=(this.state.hsMistakes||0)===0;this.recordEvidence(p,q,perfect?'independent':'assisted');const combo=perfect?this.state.combo+1:0,stars=perfect?(combo>=3?2:1):1,xpInfo=this.gainXp(p,perfect?(combo>=3?20:14):8);p.stars+=stars;this.sfx(perfect&&combo>=3?'combo':'correct');this.setState({...ns,screen:'feedback',combo:combo,lastResult:{correct:true,q:q,userAns:q.answer,stars:stars,combo:combo,viaSteps:true,perfect:perfect,xp:xpInfo.amount,levelUp:xpInfo.levelUp}});}else{this.sfx('step');this.setState({...ns,hsStep:this.state.hsStep+1});}}");
 
         markup = ReplaceRequired(markup,
             "      <!-- center -->",
@@ -74,6 +74,7 @@ internal static partial class LearningMarkupPatcher
     {
         return """
 gainXp(p,amount){const before=this.xpLevel(p);p.xp=(Number(p.xp)||0)+amount;const after=this.xpLevel(p);return{amount:amount,levelUp:after>before};}
+  revealAnswer(){const q=this.cur(),p=this.curP();this.recordEvidence(p,q,'revealed');this.sfx('wrong');this.setState({screen:'feedback',combo:0,lastResult:{correct:false,revealed:true,q:q,userAns:'わからない',stars:0,combo:0,xp:0,levelUp:false},input:'',numChoices:null,hsStepChoices:null});}
 """;
     }
 
