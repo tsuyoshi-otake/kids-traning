@@ -22,8 +22,14 @@ internal static class AppPaths
     public static string ParentSettingsPath =>
         Path.Combine(LocalAppDataRoot, "parent-settings.json");
 
-    public static string HtmlPath =>
-        Path.Combine(AppContext.BaseDirectory, "assets", "kids-training.html");
+    public static string LearningAssetsFolder =>
+        Path.Combine(AppContext.BaseDirectory, "assets", "kids-training");
+
+    public static string HtmlTemplatePath =>
+        Path.Combine(LearningAssetsFolder, "index.template.html");
+
+    public static string LearningAppDefinitionPath =>
+        Path.Combine(LearningAssetsFolder, "app", "learning-app.dc.html");
 
     public static string RuntimeHtmlPath =>
         Path.Combine(AppContext.BaseDirectory, "assets", "kids-training.runtime.html");

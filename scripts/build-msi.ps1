@@ -1,7 +1,7 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$Version = "1.9.0"
+    [string]$Version = "1.10.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -15,7 +15,15 @@ $wxsPath = Join-Path $objDir "KidsTraining.generated.wxs"
 $msiPath = Join-Path $artifacts "KidsTraining.msi"
 $iconPath = Join-Path $objDir "app.ico"
 
-New-Item -ItemType Directory -Force -Path $publishDir, $objDir | Out-Null
+$artifactsFullPath = [System.IO.Path]::GetFullPath($artifacts).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+$publishFullPath = [System.IO.Path]::GetFullPath($publishDir)
+if (!$publishFullPath.StartsWith($artifactsFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Publish directory must stay inside the artifacts directory: $publishFullPath"
+}
+if (Test-Path $publishFullPath) {
+    Remove-Item -LiteralPath $publishFullPath -Recurse -Force
+}
+New-Item -ItemType Directory -Force -Path $publishFullPath, $objDir | Out-Null
 
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "generate-icon.ps1") -OutputPath $iconPath
 if ($LASTEXITCODE -ne 0) {
@@ -28,12 +36,17 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $exePath = Join-Path $publishDir "KidsTraining.App.exe"
-$htmlPath = Join-Path $publishDir "assets\kids-training.html"
+$learningAssetsPath = Join-Path $publishDir "assets\kids-training"
+$htmlTemplatePath = Join-Path $learningAssetsPath "index.template.html"
+$appDefinitionPath = Join-Path $learningAssetsPath "app\learning-app.dc.html"
 if (!(Test-Path $exePath)) {
     throw "Published app executable was not found: $exePath"
 }
-if (!(Test-Path $htmlPath)) {
-    throw "Published HTML asset was not found: $htmlPath"
+if (!(Test-Path $htmlTemplatePath) -or !(Test-Path $appDefinitionPath)) {
+    throw "Published learning assets were not found: $learningAssetsPath"
+}
+if (Test-Path (Join-Path $publishDir "assets\kids-training.html")) {
+    throw "Legacy single-file learning HTML leaked into the publish output"
 }
 
 function ConvertTo-WixText([string]$Value) {

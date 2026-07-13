@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="kids-training/scripts/runtime.js"></script>
+</head>
+<body>
+
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link rel="stylesheet" href="kids-training/styles/fonts.css">
+<link rel="stylesheet" href="kids-training/styles/app.css">
+</helmet>
+
+<div style="position:fixed; inset:0; overflow:hidden; pointer-events:none; z-index:0; background:#fff3e0;">
+  <div style="position:absolute; width:clamp(420px,38vw,720px); height:clamp(420px,38vw,720px); border-radius:50%; background:#ffe0b8; opacity:.55; top:-12vh; right:-8vw;"></div>
+  <div style="position:absolute; width:clamp(340px,30vw,600px); height:clamp(340px,30vw,600px); border-radius:50%; background:#ffe9cf; opacity:.6; bottom:-12vh; left:-7vw;"></div>
+</div>
+<div style="position:relative; z-index:1; width:100%; min-height:100vh; min-height:100dvh; background:transparent; font-family:'Zen Maru Gothic',sans-serif; color:#3a3326; overflow-x:hidden;">
+
+  <!-- global mute toggle -->
+  <div onclick="{{ toggleMute }}" title="おと の オン/オフ" style="position:fixed; left:18px; bottom:16px; z-index:50; width:54px; height:54px; border-radius:50%; background:#fff; border:3px solid #f0e2c8; box-shadow:0 4px 0 #e7d6b6; display:flex; align-items:center; justify-content:center; font-size:26px; cursor:pointer;">{{ muteIcon }}</div>
+
+  <!-- ============ PROFILE ============ -->
+  <sc-if value="{{ isProfile }}" hint-placeholder-val="{{ true }}">
+    <div data-screen-label="プロフィール選択" style="position:relative; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px;">
+      <div style="font-size:20px; color:#b08a5a; font-weight:700;">🔒 パソコンは ロックちゅう</div>
+      <div style="font-size:46px; font-weight:900; margin-top:8px;">だれが れんしゅうする？</div>
+      <div style="display:flex; gap:26px; margin-top:42px; flex-wrap:wrap; justify-content:center;">
+        <sc-for list="{{ profiles }}" as="pr" hint-placeholder-count="2">
+          <div onclick="{{ pr.onClick }}" style="width:230px; background:#fff; border:4px solid #f0e2c8; border-radius:30px; box-shadow:0 8px 0 #f0e2c8; padding:26px; text-align:center; cursor:pointer;">
+            <div style="{{ pr.avatarStyleLg }}">{{ pr.initial }}</div>
+            <div style="font-size:30px; font-weight:900; margin-top:14px;">{{ pr.name }}</div>
+            <div style="font-size:18px; color:#9a8662; margin-top:2px;">{{ pr.gradeLabel }} ・ {{ pr.levelLabel }}</div>
+            <div style="font-size:18px; color:#e09020; font-weight:700; margin-top:6px;">🔥 {{ pr.streak }}日れんぞく</div>
+          </div>
+        </sc-for>
+        <div onclick="{{ goCalib }}" style="width:230px; border:4px dashed #d8c4a0; border-radius:30px; padding:26px; text-align:center; cursor:pointer; color:#b08a5a; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <div style="font-size:64px; line-height:1; font-weight:900;">＋</div>
+          <div style="font-size:22px; font-weight:700; margin-top:10px;">あたらしく<br>ついか</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ SETUP (new profile) ============ -->
+  <sc-if value="{{ isSetup }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="プロフィール作成" style="position:relative; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:48px;">
+      <div style="font-size:20px; color:#b08a5a; font-weight:700;">はじめまして！</div>
+      <div style="font-size:44px; font-weight:900; margin-top:6px;">きみのこと おしえてね</div>
+      <div style="width:540px; max-width:92%; background:#fff; border:4px solid #f0e2c8; border-radius:26px; padding:26px 28px; margin-top:28px;">
+        <div style="font-size:18px; color:#9a8662; font-weight:700;">なまえ</div>
+        <input value="{{ setupName }}" oninput="{{ onSetupName }}" placeholder="なまえを いれてね" style="width:100%; margin-top:8px; font-family:inherit; font-size:26px; font-weight:700; color:#3a3326; border:3px solid #ecd9b9; border-radius:16px; padding:12px 16px; outline:none; box-sizing:border-box;">
+        <div style="font-size:18px; color:#9a8662; font-weight:700; margin-top:22px;">がくねん</div>
+        <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
+          <sc-for list="{{ gradeOpts }}" as="g" hint-placeholder-count="6">
+            <div onclick="{{ g.onClick }}" style="{{ g.style }}">{{ g.label }}</div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="font-size:16px; color:#9a8662; margin-top:18px; text-align:center; line-height:1.6;">つぎに かんたんな チェックを するよ。<br>きみの「とくい・にがて」を しらべて さいしょの レベルを きめます（ごうかく・ふごうかくは なし）。</div>
+      <div style="display:flex; gap:14px; margin-top:24px;">
+        <div onclick="{{ backProfile }}" style="background:#fff; border:4px solid #f0e2c8; border-radius:24px; padding:16px 32px; font-size:20px; color:#9a8662; cursor:pointer;">← もどる</div>
+        <div onclick="{{ startCalib }}" style="{{ setupNextStyle }}">チェックへ ▶</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ CALIBRATION (interactive) ============ -->
+  <sc-if value="{{ isCalib }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="初回チェック" style="position:relative; min-height:100vh; display:flex; flex-direction:column; padding:30px 44px 38px;">
+      <div style="display:flex; align-items:center; gap:16px;">
+        <div style="flex:1; height:18px; background:#fff; border:3px solid #3a3326; border-radius:12px; overflow:hidden;"><span style="{{ calibProgStyle }}"></span></div>
+        <div style="font-size:20px; font-weight:900; white-space:nowrap;">{{ calibIdx }} / {{ calibTotal }}</div>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:16px; align-items:center; flex-wrap:wrap;">
+        <span style="background:#7a6db5; color:#fff; border-radius:30px; padding:7px 20px; font-size:18px; font-weight:900; white-space:nowrap;">チェックちゅう</span>
+        <span style="{{ calibTopicChipStyle }}">{{ calibTopicLabel }}</span>
+        <span style="font-size:16px; color:#9a8662;">ごうかく・ふごうかくは ないよ</span>
+      </div>
+      <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <sc-if value="{{ calibIsKokugo }}" hint-placeholder-val="{{ false }}">
+          <div style="font-size:46px; font-weight:900; text-align:center; margin-bottom:10px;">{{ calibKokuPre }}<span style="color:#d2691e; border-bottom:6px solid #d2691e; padding-bottom:2px;">{{ calibKokuWord }}</span>{{ calibKokuPost }}</div>
+          <div style="font-size:20px; color:#9a8662; font-weight:700;">なんと よむ？</div>
+        </sc-if>
+        <sc-if value="{{ calibIsPlain }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size:60px; font-weight:900; text-align:center; white-space:nowrap;">{{ calibPrompt }}{{ calibEq }}</div>
+          <div style="font-size:20px; color:#9a8662; margin-top:6px;">こたえを えらんでね</div>
+        </sc-if>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px; width:660px; max-width:90%;">
+          <sc-for list="{{ calibChoices }}" as="c" hint-placeholder-count="4">
+            <div onclick="{{ c.onClick }}" style="{{ c.style }}">{{ c.text }}</div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ START ============ -->
+  <sc-if value="{{ isStart }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="開始" style="position:relative; min-height:100vh; display:flex; flex-direction:column; padding:30px 44px 38px;">
+      <!-- top bar -->
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <div style="{{ avatarStyle }}">{{ profileInitial }}</div>
+          <div>
+            <div style="font-size:24px; font-weight:900; line-height:1.1;">{{ profileName }}</div>
+            <div style="font-size:15px; color:#9a8662;">{{ profileGrade }}</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <span style="background:#fff; border:3px solid #f0e2c8; border-radius:24px; padding:7px 16px; font-size:18px; font-weight:700;">{{ level }}</span>
+          <span style="background:#ffcb45; border:3px solid #3a3326; border-radius:24px; padding:7px 16px; font-size:18px; font-weight:700;">★ {{ stars }}</span>
+          <span onclick="{{ goParent }}" style="background:#fff; border:3px solid #f0e2c8; border-radius:24px; padding:7px 14px; font-size:18px; cursor:pointer;">⚙ 保護者</span>
+          <span onclick="{{ goEmergency }}" style="background:#fff; border:3px solid #f0e2c8; border-radius:24px; padding:7px 14px; font-size:18px; cursor:pointer;">🔑 解除</span>
+        </div>
+      </div>
+      <!-- center -->
+      <div style="flex:1; display:flex; align-items:center; gap:40px; justify-content:center;">
+        <div style="position:relative; width:200px; height:200px; flex:none; animation:floaty 2.8s ease-in-out infinite;">
+          <div style="width:100%; height:100%; background:#ffd24a; border:5px solid #3a3326; border-radius:32%; position:relative;">
+            <div style="position:absolute; top:34%; left:24%; width:14%; height:18%; background:#3a3326; border-radius:50%;"></div>
+            <div style="position:absolute; top:34%; right:24%; width:14%; height:18%; background:#3a3326; border-radius:50%;"></div>
+            <div style="position:absolute; top:54%; left:13%; width:15%; height:10%; background:#ff9db0; border-radius:50%; opacity:.85;"></div>
+            <div style="position:absolute; top:54%; right:13%; width:15%; height:10%; background:#ff9db0; border-radius:50%; opacity:.85;"></div>
+            <div style="position:absolute; bottom:20%; left:50%; transform:translateX(-50%); width:30%; height:16%; border:4px solid #3a3326; border-top:none; border-radius:0 0 44px 44px;"></div>
+          </div>
+        </div>
+        <div style="max-width:520px;">
+          <div style="font-size:46px; font-weight:900;">おかえり、{{ profileName }}！</div>
+          <div style="font-size:24px; color:#6b5e45; margin-top:4px;">きょうの れんしゅうを はじめよう</div>
+          <div style="display:flex; gap:16px; margin-top:22px;">
+            <div style="flex:1; background:#fff; border:4px solid #f0e2c8; border-radius:22px; padding:16px 18px;">
+              <div style="font-size:15px; color:#9a8662;">きょうの ミッション</div>
+              <div style="font-size:30px; font-weight:900;">ぜんぶで {{ total }}もん</div>
+              <div style="font-size:16px; color:#9a8662; margin-top:2px;">{{ passLine }}もん せいかいで ごうかく</div>
+            </div>
+            <sc-if value="{{ hasWeak }}" hint-placeholder-val="{{ false }}">
+              <div style="flex:1; background:#ffe6e0; border:4px solid #ff8a8a; border-radius:22px; padding:16px 18px;">
+                <div style="font-size:15px; color:#d2503f;">いまの にがて</div>
+                <div style="font-size:24px; font-weight:900; color:#d2503f;">{{ weakLabels }}</div>
+                <div style="font-size:16px; color:#d2503f; margin-top:2px;">きょう おおめに でるよ</div>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+      <!-- start button -->
+      <div onclick="{{ goStart }}" style="background:#ff8a3d; color:#fff; border:5px solid #e07d2a; border-radius:28px; padding:20px; text-align:center; font-size:38px; font-weight:900; cursor:pointer; box-shadow:0 8px 0 #d96a26;">▶ スタート</div>
+    </div>
+  </sc-if>
+
+  <!-- ============ QUIZ ============ -->
+  <sc-if value="{{ isQuiz }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="出題" style="position:relative; min-height:100vh; display:flex; flex-direction:column; padding:26px 44px 34px;">
+      <!-- progress bar -->
+      <div style="display:flex; align-items:center; gap:16px;">
+        <div onclick="{{ quitQuiz }}" title="やめる" style="flex:none; width:42px; height:42px; border-radius:14px; background:#fff; border:3px solid #f0e2c8; display:flex; align-items:center; justify-content:center; font-size:20px; cursor:pointer; color:#9a8662;">✕</div>
+        <div style="flex:1; height:18px; background:#fff; border:3px solid #3a3326; border-radius:12px; overflow:hidden;"><span style="{{ progressStyle }}"></span></div>
+        <div style="font-size:20px; font-weight:900; white-space:nowrap;">{{ qIndex }} / {{ qTotal }}</div>
+        <span style="background:#ffcb45; border:3px solid #3a3326; border-radius:22px; padding:5px 14px; font-size:18px; font-weight:700; white-space:nowrap;">★ {{ stars }}</span>
+        <sc-if value="{{ comboHot }}" hint-placeholder-val="{{ false }}">
+          <span style="background:#ff6b3d; color:#fff; border:3px solid #3a3326; border-radius:22px; padding:5px 14px; font-size:18px; font-weight:700; animation:wiggle .5s ease-in-out infinite; white-space:nowrap;">🔥 {{ comboCount }}れんぞく</span>
+        </sc-if>
+      </div>
+      <!-- topic chips -->
+      <div style="display:flex; gap:10px; margin-top:18px; align-items:center;">
+        <span style="{{ topicChipStyle }}">{{ topicLabel }}</span>
+        <sc-if value="{{ isWeakTopic }}" hint-placeholder-val="{{ false }}">
+          <span style="background:#ffe6e0; color:#d2503f; border:2px solid #ff8a8a; border-radius:24px; padding:6px 16px; font-size:18px; font-weight:700;">にがて → がんばろう</span>
+        </sc-if>
+      </div>
+
+      <!-- NUMERIC -->
+      <sc-if value="{{ modeNumeric }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1; display:flex; gap:30px; margin-top:18px; align-items:stretch;">
+          <div style="flex:1; display:flex; flex-direction:column;">
+            <div style="flex:1; background:#fff; border:4px solid #f0e2c8; border-radius:26px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:16px;">
+              <div style="font-size:72px; font-weight:900;">{{ prompt }} = ?</div>
+              <sc-if value="{{ isAddViz }}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex; flex-wrap:wrap; gap:16px; justify-content:center; align-items:center;">
+                  <sc-for list="{{ addFrames }}" as="fr" hint-placeholder-count="2">
+                    <div style="position:relative;">
+                      <div style="{{ fr.boxStyle }}">
+                        <sc-for list="{{ fr.cells }}" as="cell" hint-placeholder-count="10">
+                          <div style="{{ cell.style }}"></div>
+                        </sc-for>
+                      </div>
+                      <sc-if value="{{ fr.full }}" hint-placeholder-val="{{ false }}">
+                        <div style="position:absolute; top:-12px; right:-10px; background:#3aa655; color:#fff; border:2px solid #2f8a46; border-radius:14px; padding:2px 12px; font-size:18px; font-weight:900;">10</div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <div style="margin-top:14px; background:#fff7ec; border:4px dashed #d8c4a0; border-radius:20px; height:78px; display:flex; align-items:center; justify-content:center; font-size:48px; font-weight:900; color:#3a3326;">{{ ansBoxShown }}</div>
+            <sc-if value="{{ hsHasHint }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:12px; background:#fff6db; border:3px solid #ffd24a; border-radius:16px; padding:11px 16px; font-size:18px; color:#7a5d00;">💡 {{ hsHint }}</div>
+            </sc-if>
+            <sc-if value="{{ showNumChoices }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:12px;">
+                <div style="font-size:16px; color:#13776f; font-weight:700; margin-bottom:8px;">むずかしいときは えらんでね</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px;">
+                  <sc-for list="{{ numChoiceTiles }}" as="c" hint-placeholder-count="4"><div onclick="{{ c.onClick }}" style="{{ c.style }}">{{ c.text }}</div></sc-for>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+          <div style="width:300px; flex:none; display:grid; grid-template-columns:repeat(3,1fr); gap:12px; align-content:start;">
+            <sc-for list="{{ padKeys }}" as="k" hint-placeholder-count="12">
+              <div onclick="{{ k.onClick }}" style="{{ k.style }}">{{ k.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- HISSAN STEP-BY-STEP -->
+      <sc-if value="{{ modeHissanSteps }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1; display:flex; gap:28px; margin-top:14px;">
+          <div style="flex:1; display:flex; flex-direction:column; gap:14px;">
+            <!-- column -->
+            <div style="background:#fff; border:4px solid #f0e2c8; border-radius:26px; padding:16px 22px; display:flex; justify-content:center;">
+              <div style="display:inline-grid; grid-template-columns:54px 66px 66px; font-weight:900; text-align:center; line-height:1;">
+                <div style="height:30px;"></div>
+                <div style="height:30px; color:#e0552f; font-size:22px; display:flex; align-items:center; justify-content:center;">{{ tensMark }}</div>
+                <div style="height:30px; color:#e0552f; font-size:18px; display:flex; align-items:center; justify-content:center;">{{ onesMark }}</div>
+                <div style="font-size:58px;"></div>
+                <div style="font-size:58px;">{{ hsTensA }}</div>
+                <div style="font-size:58px;">{{ hsOnesA }}</div>
+                <div style="font-size:58px; border-bottom:6px solid #3a3326; padding-bottom:8px;">{{ hsOp }}</div>
+                <div style="font-size:58px; border-bottom:6px solid #3a3326; padding-bottom:8px;">{{ hsTensB }}</div>
+                <div style="font-size:58px; border-bottom:6px solid #3a3326; padding-bottom:8px;">{{ hsOnesB }}</div>
+                <div style="padding-top:10px;"></div>
+                <div style="padding-top:10px;"><div style="{{ tensSlotStyle }}">{{ hsTens }}</div></div>
+                <div style="padding-top:10px;"><div style="{{ onesSlotStyle }}">{{ hsOnes }}</div></div>
+              </div>
+            </div>
+            <!-- step prompt -->
+            <div style="background:#fff7ec; border:3px solid #f0e2c8; border-radius:18px; padding:13px 18px;">
+              <div style="font-size:15px; color:#e0552f; font-weight:700;">{{ hsStepLabel }}</div>
+              <div style="font-size:25px; font-weight:700; margin-top:2px;">{{ hsStepPrompt }}</div>
+            </div>
+            <div style="background:#fff; border:4px dashed #d8c4a0; border-radius:16px; height:78px; display:flex; align-items:center; justify-content:center; font-size:46px; font-weight:900; color:#3a3326;">{{ ansBoxShown }}</div>
+            <sc-if value="{{ hsHasHint }}" hint-placeholder-val="{{ false }}">
+              <div style="background:#fff6db; border:3px solid #ffd24a; border-radius:16px; padding:12px 16px; font-size:19px; color:#7a5d00; animation:rise .3s ease-out;">💡 {{ hsHint }}</div>
+            </sc-if>
+            <sc-if value="{{ showHsChoices }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <div style="font-size:16px; color:#13776f; font-weight:700; margin-bottom:8px;">えらんでこたえてもOK</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px;">
+                  <sc-for list="{{ hsChoiceTiles }}" as="c" hint-placeholder-count="4"><div onclick="{{ c.onClick }}" style="{{ c.style }}">{{ c.text }}</div></sc-for>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+          <div style="width:300px; flex:none; display:grid; grid-template-columns:repeat(3,1fr); gap:12px; align-content:start;">
+            <sc-for list="{{ hsPad }}" as="k" hint-placeholder-count="12">
+              <div onclick="{{ k.onClick }}" style="{{ k.style }}">{{ k.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- CHOICES -->
+      <sc-if value="{{ modeChoices }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; margin-top:10px;">
+          <sc-if value="{{ isClock }}" hint-placeholder-val="{{ false }}">
+            <div style="position:relative; width:240px; height:240px; border:7px solid #3a3326; border-radius:50%; background:#fff; margin-bottom:8px;">
+              <sc-for list="{{ clockMarks }}" as="mk" hint-placeholder-count="12">
+                <div style="{{ mk.style }}">
+                  <span style="font-size:22px; font-weight:900; color:#3a3326;">{{ mk.hour }}</span>
+                  <sc-if value="{{ mk.hasMin }}" hint-placeholder-val="{{ false }}">
+                    <span style="font-size:13px; font-weight:700; color:#c0453d;">{{ mk.min }}</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+              <span style="{{ clockHourStyle }}"></span>
+              <span style="{{ clockMinStyle }}"></span>
+              <span style="position:absolute; left:50%; top:50%; width:18px; height:18px; background:#3a3326; border-radius:50%; transform:translate(-50%,-50%);"></span>
+            </div>
+            <div style="font-size:16px; color:#7a6db5; font-weight:700; margin-bottom:12px;">{{ clockAskLabel }}</div>
+          </sc-if>
+          <sc-if value="{{ isKokugo }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:46px; font-weight:900; text-align:center; margin-bottom:10px;">{{ kokuPre }}<span style="color:#d2691e; border-bottom:6px solid #d2691e; padding-bottom:2px;">{{ kokuWord }}</span>{{ kokuPost }}</div>
+            <div style="background:#fdf0e2; border:2px solid #e8c9a6; border-radius:16px; padding:6px 18px; font-size:19px; color:#9a6a2e; margin-bottom:10px;">いみ：{{ kokuMean }}</div>
+            <div style="font-size:22px; color:#9a8662; font-weight:700;">したせんの ことばは なんと よむ？</div>
+          </sc-if>
+          <sc-if value="{{ isNotKokugo }}" hint-placeholder-val="{{ true }}">
+            <div style="font-size:54px; font-weight:900; text-align:center; margin-bottom:6px; white-space:nowrap;">{{ prompt }}</div>
+            <div style="font-size:20px; color:#9a8662;">こたえを えらんでね</div>
+          </sc-if>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; width:660px; max-width:90%;">
+            <sc-for list="{{ choices }}" as="c" hint-placeholder-count="4">
+              <div onclick="{{ c.onClick }}" style="{{ c.style }}">{{ c.text }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <!-- ============ FEEDBACK ============ -->
+  <sc-if value="{{ isFeedback }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="フィードバック" style="{{ feedbackBgStyle }}">
+      <sc-if value="{{ fbCorrect }}" hint-placeholder-val="{{ false }}">
+        <div style="width:200px; height:200px; border:14px solid #3aa655; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:110px; color:#3aa655; animation:popIn .45s ease-out; font-weight:900;">○</div>
+        <div style="font-size:54px; font-weight:900; color:#2f7d44; margin-top:14px; animation:rise .4s ease-out .1s both;">せいかい！</div>
+      </sc-if>
+      <sc-if value="{{ fbWrong }}" hint-placeholder-val="{{ false }}">
+        <div style="width:200px; height:200px; border:14px solid #e0552f; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:104px; color:#e0552f; animation:popIn .45s ease-out; font-weight:900;">×</div>
+        <div style="font-size:50px; font-weight:900; color:#c0453d; margin-top:14px; animation:rise .4s ease-out .1s both;">おしい！</div>
+      </sc-if>
+
+      <div style="font-size:26px; color:#5b5040; margin-top:10px;">{{ fbPrompt }} = <b>{{ fbAnswer }}</b></div>
+      <sc-if value="{{ fbViaSteps }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:10px; background:#fff; border:2px solid #cfe9d4; border-radius:18px; padding:6px 18px; font-size:18px; color:#2f7d44; font-weight:700;">✓ ステップで かいけつ できたね！</div>
+      </sc-if>
+      <sc-if value="{{ fbHelped }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-top:10px; background:#fff; border:2px solid #ffe0a8; border-radius:18px; padding:6px 18px; font-size:18px; color:#b07a1a; font-weight:700;">💡 ヒントを つかって せいかい！</div>
+      </sc-if>
+
+      <sc-if value="{{ fbCorrect }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; gap:14px; margin-top:18px; animation:pop .4s ease-out .2s both;">
+          <span style="background:#ffcb45; border:3px solid #3a3326; border-radius:24px; padding:10px 22px; font-size:24px; font-weight:900;">★ {{ fbStarText }} ポイント</span>
+          <sc-if value="{{ fbCombo }}" hint-placeholder-val="{{ false }}">
+            <span style="background:#ff6b3d; color:#fff; border:3px solid #3a3326; border-radius:24px; padding:10px 22px; font-size:24px; font-weight:900;">🔥 れんぞく ボーナス！</span>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ fbWrong }}" hint-placeholder-val="{{ false }}">
+        <div style="width:620px; max-width:90%; background:#fff; border:4px solid #f0e2c8; border-radius:22px; padding:18px 22px; margin-top:20px; animation:rise .4s ease-out .2s both;">
+          <div style="font-size:16px; color:#9a8662; margin-bottom:6px;">どうして？（かいせつ）</div>
+          <div style="font-size:24px; line-height:1.6;">{{ fbExplanation }}</div>
+          <div style="margin-top:12px;"><span style="background:#ffe6e0; color:#d2503f; border:2px solid #ff8a8a; border-radius:18px; padding:5px 14px; font-size:16px; font-weight:700;">「{{ fbTopicLabel }}」を にがてに きろく</span></div>
+        </div>
+      </sc-if>
+
+      <div onclick="{{ next }}" style="margin-top:26px; background:#ff8a3d; color:#fff; border:4px solid #e07d2a; border-radius:24px; padding:15px 56px; font-size:30px; font-weight:900; cursor:pointer; box-shadow:0 7px 0 #d96a26;">つぎへ ▶</div>
+    </div>
+  </sc-if>
+
+  <!-- ============ CLEAR ============ -->
+  <sc-if value="{{ isClear }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="合格・解除" style="position:relative; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px;">
+      <div style="font-size:26px; color:#e0a02a; font-weight:900; letter-spacing:6px;">✦ ✦ ✦</div>
+      <div style="font-size:64px; font-weight:900; animation:popIn .5s ease-out;">ごうかく！</div>
+      <div style="font-size:30px; margin-top:4px;">きょうは <b>{{ clearCorrect }} / {{ total }}</b> せいかい</div>
+      <div style="display:flex; gap:16px; margin-top:24px;">
+        <div style="width:180px; background:#fff; border:4px solid #f0e2c8; border-radius:22px; padding:16px; text-align:center;">
+          <div style="font-size:15px; color:#9a8662;">きょうの ★</div>
+          <div style="font-size:36px; font-weight:900; color:#e0a02a;">＋{{ earnedStars }}</div>
+        </div>
+        <div style="width:180px; background:#fff; border:4px solid #f0e2c8; border-radius:22px; padding:16px; text-align:center;">
+          <div style="font-size:15px; color:#9a8662;">ごうけい ★</div>
+          <div style="font-size:36px; font-weight:900;">{{ totalStars }}</div>
+        </div>
+        <div style="width:180px; background:#fff; border:4px solid #f0e2c8; border-radius:22px; padding:16px; text-align:center;">
+          <div style="font-size:15px; color:#9a8662;">れんぞく</div>
+          <div style="font-size:36px; font-weight:900;">🔥 {{ streak }}</div>
+        </div>
+      </div>
+      <div style="width:560px; max-width:90%; background:#ffe6e0; border:4px solid #ff8a8a; border-radius:22px; padding:14px 20px; font-size:20px; color:#d2503f; margin-top:20px; text-align:center;">つぎは <b>{{ weakNextLabel }}</b> を ふくしゅうするよ → レベルアップ！</div>
+      <div onclick="{{ unlockPC }}" style="margin-top:28px; background:#3aa655; color:#fff; border:5px solid #2f8a46; border-radius:28px; padding:20px 64px; font-size:36px; font-weight:900; cursor:pointer; box-shadow:0 8px 0 #2a7d3f;">🔓 パソコンを つかう</div>
+    </div>
+  </sc-if>
+
+  <!-- ============ RETRY ============ -->
+  <sc-if value="{{ isRetry }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="もういちど" style="position:relative; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px;">
+      <div style="display:flex; gap:12px; margin-bottom:6px;">
+        <span style="background:#fff; border:3px solid #f0e2c8; border-radius:22px; padding:6px 16px; font-size:17px; font-weight:700;">ちょうせん {{ retryAttempt }}かいめ</span>
+        <span style="background:#ffe6e0; border:3px solid #ff8a8a; border-radius:22px; padding:6px 16px; font-size:16px; color:#d2503f; font-weight:700;">つぎは すこし やさしくなるよ</span>
+      </div>
+      <div style="position:relative; width:140px; height:140px; animation:floaty 2.6s ease-in-out infinite; margin-top:6px;">
+        <div style="width:100%; height:100%; background:#ffd24a; border:5px solid #3a3326; border-radius:32%; position:relative;">
+          <div style="position:absolute; top:34%; left:24%; width:14%; height:18%; background:#3a3326; border-radius:50%;"></div>
+          <div style="position:absolute; top:34%; right:24%; width:14%; height:18%; background:#3a3326; border-radius:50%;"></div>
+          <div style="position:absolute; bottom:18%; left:50%; transform:translateX(-50%); width:30%; height:14%; border:3px solid #3a3326; border-bottom:none; border-radius:40px 40px 0 0;"></div>
+        </div>
+      </div>
+      <div style="font-size:48px; font-weight:900; margin-top:14px;">おしかった！</div>
+      <div style="font-size:26px; color:#5b5040; margin-top:4px;">{{ clearCorrect }} / {{ total }} せいかい ・ ごうかくまで あと <b>{{ retryRemaining }}もん</b></div>
+      <div style="width:560px; max-width:90%; background:#fff; border:4px solid #f0e2c8; border-radius:22px; padding:14px 20px; font-size:20px; margin-top:18px; text-align:center;">まちがえた もんだいを ふくしゅうして もういちど！</div>
+      <div style="display:flex; gap:14px; margin-top:24px;">
+        <div onclick="{{ retry }}" style="background:#ff8a3d; color:#fff; border:4px solid #e07d2a; border-radius:24px; padding:16px 52px; font-size:30px; font-weight:900; cursor:pointer; box-shadow:0 7px 0 #d96a26;">もういちど ▶</div>
+        <div onclick="{{ goEmergency }}" style="background:#fff; border:4px solid #f0e2c8; border-radius:24px; padding:16px 32px; font-size:20px; color:#9a8662; cursor:pointer; display:flex; align-items:center;">⚙ 保護者に れんらく</div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ PARENT ============ -->
+  <sc-if value="{{ isParent }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="保護者ダッシュボード" style="position:relative; min-height:100vh; padding:34px 56px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:34px; font-weight:900;">保護者ダッシュボード</div>
+          <div style="font-size:18px; color:#9a8662;">{{ profileName }} ・ {{ profileGrade }} ・ {{ level }}</div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <span style="font-size:15px; color:#9a8662; border:2px dashed #d8c4a0; border-radius:10px; padding:6px 12px; display:flex; align-items:center;">🔑 PINで保護</span>
+          <span onclick="{{ backStart }}" style="background:#fff; border:3px solid #f0e2c8; border-radius:22px; padding:9px 22px; font-size:18px; font-weight:700; cursor:pointer;">← もどる</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:24px; margin-top:24px; align-items:flex-start;">
+        <div style="flex:1.4; background:#fff; border:4px solid #f0e2c8; border-radius:24px; padding:22px 26px;">
+          <div style="font-size:17px; color:#9a8662; margin-bottom:14px;">領域べつ 習熟度（自動判定 ・ 出題に反映）</div>
+          <sc-for list="{{ masteryRows }}" as="r" hint-placeholder-count="6">
+            <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px;">
+              <span style="width:130px; font-size:19px; font-weight:700;">{{ r.label }}</span>
+              <span style="flex:1; height:20px; background:#f3e8d4; border:3px solid #3a3326; border-radius:12px; overflow:hidden;"><span style="{{ r.barStyle }}"></span></span>
+              <span style="{{ r.statusStyle }}">{{ r.status }}</span>
+              <span style="width:52px; text-align:right; font-size:16px; color:#9a8662;">{{ r.pctStr }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:16px;">
+          <div style="background:#fff; border:4px solid #f0e2c8; border-radius:24px; padding:20px;">
+            <div style="font-size:17px; color:#9a8662; margin-bottom:10px;">出題のしくみ</div>
+            <div style="font-size:17px; line-height:1.7;">習熟度＝<b>正答率 × 回答時間 × 直近傾向</b>でスコア化。<br>にがてな領域の出題確率を上げ、得意な領域は間引きます（得意も少し混ぜて離脱防止）。</div>
+          </div>
+          <div style="background:#fff; border:4px solid #f0e2c8; border-radius:24px; padding:20px;">
+            <div style="font-size:17px; color:#9a8662; margin-bottom:12px;">せってい <span style="font-size:14px; color:#b3a98a;">（つぎの 出題から 反映）</span></div>
+            <div style="font-size:15px; color:#9a8662; margin-bottom:8px;">しゅつだいする 教科</div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <sc-for list="{{ topicToggles }}" as="t" hint-placeholder-count="6">
+                <div onclick="{{ t.onClick }}" style="{{ t.style }}">{{ t.label }}</div>
+              </sc-for>
+            </div>
+            <div style="display:flex; gap:18px; margin-top:20px;">
+              <div style="flex:1;">
+                <div style="font-size:15px; color:#9a8662; margin-bottom:6px;">問題数</div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div onclick="{{ countDec }}" style="{{ stepBtn }}">−</div>
+                  <div style="font-size:28px; font-weight:900; min-width:48px; text-align:center;">{{ setCount }}</div>
+                  <div onclick="{{ countInc }}" style="{{ stepBtn }}">＋</div>
+                </div>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:15px; color:#9a8662; margin-bottom:6px;">合格ライン</div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div onclick="{{ passDec }}" style="{{ stepBtn }}">−</div>
+                  <div style="font-size:28px; font-weight:900; min-width:48px; text-align:center;">{{ setPass }}</div>
+                  <div onclick="{{ passInc }}" style="{{ stepBtn }}">＋</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ============ EMERGENCY ============ -->
+  <sc-if value="{{ isEmergency }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="緊急解除" style="position:relative; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px;">
+      <sc-if value="{{ emergencyNotDone }}" hint-placeholder-val="{{ true }}">
+        <div style="font-size:32px; font-weight:900;">保護者用 ・ すぐに解除</div>
+        <div style="font-size:18px; color:#9a8662; margin-top:4px;">トレーニングを とばして パソコンを使えます</div>
+        <div style="display:flex; gap:14px; margin-top:24px;">
+          <sc-for list="{{ pinDots }}" as="d" hint-placeholder-count="4">
+            <span style="width:52px; height:62px; border:3px solid #3a3326; border-radius:12px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:30px;">{{ d.char }}</span>
+          </sc-for>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(3,84px); gap:12px; margin-top:24px;">
+          <sc-for list="{{ pinKeys }}" as="k" hint-placeholder-count="12">
+            <div onclick="{{ k.onClick }}" style="{{ k.style }}">{{ k.label }}</div>
+          </sc-for>
+        </div>
+        <div style="font-size:15px; color:#9a8662; margin-top:18px; text-align:center; line-height:1.6;">PIN／OSパスワード／生体認証で認証 ・ 誤入力が続くとロック ・ 緊急解除はログに記録</div>
+        <div onclick="{{ backStart }}" style="margin-top:18px; font-size:18px; color:#9a8662; cursor:pointer;">← もどる</div>
+      </sc-if>
+      <sc-if value="{{ emergencyDone }}" hint-placeholder-val="{{ false }}">
+        <div style="width:180px; height:180px; border:14px solid #3aa655; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:90px; color:#3aa655; animation:popIn .45s ease-out;">🔓</div>
+        <div style="font-size:44px; font-weight:900; color:#2f7d44; margin-top:16px;">解除しました</div>
+        <div style="font-size:20px; color:#9a8662; margin-top:6px;">記録：保護者ダッシュボードに残ります</div>
+        <div onclick="{{ unlockPC }}" style="margin-top:24px; background:#3aa655; color:#fff; border:4px solid #2f8a46; border-radius:24px; padding:14px 48px; font-size:26px; font-weight:900; cursor:pointer; box-shadow:0 7px 0 #2a7d3f;">パソコンを つかう</div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<!--__KIDS_TRAINING_APP__-->
+
+
+</body></html>

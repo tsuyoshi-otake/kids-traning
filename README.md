@@ -1,6 +1,6 @@
 # Kids Training WebView2 App
 
-This project wraps `kids-training.html` in a fullscreen Windows WebView2 app and builds a per-user MSI installer.
+This project wraps the split learning content under `kids-training/` in a fullscreen Windows WebView2 app and builds a per-user MSI installer.
 
 ## Build
 
@@ -11,9 +11,32 @@ rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.
 
 The MSI is written to `artifacts\KidsTraining.msi`.
 
+## Architecture
+
+The application shell follows an inward dependency direction:
+
+```text
+Presentation/WinForms -> Application <- Infrastructure
+                              |
+                            Domain
+```
+
+- `Domain` contains stable values and terminal result types such as parent PINs, release versions, and update outcomes.
+- `Application` contains learning-page, parent-password, and update use cases plus their external ports. It does not access WinForms, WebView2, files, HTTP, or processes.
+- `Infrastructure` implements those ports with split learning assets, JSON settings, GitHub Releases, MSI launching, and the LAN parent-control adapter.
+- `Presentation/WinForms` owns the tray and fullscreen UI and receives its use cases from `Program.cs`, the composition root.
+- Runtime markup patches are ordered in `Application/Learning/Markup` and fail explicitly when a required anchor is missing.
+
+Run the dependency and use-case checks with:
+
+```powershell
+rtk dotnet run --project tests\KidsTraining.ArchitectureTests\KidsTraining.ArchitectureTests.csproj -c Release -- .
+```
+
 ## Runtime Behavior
 
-- The app loads `assets\kids-training.html` in WebView2.
+- The app builds `assets\kids-training.runtime.html` from the source template and learning app definition, then loads it in WebView2. The runtime path stays compatible with earlier releases so the existing WebView `file://` storage origin is preserved.
+- Learning content is split into `index.template.html`, `app/learning-app.dc.html`, external CSS and JavaScript, and WOFF2 files under `fonts/`. This keeps the repository source maintainable without changing the existing `file://` origin used by WebView2 and `localStorage`.
 - The training page uses `localStorage` for data (`kt_profiles_v1`, `kt_settings_v1`, `kt_muted_v1`), physically under `%LOCALAPPDATA%\KidsTraining\WebView2UserData`.
 - The wrapper loads a runtime-patched copy of the bundled HTML so the profile selection screen is skipped.
 - The profile store is normalized to a single current Windows user profile at startup, so bundled samples and the temporary `キッズ` profile are removed while first-profile progress is preserved.
@@ -63,3 +86,5 @@ Tracking issues:
 - Session length and pass threshold: https://github.com/tsuyoshi-otake/kids-traning/issues/13
 - Four-stage curriculum review and English pronunciation choices: https://github.com/tsuyoshi-otake/kids-traning/issues/20
 - Twenty-question migration and five-level mastery: https://github.com/tsuyoshi-otake/kids-traning/issues/21
+- Split learning HTML assets: https://github.com/tsuyoshi-otake/kids-traning/issues/22
+- Clean Architecture refactoring: https://github.com/tsuyoshi-otake/kids-traning/issues/23

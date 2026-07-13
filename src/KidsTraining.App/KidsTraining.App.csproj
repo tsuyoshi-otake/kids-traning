@@ -16,7 +16,7 @@
     <DebugType>embedded</DebugType>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.4.5</Version>
+    <Version>1.10.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,8 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\kids-training.html" Link="assets\kids-training.html">
-      <TargetPath>assets\kids-training.html</TargetPath>
+    <Content Include="..\..\kids-training\**\*" Link="assets\kids-training\%(RecursiveDir)%(Filename)%(Extension)">
+      <TargetPath>assets\kids-training\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>Always</CopyToPublishDirectory>

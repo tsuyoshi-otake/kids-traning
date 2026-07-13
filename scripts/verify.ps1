@@ -8,15 +8,79 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.9.0"
+$version = "1.10.0"
 
+$architectureSourceRoot = Join-Path $root "src\KidsTraining.App"
 $programSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Program.cs")
-$traySource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\TrayApplicationContext.cs")
-$updateSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\UpdateManager.cs")
-$runtimeSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\RuntimeHtmlPreparer.cs")
-$trainingSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\TrainingForm.cs")
-$parentSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\ParentControlServer.cs")
-$parentSettingsSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\ParentSettings.cs")
+$traySource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Presentation\WinForms\TrayApplicationContext.cs")
+$updateSource = [string]::Join(
+    "`n",
+    @(Get-ChildItem -Path (Join-Path $architectureSourceRoot "Application\Updates"), (Join-Path $architectureSourceRoot "Domain\Updates"), (Join-Path $architectureSourceRoot "Infrastructure\Updates") -Filter "*.cs" -File -Recurse |
+        Sort-Object FullName |
+        ForEach-Object { Get-Content -Raw -Encoding UTF8 $_.FullName }))
+$runtimeSource = [string]::Join(
+    "`n",
+    @(Get-ChildItem -Path (Join-Path $architectureSourceRoot "Application\Learning"), (Join-Path $architectureSourceRoot "Domain\Learning") -Filter "*.cs" -File -Recurse |
+        Sort-Object FullName |
+        ForEach-Object { Get-Content -Raw -Encoding UTF8 $_.FullName }))
+$trainingSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Presentation\WinForms\TrainingForm.cs")
+$parentSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Infrastructure\ParentControl\ParentControlServer.cs")
+$parentSettingsSource = [string]::Join(
+    "`n",
+    @(Get-ChildItem -Path (Join-Path $architectureSourceRoot "Application\ParentControl"), (Join-Path $architectureSourceRoot "Domain\ParentControl"), (Join-Path $architectureSourceRoot "Infrastructure\Settings") -Filter "*.cs" -File -Recurse |
+        Sort-Object FullName |
+        ForEach-Object { Get-Content -Raw -Encoding UTF8 $_.FullName }))
+$learningSourceDir = Join-Path $root "kids-training"
+$htmlTemplateSource = Join-Path $learningSourceDir "index.template.html"
+$appDefinitionSource = Join-Path $learningSourceDir "app\learning-app.dc.html"
+$runtimeScriptSource = Join-Path $learningSourceDir "scripts\runtime.js"
+$fontCssSource = Join-Path $learningSourceDir "styles\fonts.css"
+$fontSourceDir = Join-Path $learningSourceDir "fonts"
+$rootFullPath = [System.IO.Path]::GetFullPath($root).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
+$publishFullPath = [System.IO.Path]::GetFullPath($publishDir)
+$coreSourceFiles = @(Get-ChildItem -Path (Join-Path $architectureSourceRoot "Domain"), (Join-Path $architectureSourceRoot "Application") -Filter "*.cs" -File -Recurse)
+
+if (!$publishFullPath.StartsWith($rootFullPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Publish directory must stay inside the repository: $publishFullPath"
+}
+if (Test-Path $publishFullPath) {
+    Remove-Item -LiteralPath $publishFullPath -Recurse -Force
+}
+
+if (!(Test-Path $htmlTemplateSource) -or !(Test-Path $appDefinitionSource) -or !(Test-Path $runtimeScriptSource) -or !(Test-Path $fontCssSource)) {
+    throw "Split learning source assets are incomplete"
+}
+if (Test-Path (Join-Path $root "kids-training.html")) {
+    throw "The legacy single-file kids-training.html bundle must not remain"
+}
+if (Test-Path (Join-Path $architectureSourceRoot "RuntimeHtmlPreparer.cs")) {
+    throw "The legacy RuntimeHtmlPreparer must be replaced by the learning application boundary"
+}
+foreach ($coreSourceFile in $coreSourceFiles) {
+    $coreSource = Get-Content -Raw -Encoding UTF8 $coreSourceFile.FullName
+    if ($coreSource -match "System\.Windows\.Forms|Microsoft\.Web\.WebView2|\bHttpClient\b|\bProcess\.|\bFile\.|\bDirectory\.") {
+        throw "Core layer has an infrastructure dependency: $($coreSourceFile.FullName)"
+    }
+}
+$htmlTemplateText = Get-Content -Raw -Encoding UTF8 $htmlTemplateSource
+$fontCssText = Get-Content -Raw -Encoding UTF8 $fontCssSource
+$fontFiles = @(Get-ChildItem -Path $fontSourceDir -Filter "*.woff2" -File)
+if ($htmlTemplateText -notmatch [regex]::Escape("<!--__KIDS_TRAINING_APP__-->") -or
+    $htmlTemplateText -notmatch [regex]::Escape('kids-training/scripts/runtime.js') -or
+    $htmlTemplateText -notmatch [regex]::Escape('kids-training/styles/fonts.css') -or
+    $htmlTemplateText -match "__bundler/manifest" -or
+    $fontFiles.Count -ne 366) {
+    throw "Split learning source structure is invalid"
+}
+$fontReferences = [regex]::Matches($fontCssText, 'url\("\.\./fonts/([^"\)]+\.woff2)"\)')
+if ($fontReferences.Count -ne $fontFiles.Count) {
+    throw "Font CSS reference count does not match the extracted font files"
+}
+foreach ($fontReference in $fontReferences) {
+    if (!(Test-Path (Join-Path $fontSourceDir $fontReference.Groups[1].Value))) {
+        throw "Missing referenced font: $($fontReference.Groups[1].Value)"
+    }
+}
 
 if ($programSource -notmatch "TrayApplicationContext" -or $programSource -notmatch "--training" -or $programSource -notmatch "--auto-training" -or $programSource -notmatch "--apply-update") {
     throw "Program entry point must support tray, training, and update-runner modes"
@@ -44,10 +108,10 @@ if ($traySource -notmatch "ParentControlServer" -or $traySource -notmatch "保�
 if ($parentSource -notmatch "TcpListener" -or $parentSource -notmatch "IPAddress.Any" -or $parentSource -notmatch "DefaultPort = 44567" -or $parentSource -notmatch "IsAllowedRemoteAddress" -or $parentSource -notmatch "Kids Training 保護者画面" -or $parentSource -notmatch "/api/start" -or $parentSource -notmatch "/api/return" -or $parentSource -notmatch "/api/password" -or $parentSource -notmatch "パスワードを変更") {
     throw "Parent control server must listen on LAN and expose start/return/password controls"
 }
-if ($parentSettingsSource -notmatch "parentPassword" -or $parentSettingsSource -notmatch "ChangeParentPassword" -or $parentSettingsSource -notmatch "NormalizePassword" -or $parentSettingsSource -notmatch "File.Move\(tempPath, AppPaths.ParentSettingsPath, overwrite: true\)") {
+if ($parentSettingsSource -notmatch "parentPassword" -or $parentSettingsSource -notmatch "ParentPasswordService" -or $parentSettingsSource -notmatch "ParentPin.TryCreate" -or $parentSettingsSource -notmatch "File.Move\(tempPath, AppPaths.ParentSettingsPath, overwrite: true\)") {
     throw "Parent settings must persist a configurable 4-digit parent password"
 }
-if ($programSource -notmatch "ParentControlServer.BuildParentPage" -or $programSource -notmatch "192.168.1.10" -or $programSource -notmatch "8.8.8.8" -or $programSource -notmatch "ParentSettings.NormalizePassword") {
+if ($programSource -notmatch "ParentControlServer.BuildParentPage" -or $programSource -notmatch "192.168.1.10" -or $programSource -notmatch "8.8.8.8" -or $programSource -notmatch "ParentPin.TryCreate") {
     throw "Smoke test must validate parent control page, password validation, and LAN address filtering"
 }
 if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "moji:\.05" -or $runtimeSource -notmatch "measure:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "effectiveGrade\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics" -or $runtimeSource -notmatch "profileGrade:this\.gradeLabel") {
@@ -126,19 +190,36 @@ if ($trainingSource -match "defaultAvatar" -or $trainingSource -match "avatarRea
     throw "Training storage bootstrap must not add avatar state"
 }
 
+$architectureTests = Join-Path $root "tests\KidsTraining.ArchitectureTests\KidsTraining.ArchitectureTests.csproj"
+& dotnet run --project $architectureTests -c Release -- $root
+if ($LASTEXITCODE -ne 0) {
+    throw "Architecture tests failed with exit code $LASTEXITCODE"
+}
+
 & dotnet publish $project -c Release -r win-x64 --self-contained true /p:Version=$version
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE"
 }
 
 $publishedExe = Join-Path $publishDir "KidsTraining.App.exe"
-$publishedHtml = Join-Path $publishDir "assets\kids-training.html"
+$publishedLearningDir = Join-Path $publishDir "assets\kids-training"
+$publishedHtml = Join-Path $publishedLearningDir "index.template.html"
+$publishedAppDefinition = Join-Path $publishedLearningDir "app\learning-app.dc.html"
+$publishedRuntimeScript = Join-Path $publishedLearningDir "scripts\runtime.js"
+$publishedFonts = Join-Path $publishedLearningDir "fonts"
 $publishedFavicon = Join-Path $publishDir "assets\favicon.ico"
 if (!(Test-Path $publishedExe)) {
     throw "Missing published executable: $publishedExe"
 }
 if (!(Test-Path $publishedHtml)) {
     throw "Missing published HTML asset: $publishedHtml"
+}
+if (Test-Path (Join-Path $publishDir "assets\kids-training.html")) {
+    throw "Legacy single-file HTML remains in the publish output"
+}
+if (!(Test-Path $publishedAppDefinition) -or !(Test-Path $publishedRuntimeScript) -or
+    @(Get-ChildItem -Path $publishedFonts -Filter "*.woff2" -File).Count -ne 366) {
+    throw "Published split learning assets are incomplete"
 }
 if (!(Test-Path $publishedFavicon)) {
     throw "Missing published favicon asset: $publishedFavicon"
@@ -167,8 +248,13 @@ if (!(Test-Path $msiPath)) {
 if (!(Test-Path (Join-Path $artifactsPublishDir "KidsTraining.App.exe"))) {
     throw "Missing artifacts publish executable"
 }
-if (!(Test-Path (Join-Path $artifactsPublishDir "assets\kids-training.html"))) {
-    throw "Missing artifacts publish HTML"
+if (!(Test-Path (Join-Path $artifactsPublishDir "assets\kids-training\index.template.html")) -or
+    !(Test-Path (Join-Path $artifactsPublishDir "assets\kids-training\app\learning-app.dc.html")) -or
+    !(Test-Path (Join-Path $artifactsPublishDir "assets\kids-training\scripts\runtime.js"))) {
+    throw "Missing artifacts publish learning assets"
+}
+if (Test-Path (Join-Path $artifactsPublishDir "assets\kids-training.html")) {
+    throw "Legacy single-file HTML remains in the artifacts publish output"
 }
 if (!(Test-Path (Join-Path $artifactsPublishDir "assets\favicon.ico"))) {
     throw "Missing artifacts publish favicon"

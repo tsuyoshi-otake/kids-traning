@@ -1,0 +1,220 @@
+<script type="text/x-dc" data-dc-script="" data-props="{&quot;$preview&quot;:{&quot;width&quot;:1600,&quot;height&quot;:900},&quot;questionCount&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:10,&quot;min&quot;:4,&quot;max&quot;:15,&quot;tsType&quot;:&quot;number&quot;},&quot;passLine&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:8,&quot;min&quot;:1,&quot;max&quot;:15,&quot;tsType&quot;:&quot;number&quot;},&quot;soundCue&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = {
+    screen:'profile', profileIdx:0,
+    profiles:[
+      {name:'はな',grade:2,color:'#ff8a3d',streak:5,stars:21,mastery:{add:.86,sub:.42,mul:.55,clock:.62,kokugo:.78,hissan:.46}},
+      {name:'そら',grade:1,color:'#3b82f6',streak:2,stars:8,mastery:{add:.52,sub:.44,mul:.22,clock:.36,kokugo:.5,hissan:.3}},
+    ],
+    session:null, lastResult:null, input:'', combo:0, pin:'', emergencyDone:false,
+    hsStep:0, hsOnes:'', hsTens:'', hsCarry:false, hsBorrow:false, hsMistakes:0, hsHint:'',
+    numMiss:0, numChoices:null, hsStepMiss:0, hsStepChoices:null,
+    muted:false, setupName:'', setupGrade:1, calib:null, settings:null,
+  };
+
+  topics = {
+    add:{label:'たしざん',color:'#ff8a3d'},
+    sub:{label:'くりさがり',color:'#ef6a3d'},
+    hissan:{label:'ひっさん',color:'#e0552f'},
+    mul:{label:'かけざん',color:'#1fa39a'},
+    clock:{label:'とけい',color:'#7a6db5'},
+    kokugo:{label:'こくご',color:'#d2691e'},
+  };
+
+  rand(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
+  clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+  shuffle(a){for(let i=a.length-1;i>0;i--){const j=this.rand(0,i);const t=a[i];a[i]=a[j];a[j]=t;}return a;}
+
+  ensureAudio(){if(this._ac!==undefined)return this._ac;try{this._ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){this._ac=null;}return this._ac;}
+  beep(notes){if(this.state.muted||!(this.props.soundCue??true))return;const ac=this.ensureAudio();if(!ac)return;if(ac.state==='suspended')ac.resume();const now=ac.currentTime;notes.forEach(n=>{const o=ac.createOscillator(),g=ac.createGain();o.type=n.type||'sine';o.frequency.setValueAtTime(n.f,now+(n.t||0));if(n.f2)o.frequency.exponentialRampToValueAtTime(n.f2,now+(n.t||0)+(n.d||0.12));o.connect(g);g.connect(ac.destination);const s=now+(n.t||0),d=n.d||0.12,pk=n.g||0.16;g.gain.setValueAtTime(0.0001,s);g.gain.exponentialRampToValueAtTime(pk,s+0.012);g.gain.exponentialRampToValueAtTime(0.0001,s+d);o.start(s);o.stop(s+d+0.03);});}
+  sfx(name){const M={
+    tap:[{f:520,d:0.05,type:'triangle',g:0.06}],
+    select:[{f:600,d:0.07,type:'triangle',g:0.1},{f:900,t:0.05,d:0.08,type:'triangle',g:0.08}],
+    step:[{f:740,d:0.09,type:'sine',g:0.12}],
+    correct:[{f:660,t:0,d:0.12,type:'sine',g:0.16},{f:880,t:0.1,d:0.14,type:'sine',g:0.16},{f:1320,t:0.22,d:0.2,type:'sine',g:0.14}],
+    combo:[{f:880,t:0,d:0.1,type:'triangle',g:0.14},{f:1175,t:0.08,d:0.1,type:'triangle',g:0.14},{f:1568,t:0.16,d:0.12,type:'triangle',g:0.13},{f:2093,t:0.26,d:0.22,type:'sine',g:0.12}],
+    wrong:[{f:330,f2:200,t:0,d:0.28,type:'sine',g:0.14}],
+    clear:[{f:523,t:0,d:0.16,type:'triangle',g:0.15},{f:659,t:0.14,d:0.16,type:'triangle',g:0.15},{f:784,t:0.28,d:0.16,type:'triangle',g:0.15},{f:1047,t:0.42,d:0.36,type:'sine',g:0.16}],
+    unlock:[{f:784,t:0,d:0.12,type:'sine',g:0.15},{f:1047,t:0.1,d:0.12,type:'sine',g:0.15},{f:1319,t:0.2,d:0.3,type:'sine',g:0.15}],
+  };this.beep(M[name]||M.tap);}
+
+  defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true},count:this.props.questionCount??10,pass:this.props.passLine??8};}
+  componentDidMount(){try{const raw=localStorage.getItem('kt_profiles_v1');if(raw){const p=JSON.parse(raw);if(Array.isArray(p)&&p.length){this._lastSaved=raw;this.setState({profiles:p});}}const m=localStorage.getItem('kt_muted_v1');if(m!=null)this.setState({muted:m==='1'});}catch(e){}let st=null;try{const r=localStorage.getItem('kt_settings_v1');if(r)st=JSON.parse(r);}catch(e){}const def=this.defaultSettings();this.setState({settings:st&&st.topics?{topics:{...def.topics,...st.topics},count:st.count||def.count,pass:st.pass||def.pass}:def});}
+  setSettings(patch){const ns={...this.state.settings,...patch};this.setState({settings:ns});try{localStorage.setItem('kt_settings_v1',JSON.stringify(ns));}catch(e){}}
+  toggleTopic(k){this.sfx('tap');const s=this.state.settings;const topics={...s.topics,[k]:!s.topics[k]};if(Object.values(topics).filter(Boolean).length===0)return;this.setSettings({topics:topics});}
+  countDelta(d){this.sfx('tap');const s=this.state.settings;const count=this.clamp(s.count+d,4,15);this.setSettings({count:count,pass:Math.min(s.pass,count)});}
+  passDelta(d){this.sfx('tap');const s=this.state.settings;this.setSettings({pass:this.clamp(s.pass+d,1,s.count)});}
+  componentDidUpdate(){try{const s=JSON.stringify(this.state.profiles);if(s!==this._lastSaved){localStorage.setItem('kt_profiles_v1',s);this._lastSaved=s;}}catch(e){}}
+  toggleMute(){const m=!this.state.muted;this.setState({muted:m});try{localStorage.setItem('kt_muted_v1',m?'1':'0');}catch(e){}if(!m)setTimeout(()=>this.sfx('select'),0);}
+  quitQuiz(){this.sfx('select');this.setState({screen:'start',session:null,combo:0});}
+  onSetupName(e){this.setState({setupName:e.target.value});}
+  setGrade(g){this.sfx('tap');this.setState({setupGrade:g});}
+  backProfile(){this.sfx('select');this.setState({screen:'profile'});}
+  calibChoicesFor(q){return q.choices?q.choices.slice():this.numChoicesFor(q.answer);}
+  buildCalib(){const order=['add','sub','hissan','mul','kokugo'];return order.map(t=>{const q=this.genFor(t);return{q:q,choices:this.calibChoicesFor(q)};});}
+  startCalib(){if(!this.state.setupName.trim())return;this.sfx('select');this.setState({screen:'calib',calib:{items:this.buildCalib(),idx:0,results:{}}});}
+  calibAnswer(c){const cb=this.state.calib,it=cb.items[cb.idx],ok=String(c)===String(it.q.answer);this.sfx(ok?'correct':'wrong');const results={...cb.results};results[it.q.topic]=ok;const ni=cb.idx+1;if(ni>=cb.items.length){const mastery={};['add','sub','hissan','mul','clock','kokugo'].forEach(t=>{mastery[t]=results[t]===undefined?0.5:(results[t]?0.72:0.32);});const ps=this.state.profiles.slice();const colors=['#4ad991','#f0883e','#6aa0ff','#d96ad9','#23b5a8'];ps.push({name:this.state.setupName.trim(),grade:this.state.setupGrade,color:colors[ps.length%colors.length],streak:0,stars:0,mastery:mastery});this.setState({profiles:ps,profileIdx:ps.length-1,screen:'start',calib:null});}else{this.setState({calib:{...cb,idx:ni,results:results}});}}
+
+  genAdd(){const a=this.rand(3,9),b=this.rand(2,9),ans=a+b;return{topic:'add',mode:'num',n1:a,n2:b,prompt:a+' ＋ '+b,answer:''+ans,explanation:a+'と'+b+'を あわせると '+ans+'。'};}
+  genSub(){const a=this.rand(11,17),o=a%10,b=this.rand(o+1,9),ans=a-b;return{topic:'sub',mode:'num',prompt:a+' − '+b,answer:''+ans,explanation:a+'を 10と'+(a-10)+'に わける。10−'+b+'='+(10-b)+'、'+(10-b)+'＋'+(a-10)+'='+ans+'。'};}
+  genHissan(){if(Math.random()<0.5){let a,b;do{a=this.rand(14,48);b=this.rand(14,48);}while((a%10+b%10)<10);return this.hissanAdd(a,b);}let a,b;do{a=this.rand(22,89);b=this.rand(13,a-1);}while(!((a%10)<(b%10)&&Math.floor(a/10)>=Math.floor(b/10)+2));return this.hissanSub(a,b);}
+  hissanAdd(a,b){const oa=a%10,ob=b%10,os=oa+ob,od=os%10,ta=Math.floor(a/10),tb=Math.floor(b/10),ts=ta+tb+1,ans=a+b;return{topic:'hissan',mode:'hissan-steps',op:'＋',a:a,b:b,answer:''+ans,prompt:a+' ＋ '+b,explanation:'一のくらい '+oa+'＋'+ob+'='+os+'（'+od+'をかいて 1くりあがり）。十のくらい 1＋'+ta+'＋'+tb+'='+ts+'。こたえは '+ans+'。',steps:[{place:'ones',prompt:'一のくらい： '+oa+' ＋ '+ob+' は？',expect:''+os,writeOnes:''+od,carry:true,explain:os+' だから 一のくらいに '+od+' をかいて、じゅうのくらいへ 1 くりあがり。'},{place:'tens',prompt:'十のくらい： 1（くりあがり） ＋ '+ta+' ＋ '+tb+' は？',expect:''+ts,writeTens:''+ts,explain:'1＋'+ta+'＋'+tb+'='+ts+'。'}]};}
+  hissanSub(a,b){const oa=a%10,ob=b%10,orr=oa+10-ob,ta=Math.floor(a/10),tb=Math.floor(b/10),tr=(ta-1)-tb,ans=a-b;return{topic:'hissan',mode:'hissan-steps',op:'−',a:a,b:b,answer:''+ans,prompt:a+' − '+b,explanation:'一のくらいは ひけないので となりから 10かりて '+(oa+10)+'−'+ob+'='+orr+'。十のくらいは '+(ta-1)+'−'+tb+'='+tr+'。こたえは '+ans+'。',steps:[{place:'ones',prompt:'一のくらい： '+oa+' から '+ob+' は ひけない。となりから 10かりて '+(oa+10)+' − '+ob+' は？',expect:''+orr,writeOnes:''+orr,borrow:true,explain:'となりから 10かりて '+(oa+10)+'−'+ob+'='+orr+'。じゅうのくらいは 1へるよ。'},{place:'tens',prompt:'十のくらい： '+(ta-1)+' − '+tb+' は？（1かしたよ）',expect:''+tr,writeTens:''+tr,explain:(ta-1)+'−'+tb+'='+tr+'。'}]};}
+  pickMul(){const L=[[7,6,42,[42,48,36,56]],[8,7,56,[56,54,48,63]],[6,8,48,[48,42,54,56]],[9,4,36,[36,32,45,40]],[7,8,56,[56,49,54,63]],[6,7,42,[42,36,48,40]],[8,4,32,[32,28,36,24]],[9,7,63,[63,56,72,54]]];const it=L[this.rand(0,L.length-1)];return{topic:'mul',mode:'choices',prompt:it[0]+' × '+it[1],answer:''+it[2],choices:this.shuffle(it[3].map(String)),explanation:it[0]+'のだん。'+it[0]+'×'+it[1]+'='+it[2]+'。'};}
+  pick4(ans,pool){const s=new Set([ans]);const out=[ans];for(const x of pool){if(out.length>=4)break;if(!s.has(x)){s.add(x);out.push(x);}}let k=1;while(out.length<4){const v=ans+'　'.repeat(k);if(!s.has(v)){s.add(v);out.push(v);}k++;}return this.shuffle(out);}
+  clockExplain(h,m,ask,a){if(ask==='hour')return 'みじかい はり が '+h+' を さして いるね。こたえは '+a+'。';if(ask==='minute')return 'ながい はり が さす すうじ ×5 が ふん。'+(m/5)+'×5='+m+'ふん。こたえは '+a+'。';return 'みじかい はり＝じ、ながい はり＝ふん。こたえは '+a+'。';}
+  pickClock(){const hourStr=x=>((x-1+12)%12+1)+'じ';const kinds=['hour','hour','half','minute','both'];const k=kinds[this.rand(0,kinds.length-1)];let h=this.rand(1,12),m=0,ask='hour',prompt='なんじ？',a='',pool=[];
+    if(k==='hour'){m=0;ask='hour';prompt='とけいを よもう ・ なんじ？';a=h+'じ';pool=[hourStr(h+1),hourStr(h-1),hourStr(h+2),hourStr(h+3)];}
+    else if(k==='half'){m=30;ask='both';prompt='とけいを よもう ・ なんじ なんぷん？';a=h+'じ30ぷん';pool=[hourStr(h+1).replace('じ','じ30ぷん'),h+'じ',hourStr(h-1).replace('じ','じ30ぷん'),hourStr(h+2).replace('じ','じ30ぷん')];}
+    else if(k==='minute'){const mins=[5,10,15,20,40,45];m=mins[this.rand(0,mins.length-1)];ask='minute';prompt='ながい はりを よもう ・ なんぷん？';a=m+'ふん';pool=[5,10,15,20,25,40,45,50].filter(x=>x!==m).map(x=>x+'ふん');}
+    else{const mins=[15,45];m=mins[this.rand(0,1)];ask='both';prompt='とけいを よもう ・ なんじ なんぷん？';a=h+'じ'+m+'ふん';pool=[hourStr(h+1).replace('じ','じ'+m+'ふん'),h+'じ'+(m===15?45:15)+'ふん',hourStr(h-1).replace('じ','じ'+m+'ふん'),h+'じ'];}
+    return{topic:'clock',mode:'choices',isClock:true,h:h,m:m,ask:ask,prompt:prompt,answer:a,choices:this.pick4(a,pool),explanation:this.clockExplain(h,m,ask,a)};}
+  pickKokugo(){const L=[{pre:'まいにち ',word:'学校',post:' へ いく',a:'がっこう',mean:'べんきょうを する ところ',c:['がっこう','がくこう','まなびや','がっこ']},{pre:'やさしい ',word:'先生',post:'',a:'せんせい',mean:'おしえて くれる ひと',c:['せんせい','さきいき','せんせ','せいせい']},{pre:'あかい ',word:'花',post:' が さく',a:'はな',mean:'くさきに さく きれいな もの',c:['はな','か','くさ','め']},{pre:'',word:'川',post:' で あそぶ',a:'かわ',mean:'みずが ながれる ところ',c:['かわ','やま','かは','うみ']},{pre:'いえで ',word:'休む',post:'',a:'やすむ',mean:'からだを やすめる こと',c:['やすむ','きゅうむ','やすみ','ねる']},{pre:'あおい ',word:'空',post:' を みる',a:'そら',mean:'あたまの うえに ひろがる ところ',c:['そら','くう','あめ','くも']}];const it=L[this.rand(0,L.length-1)];return{topic:'kokugo',mode:'choices',isKokugo:true,pre:it.pre,word:it.word,post:it.post,mean:it.mean,prompt:it.pre+it.word+it.post,answer:it.a,choices:this.shuffle(it.c.slice()),explanation:'「'+it.word+'」は 「'+it.a+'」と よむよ。いみ：'+it.mean};}
+  genFor(k){return k==='add'?this.genAdd():k==='sub'?this.genSub():k==='hissan'?this.genHissan():k==='mul'?this.pickMul():k==='clock'?this.pickClock():this.pickKokugo();}
+
+  weightedPick(p){const all=Object.keys(this.topics);const cfg=this.state.settings;const en=(cfg&&cfg.topics)?all.filter(k=>cfg.topics[k]):all;const ks=en.length?en:all;const w=ks.map(k=>{let b=0.25+(1-p.mastery[k])*1.7;if(p.grade<2&&(k==='mul'||k==='hissan'))b*=0.25;return b;});let s=w.reduce((a,b)=>a+b,0),r=Math.random()*s;for(let i=0;i<ks.length;i++){r-=w[i];if(r<=0)return ks[i];}return ks[0];}
+  total(){const s=this.state.settings;return s?s.count:(this.props.questionCount??10);}
+  passLine(){const s=this.state.settings;return s?s.pass:(this.props.passLine??8);}
+  buildSession(p,attempt){const n=this.total(),qs=[];for(let i=0;i<n;i++)qs.push(this.genFor(this.weightedPick(p)));return{questions:qs,idx:0,correct:0,attempt:attempt,startStars:p.stars};}
+
+  curP(){return this.state.profiles[this.state.profileIdx];}
+  cur(){return this.state.session.questions[this.state.session.idx];}
+  lvl(p){return 'レベル '+Math.max(1,Math.round((Object.values(p.mastery).reduce((a,b)=>a+b,0)/6)*5));}
+
+  selectProfile(i){this.sfx('select');this.setState({profileIdx:i,screen:'start'});}
+  goCalib(){this.sfx('select');this.setState({screen:'setup',setupName:'',setupGrade:1});}
+  calibDone(){this.sfx('select');const ps=this.state.profiles.slice();ps.push({name:'あたらしい こ',grade:1,color:'#4ad991',streak:0,stars:0,mastery:{add:.5,sub:.5,mul:.5,clock:.5,kokugo:.5,hissan:.5}});this.setState({profiles:ps,profileIdx:ps.length-1,screen:'start'});}
+  freshQ(){return {hsStep:0,hsOnes:'',hsTens:'',hsCarry:false,hsBorrow:false,hsMistakes:0,hsHint:'',input:'',numMiss:0,numChoices:null,hsStepMiss:0,hsStepChoices:null};}
+  numChoicesFor(correct){const b=parseInt(correct,10);const set=new Set([b]);const out=[b];const deltas=[1,-1,2,-2,10,-10,3,-3];for(const d of deltas){const v=b+d;if(v>=0&&!set.has(v)){set.add(v);out.push(v);}if(out.length>=4)break;}let n=4;while(out.length<4){const v=b+n;if(!set.has(v)){set.add(v);out.push(v);}n++;}return this.shuffle(out.slice(0,4).map(String));}
+  goStart(){this.sfx('select');const p=this.curP();this.setState({session:this.buildSession(p,1),screen:'quiz',combo:0,...this.freshQ()});}
+  press(d){if(this.state.input.length>=4)return;this.sfx('tap');this.setState({input:this.state.input+d});}
+  del(){this.sfx('tap');this.setState({input:this.state.input.slice(0,-1)});}
+  submitNum(){if(!this.state.input)return;this.checkNumeric(this.state.input);}
+  checkNumeric(val){const q=this.cur();if(String(val)===String(q.answer)){this.finishNumeric();return;}this.sfx('wrong');const miss=(this.state.numMiss||0)+1;const upd={numMiss:miss,input:'',hsHint:q.explanation};if(miss>=2)upd.numChoices=this.numChoicesFor(q.answer);this.setState(upd);}
+  finishNumeric(){const q=this.cur(),p=this.curP();const perfect=(this.state.numMiss||0)===0;p.mastery[q.topic]=this.clamp(p.mastery[q.topic]+(perfect?0.12:-0.08),0.05,0.99);const combo=perfect?this.state.combo+1:0;const stars=perfect?(combo>=3?2:1):1;p.stars+=stars;if(perfect)this.state.session.correct++;this.sfx(perfect&&combo>=3?'combo':'correct');this.setState({screen:'feedback',combo:combo,lastResult:{correct:true,q:q,userAns:q.answer,stars:stars,combo:combo,helped:!perfect},input:'',numChoices:null});}
+  submit(ans){const q=this.cur(),correct=String(ans)===String(q.answer),p=this.curP();p.mastery[q.topic]=this.clamp(p.mastery[q.topic]+(correct?0.12:-0.16),0.05,0.99);const combo=correct?this.state.combo+1:0,stars=correct?(combo>=3?2:1):0;if(correct){p.stars+=stars;this.state.session.correct++;this.sfx(combo>=3?'combo':'correct');}else{this.sfx('wrong');}this.setState({screen:'feedback',combo:combo,lastResult:{correct:correct,q:q,userAns:ans,stars:stars,combo:combo},input:''});}
+  next(){this.sfx('select');const s=this.state.session;if(s.idx>=this.total()-1){const pass=s.correct>=this.passLine();if(pass)setTimeout(()=>this.sfx('clear'),280);this.setState({screen:pass?'clear':'retry'});}else{s.idx++;this.setState({screen:'quiz',...this.freshQ()});}}
+  retry(){this.sfx('select');const p=this.curP();this.setState({session:this.buildSession(p,this.state.session.attempt+1),screen:'quiz',combo:0,...this.freshQ()});}
+  submitHissanStep(val){const q=this.cur(),st=q.steps[this.state.hsStep];const v=val!=null?val:this.state.input;if(v!==st.expect){this.sfx('wrong');const sm=(this.state.hsStepMiss||0)+1;const upd={hsHint:st.explain,input:'',hsMistakes:(this.state.hsMistakes||0)+1,hsStepMiss:sm};if(sm>=2)upd.hsStepChoices=this.numChoicesFor(st.expect);this.setState(upd);return;}const ns={input:'',hsHint:'',hsStepMiss:0,hsStepChoices:null};if(st.place==='ones'){ns.hsOnes=st.writeOnes;if(st.carry)ns.hsCarry=true;if(st.borrow)ns.hsBorrow=true;}else ns.hsTens=st.writeTens;const last=this.state.hsStep>=q.steps.length-1;if(last){const p=this.curP();const perfect=(this.state.hsMistakes||0)===0;p.mastery[q.topic]=this.clamp(p.mastery[q.topic]+(perfect?0.12:-0.05),0.05,0.99);const combo=perfect?this.state.combo+1:0;const stars=perfect?(combo>=3?2:1):1;p.stars+=stars;this.state.session.correct++;this.sfx(perfect&&combo>=3?'combo':'correct');this.setState({...ns,screen:'feedback',combo:combo,lastResult:{correct:true,q:q,userAns:q.answer,stars:stars,combo:combo,viaSteps:true,perfect:perfect}});}else{this.sfx('step');this.setState({...ns,hsStep:this.state.hsStep+1});}}
+  unlockPC(){this.sfx('unlock');this.setState({screen:'profile',session:null,combo:0,pin:'',emergencyDone:false});}
+  goParent(){this.sfx('select');this.setState({screen:'parent'});}
+  goEmergency(){this.sfx('select');this.setState({screen:'emergency',pin:'',emergencyDone:false});}
+  backStart(){this.sfx('select');this.setState({screen:'start'});}
+  pinPress(d){if(this.state.emergencyDone||this.state.pin.length>=4)return;this.sfx('tap');const np=this.state.pin+d;if(np.length===4){const ok=np==='1234';this.sfx(ok?'unlock':'wrong');this.setState({pin:np,emergencyDone:ok});if(!ok)setTimeout(()=>this.setState({pin:''}),450);}else this.setState({pin:np});}
+  pinDel(){this.setState({pin:this.state.pin.slice(0,-1),emergencyDone:false});}
+
+  renderVals(){
+    const S=this.state, sc=S.screen, p=this.curP(), T=this.topics;
+    const avatar=(c,sz,fs)=>'width:'+sz+'px;height:'+sz+'px;border-radius:50%;background:'+c+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:'+fs+'px;font-weight:900;border:4px solid #3a3326;flex:none;';
+    const keyTile='display:flex;align-items:center;justify-content:center;height:74px;border-radius:18px;font-weight:900;cursor:pointer;border:3px solid #ecd9b9;background:#fff;color:#3a3326;font-size:32px;box-shadow:0 5px 0 #ecd9b9;user-select:none;';
+    const keyClear='display:flex;align-items:center;justify-content:center;height:74px;border-radius:18px;font-weight:700;cursor:pointer;border:3px solid #ecd9b9;background:#f3e8d4;color:#9a8662;font-size:22px;box-shadow:0 5px 0 #ecd9b9;user-select:none;';
+    const keyOk='display:flex;align-items:center;justify-content:center;height:74px;border-radius:18px;font-weight:900;cursor:pointer;border:3px solid #e07d2a;background:#ff8a3d;color:#fff;font-size:26px;box-shadow:0 5px 0 #d96a26;user-select:none;';
+    const choiceTile='display:flex;align-items:center;justify-content:center;min-height:88px;border-radius:22px;font-weight:900;cursor:pointer;border:3px solid #ecd9b9;background:#fff;color:#3a3326;font-size:40px;box-shadow:0 6px 0 #ecd9b9;user-select:none;';
+
+    const padKeys=['1','2','3','4','5','6','7','8','9'].map(n=>({label:n,style:keyTile,onClick:()=>this.press(n)}));
+    padKeys.push({label:'けす',style:keyClear,onClick:()=>this.del()});
+    padKeys.push({label:'0',style:keyTile,onClick:()=>this.press('0')});
+    padKeys.push({label:'OK',style:keyOk,onClick:()=>this.submitNum()});
+
+    const profiles=S.profiles.map((pr,i)=>({name:pr.name,initial:pr.name.charAt(0),avatarStyleLg:avatar(pr.color,110,52),gradeLabel:pr.grade+'年生',levelLabel:this.lvl(pr),streak:pr.streak,onClick:()=>this.selectProfile(i)}));
+
+    const weakKeys=Object.keys(T).filter(k=>p.mastery[k]<0.5);
+    const weakLabels=weakKeys.map(k=>T[k].label).join('・');
+
+    const masteryRows=Object.keys(T).map(k=>{const m=p.mastery[k];const pct=Math.round(m*100);const weak=m<0.5;const status=m>=0.75?'とくい':m>=0.5?'ふつう':'にがて';const bc=m>=0.75?'#3aa655':m>=0.5?'#9fd17a':'#ff8a8a';const sc2=m<0.5?'#d2503f':'#6b5e45';return{label:T[k].label,pct:pct,pctStr:pct+'%',status:status,barStyle:'display:block;height:100%;width:'+pct+'%;background:'+bc+';',statusStyle:'width:60px;text-align:center;font-size:15px;font-weight:700;color:'+sc2+';'};});
+
+    const hsPad=['1','2','3','4','5','6','7','8','9'].map(n=>({label:n,style:keyTile,onClick:()=>this.press(n)}));
+    hsPad.push({label:'けす',style:keyClear,onClick:()=>this.del()});
+    hsPad.push({label:'0',style:keyTile,onClick:()=>this.press('0')});
+    hsPad.push({label:'OK',style:keyOk,onClick:()=>this.submitHissanStep()});
+
+    const choiceSm='display:flex;align-items:center;justify-content:center;min-height:66px;border-radius:16px;font-weight:900;cursor:pointer;border:3px solid #2aa39a;background:#e6fbf7;color:#13776f;font-size:30px;box-shadow:0 5px 0 #b8e8e2;user-select:none;';
+    let q=null,choices=[],modeNumeric=false,modeChoices=false,modeHissan=false,isHissan=false,isPlainEq=false,isClock=false,topicLabel='',topicColor='#ccc',isWeakTopic=false,clockHourStyle='',clockMinStyle='';
+    let hsTensA='',hsOnesA='',hsTensB='',hsOnesB='',hsOp='',hsTens='',hsOnes='',tensMark='',onesMark='',onesSlotStyle='',tensSlotStyle='',hsStepLabel='',hsStepPrompt='';
+    let isAddViz=false,addFrames=[],isKokugo=false,isNotKokugo=false,kokuPre='',kokuWord='',kokuPost='',kokuMean='',clockMarks=[],clockAskLabel='',showNumChoices=false,numChoiceTiles=[],showHsChoices=false,hsChoiceTiles=[];
+    if(S.session && sc==='quiz'){
+      q=this.cur();const t=T[q.topic];topicLabel=t.label;topicColor=t.color;isWeakTopic=p.mastery[q.topic]<0.5;
+      modeNumeric=q.mode==='num';modeChoices=q.mode==='choices';modeHissan=q.mode==='hissan-steps';isPlainEq=modeNumeric;isClock=!!q.isClock;
+      if(modeChoices)choices=q.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.submit(c)}));
+      if(modeHissan){
+        hsTensA=Math.floor(q.a/10);hsOnesA=q.a%10;hsTensB=Math.floor(q.b/10);hsOnesB=q.b%10;hsOp=q.op;
+        hsOnes=S.hsOnes;hsTens=S.hsTens;
+        tensMark=S.hsCarry?'1':(S.hsBorrow?'−1':'');onesMark=S.hsBorrow?'10':'';
+        const st=q.steps[S.hsStep];hsStepLabel='ステップ '+(S.hsStep+1)+' / '+q.steps.length;hsStepPrompt=st?st.prompt:'';
+        const onesActive=st&&st.place==='ones',tensActive=st&&st.place==='tens';
+        const onesFilled=S.hsOnes!=='',tensFilled=S.hsTens!=='';
+        const slotBase='width:58px;height:66px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:48px;font-weight:900;margin:0 auto;';
+        onesSlotStyle=slotBase+(onesFilled?'background:#eafaef;border:3px solid #3aa655;color:#2f7d44;':(onesActive?'border:3px dashed #ff8a3d;background:#fff7ec;':'border:3px dashed #d8c4a0;'));
+        tensSlotStyle=slotBase+(tensFilled?'background:#eafaef;border:3px solid #3aa655;color:#2f7d44;':(tensActive?'border:3px dashed #ff8a3d;background:#fff7ec;':'border:3px dashed #d8c4a0;'));
+      }
+      if(isClock){const hd=(q.h%12)/12*360+q.m/60*30,md=q.m/60*360;clockHourStyle='position:absolute;left:50%;top:50%;width:9px;height:54px;background:#3a3326;border-radius:6px;transform-origin:bottom center;transform:translate(-50%,-100%) rotate('+hd+'deg);';clockMinStyle='position:absolute;left:50%;top:50%;width:7px;height:84px;background:#ff8a3d;border-radius:6px;transform-origin:bottom center;transform:translate(-50%,-100%) rotate('+md+'deg);';
+        const showMin=q.ask!=='hour';
+        for(let i=1;i<=12;i++){const ang=i*30,r=92,x=Math.round(Math.sin(ang*Math.PI/180)*r),y=Math.round(-Math.cos(ang*Math.PI/180)*r);clockMarks.push({hour:i,min:(i*5===60?0:i*5),hasMin:showMin,style:'position:absolute;left:50%;top:50%;transform:translate(calc(-50% + '+x+'px), calc(-50% + '+y+'px));display:flex;flex-direction:column;align-items:center;line-height:1;'});}
+        clockAskLabel=q.ask==='hour'?'みじかい はり ＝ なんじ':q.ask==='minute'?'ながい はり ＝ なんぷん（すうじ ×5）':'みじかい＝じ ／ ながい＝ふん';
+      }
+      if(modeNumeric){
+        if(q.topic==='add'){isAddViz=true;const n1=q.n1,n2=q.n2,tot=n1+n2,frames=Math.ceil(tot/10);for(let f=0;f<frames;f++){const cells=[];let fill=0;for(let i=0;i<10;i++){const idx=f*10+i;let st;if(idx<n1){st='background:#ff8a3d;border:2px solid #e07d2a;';fill++;}else if(idx<tot){st='background:#2aa39a;border:2px solid #178a82;';fill++;}else{st='background:#fff;border:2px dashed #d8c4a0;';}cells.push({style:'width:26px;height:26px;border-radius:50%;'+st});}addFrames.push({full:fill===10,cells:cells,boxStyle:'display:inline-grid;grid-template-columns:repeat(5,26px);gap:6px;padding:10px;border-radius:14px;'+(fill===10?'border:3px solid #3aa655;background:#eafaef;':'border:3px solid #f0e2c8;background:#fff;')});}}
+        if(S.numChoices){showNumChoices=true;numChoiceTiles=S.numChoices.map(c=>({text:c,style:choiceSm,onClick:()=>this.checkNumeric(c)}));}
+      }
+      if(modeHissan && S.hsStepChoices){showHsChoices=true;hsChoiceTiles=S.hsStepChoices.map(c=>({text:c,style:choiceSm,onClick:()=>this.submitHissanStep(c)}));}
+      if(q.isKokugo){isKokugo=true;kokuPre=q.pre;kokuWord=q.word;kokuPost=q.post;kokuMean=q.mean;}
+      isNotKokugo=modeChoices&&!isKokugo;
+    }
+
+    const gradeBtnBase='display:flex;align-items:center;justify-content:center;min-width:64px;height:52px;padding:0 14px;border-radius:14px;font-size:20px;font-weight:900;cursor:pointer;user-select:none;';
+    const gradeOpts=[1,2,3,4,5,6].map(g=>({label:g+'年',onClick:()=>this.setGrade(g),style:gradeBtnBase+(S.setupGrade===g?'background:#7a6db5;color:#fff;border:3px solid #5f5494;box-shadow:0 4px 0 #5f5494;':'background:#fff;color:#7a6db5;border:3px solid #ecd9b9;box-shadow:0 4px 0 #ecd9b9;')}));
+    const nameOk=!!S.setupName.trim();
+    const setupNextStyle='background:'+(nameOk?'#7a6db5':'#cfc4ea')+';color:#fff;border:4px solid '+(nameOk?'#5f5494':'#b8abe0')+';border-radius:24px;padding:16px 40px;font-size:24px;font-weight:900;cursor:'+(nameOk?'pointer':'not-allowed')+';box-shadow:0 6px 0 '+(nameOk?'#5f5494':'#b8abe0')+';';
+    let calibIdx=0,calibTotal=0,calibProgStyle='',calibTopicLabel='',calibTopicChipStyle='',calibChoices=[],calibIsKokugo=false,calibIsPlain=true,calibPrompt='',calibKokuPre='',calibKokuWord='',calibKokuPost='';
+    if(sc==='calib'&&S.calib){const cb=S.calib,it=cb.items[cb.idx],cq=it.q;calibIdx=cb.idx+1;calibTotal=cb.items.length;calibProgStyle='display:block;height:100%;width:'+Math.round(cb.idx/cb.items.length*100)+'%;background:#7a6db5;transition:width .3s;';calibTopicLabel=T[cq.topic].label;calibTopicChipStyle='display:inline-flex;align-items:center;white-space:nowrap;background:'+T[cq.topic].color+';color:#fff;border-radius:30px;padding:6px 18px;font-size:18px;font-weight:900;';calibChoices=it.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.calibAnswer(c)}));calibIsKokugo=!!cq.isKokugo;calibIsPlain=!calibIsKokugo;if(calibIsKokugo){calibKokuPre=cq.pre;calibKokuWord=cq.word;calibKokuPost=cq.post;}else{calibPrompt=cq.prompt;}}
+
+    const stepBtn='display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:14px;font-size:26px;font-weight:900;cursor:pointer;background:#fff;color:#7a6db5;border:3px solid #ecd9b9;box-shadow:0 4px 0 #ecd9b9;user-select:none;';
+    const topicToggles=Object.keys(T).map(k=>{const on=S.settings?!!S.settings.topics[k]:true;return{label:T[k].label,onClick:()=>this.toggleTopic(k),style:'display:flex;align-items:center;justify-content:center;padding:8px 16px;border-radius:20px;font-size:16px;font-weight:900;cursor:pointer;user-select:none;'+(on?'background:'+T[k].color+';color:#fff;border:3px solid rgba(0,0,0,.10);':'background:#f3e8d4;color:#9a8662;border:3px solid #ecd9b9;')};});
+
+    const total=this.total();
+    const prog=S.session?Math.round(S.session.idx/total*100):0;
+
+    const lr=S.lastResult||{};const fb=lr.q||{};
+    const mood=sc==='feedback'?(lr.correct?'cheer':'sad'):sc==='clear'?'cheer':sc==='quiz'?'think':'happy';
+
+    const sess=S.session||{};
+    const earned=sess.startStars!=null?(p.stars-sess.startStars):0;
+    const fbBgColor=lr.correct?'#eafbe8':'#fdeeee';
+
+    return {
+      isProfile:sc==='profile',isCalib:sc==='calib',isStart:sc==='start',isQuiz:sc==='quiz',isFeedback:sc==='feedback',isClear:sc==='clear',isRetry:sc==='retry',isParent:sc==='parent',isEmergency:sc==='emergency',
+      profiles:profiles, goCalib:()=>this.goCalib(),
+      isSetup:sc==='setup', setupName:S.setupName, onSetupName:(e)=>this.onSetupName(e), gradeOpts:gradeOpts, setupNextStyle:setupNextStyle, startCalib:()=>this.startCalib(), backProfile:()=>this.backProfile(),
+      calibIdx:calibIdx, calibTotal:calibTotal, calibProgStyle:calibProgStyle, calibTopicLabel:calibTopicLabel, calibTopicChipStyle:calibTopicChipStyle, calibChoices:calibChoices, calibIsKokugo:calibIsKokugo, calibIsPlain:calibIsPlain, calibPrompt:calibPrompt, calibEq:' ＝ ？', calibKokuPre:calibKokuPre, calibKokuWord:calibKokuWord, calibKokuPost:calibKokuPost,
+      muted:S.muted, muteIcon:S.muted?'🔇':'🔊', toggleMute:()=>this.toggleMute(), quitQuiz:()=>this.quitQuiz(),
+      topicToggles:topicToggles, stepBtn:stepBtn, setCount:total, setPass:this.passLine(), countInc:()=>this.countDelta(1), countDec:()=>this.countDelta(-1), passInc:()=>this.passDelta(1), passDec:()=>this.passDelta(-1),
+      profileName:p.name, profileInitial:p.name.charAt(0), avatarStyle:avatar(p.color,56,26), profileGrade:p.grade+'年生', stars:p.stars, streak:p.streak, level:this.lvl(p),
+      weakLabels:weakLabels, hasWeak:weakKeys.length>0,
+      goStart:()=>this.goStart(), goParent:()=>this.goParent(), goEmergency:()=>this.goEmergency(), backStart:()=>this.backStart(),
+      total:total, passLine:this.passLine(),
+      qIndex:S.session?S.session.idx+1:0, qTotal:total, progressStyle:'display:block;height:100%;width:'+prog+'%;background:#ff8a3d;transition:width .3s;', comboHot:S.combo>=2, comboCount:S.combo,
+      topicLabel:topicLabel, topicChipStyle:'display:inline-flex;align-items:center;white-space:nowrap;background:'+topicColor+';color:#fff;border-radius:30px;padding:8px 22px;font-size:22px;font-weight:900;', isWeakTopic:isWeakTopic,
+      modeNumeric:modeNumeric, modeChoices:modeChoices, modeHissanSteps:modeHissan, isHissan:false, isPlainEq:isPlainEq, isClock:isClock,
+      prompt:q?q.prompt:'', choices:choices, padKeys:padKeys, ansBoxShown:S.input||'　',
+      clockHourStyle:clockHourStyle, clockMinStyle:clockMinStyle,
+      hsTensA:hsTensA, hsOnesA:hsOnesA, hsTensB:hsTensB, hsOnesB:hsOnesB, hsOp:hsOp, hsTens:hsTens, hsOnes:hsOnes,
+      tensMark:tensMark, onesMark:onesMark, onesSlotStyle:onesSlotStyle, tensSlotStyle:tensSlotStyle,
+      hsStepLabel:hsStepLabel, hsStepPrompt:hsStepPrompt, hsPad:hsPad, hsHasHint:!!S.hsHint, hsHint:S.hsHint,
+      isAddViz:isAddViz, addFrames:addFrames,
+      isKokugo:isKokugo, isNotKokugo:isNotKokugo, kokuPre:kokuPre, kokuWord:kokuWord, kokuPost:kokuPost, kokuMean:kokuMean,
+      clockMarks:clockMarks, clockAskLabel:clockAskLabel,
+      showNumChoices:showNumChoices, numChoiceTiles:numChoiceTiles, showHsChoices:showHsChoices, hsChoiceTiles:hsChoiceTiles,
+      fbViaSteps:!!lr.viaSteps, fbHelped:!!lr.helped,
+      fbCorrect:!!lr.correct, fbWrong:lr.correct===false, fbPrompt:fb.prompt||'', fbAnswer:fb.answer||'', fbExplanation:fb.explanation||'', fbStarText:lr.stars||0, fbCombo:(lr.combo||0)>=3, fbTopicLabel:fb.topic?T[fb.topic].label:'',
+      feedbackBgStyle:'position:relative;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;background:'+fbBgColor+';',
+      next:()=>this.next(),
+      clearCorrect:sess.correct||0, earnedStars:earned, totalStars:p.stars, weakNextLabel:weakLabels||'なし', unlockPC:()=>this.unlockPC(),
+      retryRemaining:Math.max(0,this.passLine()-(sess.correct||0)), retryAttempt:sess.attempt||1, retry:()=>this.retry(),
+      masteryRows:masteryRows,
+      pinDots:[0,1,2,3].map(i=>({char:i<S.pin.length?'●':''})),
+      pinKeys:['1','2','3','4','5','6','7','8','9'].map(n=>({label:n,onClick:()=>this.pinPress(n),style:keyTile})).concat([{label:'けす',onClick:()=>this.pinDel(),style:keyClear},{label:'0',onClick:()=>this.pinPress('0'),style:keyTile},{label:'OK',onClick:()=>{},style:keyOk}]),
+      emergencyDone:S.emergencyDone, emergencyNotDone:!S.emergencyDone,
+    };
+  }
+}
+</script>

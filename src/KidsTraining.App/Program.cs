@@ -1,4 +1,16 @@
 using System.Net;
+using System.Reflection;
+using KidsTraining.App.Application.Learning;
+using KidsTraining.App.Application.ParentControl;
+using KidsTraining.App.Application.Updates;
+using KidsTraining.App.Domain.Learning;
+using KidsTraining.App.Domain.ParentControl;
+using KidsTraining.App.Domain.Updates;
+using KidsTraining.App.Infrastructure.Learning;
+using KidsTraining.App.Infrastructure.ParentControl;
+using KidsTraining.App.Infrastructure.Settings;
+using KidsTraining.App.Infrastructure.Updates;
+using KidsTraining.App.Presentation.WinForms;
 using Microsoft.Web.WebView2.Core;
 
 namespace KidsTraining.App;
@@ -21,20 +33,29 @@ internal static class Program
 
         if (args.Any(static arg => string.Equals(arg, ApplyUpdateArg, StringComparison.OrdinalIgnoreCase)))
         {
-            return UpdateInstaller.Run(args);
+            return MsiUpdateApplier.Run(args);
         }
 
         ApplicationConfiguration.Initialize();
+        var services = CreateApplicationServices();
         if (args.Any(static arg =>
                 string.Equals(arg, TrainingArg, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(arg, LearnArg, StringComparison.OrdinalIgnoreCase)))
         {
-            Application.Run(new TrainingForm());
+            System.Windows.Forms.Application.Run(new TrainingForm(
+                services.LearningPagePreparer,
+                services.ParentPinProvider,
+                services.ProfileNameProvider));
         }
         else
         {
-            Application.Run(new TrayApplicationContext(args.Any(static arg =>
-                string.Equals(arg, AutoTrainingArg, StringComparison.OrdinalIgnoreCase))));
+            System.Windows.Forms.Application.Run(new TrayApplicationContext(
+                args.Any(static arg => string.Equals(arg, AutoTrainingArg, StringComparison.OrdinalIgnoreCase)),
+                services.LearningPagePreparer,
+                services.ParentPinProvider,
+                services.ProfileNameProvider,
+                services.ParentPasswordService,
+                services.UpdateService));
         }
 
         return 0;
@@ -45,27 +66,30 @@ internal static class Program
         try
         {
             AppPaths.EnsureRuntimeDirectories();
+            var services = CreateApplicationServices();
 
-            if (!File.Exists(AppPaths.HtmlPath))
+            if (!File.Exists(AppPaths.HtmlTemplatePath) ||
+                !File.Exists(AppPaths.LearningAppDefinitionPath))
             {
                 return 11;
             }
 
-            var runtimeHtml = RuntimeHtmlPreparer.Prepare();
-            if (!File.Exists(runtimeHtml))
+            var preparation = services.LearningPagePreparer.Prepare();
+            if (!preparation.IsSuccess ||
+                preparation.RuntimePagePath is null ||
+                !File.Exists(preparation.RuntimePagePath))
             {
                 return 13;
             }
 
-            var patchedHtml = File.ReadAllText(runtimeHtml);
-            var template = RuntimeHtmlPreparer.ExtractBundledTemplate(patchedHtml);
-            if (template is null ||
-                !template.Contains("screen:'start', profileIdx:0,", StringComparison.Ordinal) ||
+            var patchedHtml = File.ReadAllText(preparation.RuntimePagePath);
+            var template = patchedHtml;
+            if (!template.Contains("screen:'start', profileIdx:0,", StringComparison.Ordinal) ||
                 template.Contains("screen:'profile', profileIdx:0,", StringComparison.Ordinal) ||
                 !template.Contains("profiles:[\n", StringComparison.Ordinal) ||
-                !template.Contains($"name:{System.Text.Json.JsonSerializer.Serialize(RuntimeHtmlPreparer.PrimaryProfileName)}", StringComparison.Ordinal) ||
+                !template.Contains($"name:{System.Text.Json.JsonSerializer.Serialize(services.ProfileNameProvider.GetProfileName())}", StringComparison.Ordinal) ||
                 !template.Contains("xp:0", StringComparison.Ordinal) ||
-                !template.Contains(RuntimeHtmlPreparer.BeginnerMasteryMarkup, StringComparison.Ordinal) ||
+                !template.Contains(LearningDefaults.BeginnerMasteryMarkup, StringComparison.Ordinal) ||
                 !template.Contains("count:this.props.questionCount??20", StringComparison.Ordinal) ||
                 !template.Contains("pass:this.props.passLine??15", StringComparison.Ordinal) ||
                 !template.Contains("genAdd(p)", StringComparison.Ordinal) ||
@@ -202,9 +226,9 @@ internal static class Program
                 return 15;
             }
 
-            if (!UpdateManager.TryGetReleaseVersion("v1.1.3", out var parsedVersion) ||
-                !UpdateManager.IsNewerVersion(parsedVersion, new Version(1, 1, 1, 0)) ||
-                !UpdateManager.TryGetReleaseVersion("1.1.0", out _))
+            if (!ReleaseVersion.TryParse("v1.1.3", out var parsedVersion) ||
+                !ReleaseVersion.IsNewer(parsedVersion, new Version(1, 1, 1, 0)) ||
+                !ReleaseVersion.TryParse("1.1.0", out _))
             {
                 return 16;
             }
@@ -228,9 +252,9 @@ internal static class Program
                 return 18;
             }
 
-            if (ParentSettings.NormalizePassword("4456") != "4456" ||
-                ParentSettings.NormalizePassword("abcd") is not null ||
-                ParentSettings.NormalizePassword("12345") is not null)
+            if (!ParentPin.TryCreate("4456", out var validPin) || validPin.Value != "4456" ||
+                ParentPin.TryCreate("abcd", out _) ||
+                ParentPin.TryCreate("12345", out _))
             {
                 return 19;
             }
@@ -242,9 +266,40 @@ internal static class Program
         {
             return 21;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.Error.WriteLine(ex);
             return 99;
         }
     }
+
+    private static ApplicationServices CreateApplicationServices()
+    {
+        var parentPasswordService = new ParentPasswordService(new JsonParentPinStore());
+        IParentPinProvider parentPinProvider = parentPasswordService;
+        var profileNameProvider = new WindowsUserProfileNameProvider();
+        var learningPagePreparer = new FileLearningPagePreparer(
+            new LearningPageBuilder(),
+            parentPinProvider,
+            profileNameProvider);
+        var currentVersion = ReleaseVersion.Normalize(
+            Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0));
+        var updateService = new UpdateService(
+            currentVersion,
+            new GitHubReleaseClient(currentVersion),
+            new MsiUpdateInstaller());
+        return new ApplicationServices(
+            learningPagePreparer,
+            parentPinProvider,
+            profileNameProvider,
+            parentPasswordService,
+            updateService);
+    }
+
+    private sealed record ApplicationServices(
+        ILearningPagePreparer LearningPagePreparer,
+        IParentPinProvider ParentPinProvider,
+        IUserProfileNameProvider ProfileNameProvider,
+        ParentPasswordService ParentPasswordService,
+        UpdateService UpdateService);
 }
