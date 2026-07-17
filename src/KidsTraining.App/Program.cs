@@ -116,6 +116,11 @@ internal static class Program
                 !template.Contains("pickMoney(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickGroups(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickOrder(p)", StringComparison.Ordinal) ||
+                !template.Contains("resetLearningProgress()", StringComparison.Ordinal) ||
+                !template.Contains("progressResetAt:Date.now()", StringComparison.Ordinal) ||
+                !template.Contains("aria-modal=", StringComparison.Ordinal) ||
+                !template.Contains("学習状況をリセット", StringComparison.Ordinal) ||
+                template.Contains("localStorage.clear()", StringComparison.Ordinal) ||
                 !template.Contains("あまり", StringComparison.Ordinal) ||
                 !template.Contains("正三角形", StringComparison.Ordinal) ||
                 !template.Contains("subtype:'romaji'", StringComparison.Ordinal) ||

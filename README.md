@@ -62,6 +62,7 @@ rtk dotnet run --project tests\KidsTraining.ArchitectureTests\KidsTraining.Archi
 - The default executable mode is a task tray resident updater. Use the tray menu or run `KidsTraining.App.exe --training` to start fullscreen learning.
 - The tray app also serves a LAN parent control page on `http://<PCのIP>:44567/` when the port is available. The page can start fullscreen learning or return the PC screen from another device on the same private network.
 - The parent control page can change the four-digit parent password after the current password is entered. The password is saved under `%LOCALAPPDATA%\KidsTraining\parent-settings.json` and synced into the WebView storage when learning starts.
+- The in-app parent dashboard includes a two-step learning-progress reset. It clears stars, XP, streak, mastery, five-stage evidence, achievements, review dates, and any active session while preserving the learner name, selected grade, profile color, parent PIN, question count, pass line, enabled topics, and mute setting. The reset is persisted immediately and cannot run unless the confirmation panel is open.
 - The tray menu includes `保護者画面を開く` and `保護者画面URLをコピー` for finding the parent control URL.
 - Login startup is registered as `KidsTraining.App.exe --auto-training`, so the tray resident app starts and immediately opens fullscreen learning after user login.
 - The tray app checks GitHub Releases once per hour. If a newer `KidsTraining.msi` is attached to the latest non-prerelease release, it downloads the MSI under `%LOCALAPPDATA%\KidsTraining\Updates`, starts a copied update runner, exits, and lets `msiexec` perform a quiet per-user reinstall without update-start notifications.
@@ -73,10 +74,10 @@ rtk dotnet run --project tests\KidsTraining.ArchitectureTests\KidsTraining.Archi
 Build new releases with a version that matches the release tag:
 
 ```powershell
-rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.12.0
+rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.13.0
 ```
 
-Publish a GitHub Release such as `v1.12.0` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
+Publish a GitHub Release such as `v1.13.0` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
 
 Tracking issues:
 - Initial app and installer: https://github.com/tsuyoshi-otake/kids-traning/issues/1
@@ -94,3 +95,4 @@ Tracking issues:
 - Clean Architecture refactoring: https://github.com/tsuyoshi-otake/kids-traning/issues/23
 - Evidence-based curriculum progression: https://github.com/tsuyoshi-otake/kids-traning/issues/24
 - Ordered grade 1-3 curriculum coverage: https://github.com/tsuyoshi-otake/kids-traning/issues/25
+- Protected learning-progress reset: https://github.com/tsuyoshi-otake/kids-traning/issues/26

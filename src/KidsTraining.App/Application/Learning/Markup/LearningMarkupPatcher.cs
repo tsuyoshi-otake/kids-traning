@@ -169,6 +169,7 @@ internal static partial class LearningMarkupPatcher
             StringComparison.Ordinal);
 
         markup = PatchEducationalPersistence(markup);
+        markup = PatchLearningProgressReset(markup);
 
         markup = ReplaceRequired(markup,
             "gradeLabel:pr.grade+'年生'",

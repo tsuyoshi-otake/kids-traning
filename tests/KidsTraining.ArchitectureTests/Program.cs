@@ -165,6 +165,20 @@ internal static class Program
         Assert(html.Contains("pickDiv(p)", StringComparison.Ordinal) && html.Contains("等分除", StringComparison.Ordinal) && html.Contains("包含除", StringComparison.Ordinal), "division concepts are incomplete");
         Assert(html.Contains("difficulty:5", StringComparison.Ordinal) && html.Contains("コンパス", StringComparison.Ordinal), "staged grade 3 written arithmetic or circle work is missing");
         Assert(html.Contains("q.isMoney", StringComparison.Ordinal) && html.Contains("q.isGroups", StringComparison.Ordinal) && html.Contains("q.isTape", StringComparison.Ordinal), "new visual scaffolding is missing");
+        Assert(html.Contains("requestLearningReset()", StringComparison.Ordinal) && html.Contains("if(!this.state.resetConfirming)return", StringComparison.Ordinal), "learning reset bypasses two-step confirmation");
+        Assert(html.Contains("streak:0,stars:0,xp:0", StringComparison.Ordinal) && html.Contains("level:1,stageAttempts:0,stageIndependent:0", StringComparison.Ordinal) && html.Contains("cleared:{}", StringComparison.Ordinal), "learning reset does not clear all progress evidence");
+        Assert(html.Contains("const reset={...current", StringComparison.Ordinal) && html.Contains("progressResetAt:Date.now()", StringComparison.Ordinal), "learning reset does not preserve profile identity and grade");
+        Assert(html.Contains("localStorage.setItem('kt_profiles_v1',persisted)", StringComparison.Ordinal) && !html.Contains("localStorage.clear()", StringComparison.Ordinal), "learning reset is not scoped to profile progress");
+        Assert(html.Contains("aria-modal=", StringComparison.Ordinal) && html.Contains("cancelLearningReset", StringComparison.Ordinal), "learning reset confirmation is inaccessible or cannot be cancelled");
+        var trainingFormSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "src",
+            "KidsTraining.App",
+            "Presentation",
+            "WinForms",
+            "TrainingForm.cs"));
+        Assert(trainingFormSource.Contains("!hasMeaningfulProgress(profile) && !profile.progressResetAt", StringComparison.Ordinal), "a reset profile loses its selected grade on the next launch");
+        Assert(trainingFormSource.Contains("'money', 'groups', 'order'", StringComparison.Ordinal), "profile bootstrap omits newly added resettable topics");
         Assert(html.Contains("補助活動：音声を聞き、声に出して", StringComparison.Ordinal) && html.Contains("ノートに漢字を書いて", StringComparison.Ordinal), "supplementary output practice is not identified");
         Assert(html.Contains("aria-label=\"答えと説明を見る\"", StringComparison.Ordinal) && html.Contains("outcome==='revealed'", StringComparison.Ordinal), "revealed-answer control is inaccessible or unscored");
         Assert(html.Contains("role=\"button\" tabindex=\"0\"", StringComparison.Ordinal) && html.Contains("document.addEventListener('keydown'", StringComparison.Ordinal) && html.Contains("aria-live=\"polite\"", StringComparison.Ordinal), "keyboard or live-region accessibility is missing");
