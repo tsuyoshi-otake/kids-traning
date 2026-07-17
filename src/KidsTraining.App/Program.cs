@@ -113,6 +113,9 @@ internal static class Program
                 !template.Contains("pickFrac(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickChart(p)", StringComparison.Ordinal) ||
                 !template.Contains("pickStory(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickMoney(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickGroups(p)", StringComparison.Ordinal) ||
+                !template.Contains("pickOrder(p)", StringComparison.Ordinal) ||
                 !template.Contains("あまり", StringComparison.Ordinal) ||
                 !template.Contains("正三角形", StringComparison.Ordinal) ||
                 !template.Contains("subtype:'romaji'", StringComparison.Ordinal) ||
@@ -159,7 +162,8 @@ internal static class Program
                 !template.Contains("あつめた 数は？", StringComparison.Ordinal) ||
                 !template.Contains("pickEigo(p)", StringComparison.Ordinal) ||
                 !template.Contains("topic:'eigo'", StringComparison.Ordinal) ||
-                !template.Contains("g3=['div','eigo']", StringComparison.Ordinal) ||
+                !template.Contains("curriculumLanes(p)", StringComparison.Ordinal) ||
+                !template.Contains("nextCurriculumTopic(p)", StringComparison.Ordinal) ||
                 !template.Contains("を 英語で いうと？", StringComparison.Ordinal) ||
                 !template.Contains("Good morning.", StringComparison.Ordinal) ||
                 !template.Contains("q.sessionRole=role", StringComparison.Ordinal) ||
@@ -167,13 +171,16 @@ internal static class Program
                 !template.Contains("pickStage(stage,buckets,reviewRate=.25)", StringComparison.Ordinal) ||
                 !template.Contains("reviewStage(p,k)", StringComparison.Ordinal) ||
                 !template.Contains("profileAtStage(p,k,stage)", StringComparison.Ordinal) ||
-                !template.Contains("if(m<0.20)return 1;if(m<0.40)return 2;if(m<0.60)return 3;if(m<0.80)return 4;return 5", StringComparison.Ordinal) ||
+                !template.Contains("Number.isFinite(saved)", StringComparison.Ordinal) ||
+                !template.Contains("learningSchema===3", StringComparison.Ordinal) ||
+                !template.Contains("stageAttempts", StringComparison.Ordinal) ||
                 !template.Contains("Math.min(5,Number(stage)||1)", StringComparison.Ordinal) ||
                 !template.Contains("masteredAt", StringComparison.Ordinal) ||
                 !template.Contains("fromPairs([[1,2],[2,1],[2,2]", StringComparison.Ordinal) ||
                 !template.Contains("prompt:a+' × '+b", StringComparison.Ordinal) ||
                 template.Contains("prompt:a+' x '+b", StringComparison.Ordinal) ||
-                !template.Contains("[()=>exact(2,1),()=>exact(2,2),()=>exact(2,3)]", StringComparison.Ordinal) ||
+                !template.Contains("これは等分除", StringComparison.Ordinal) ||
+                !template.Contains("これは包含除", StringComparison.Ordinal) ||
                 !template.Contains("q.topic==='div'&&this.topicStage(p,'div')<=2", StringComparison.Ordinal) ||
                 !template.Contains("speakEnglish(text)", StringComparison.Ordinal) ||
                 !template.Contains("if(m)this.stopEnglishSpeech()", StringComparison.Ordinal) ||

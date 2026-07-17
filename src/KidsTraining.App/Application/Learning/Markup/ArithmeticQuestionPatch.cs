@@ -10,7 +10,7 @@ genAdd(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'add'),make=(a,
     [()=>{let a=this.rand(2,9),b=this.rand(1,9);if(a+b>18)b=Math.max(1,18-a);return make(a,b);}],
     [()=>{const a=this.rand(10,89),max=Math.max(1,9-a%10),b=this.rand(1,max);return make(a,b);},()=>{const a=this.rand(1,8)*10,b=this.rand(1,9-a/10)*10,ans=a+b;return make(a,b,{prompt:a+' + '+b,answer:ans,explanation:'10のまとまりで かんがえる。'+a+' + '+b+' = '+ans+'。'});}],
     [()=>{const a=this.rand(18,89),b=this.rand(2,9);return make(a,b);},()=>{const x=this.rand(1,9),y=this.rand(1,9),z=this.rand(1,9),s=x+y+z;return make(x+y,z,{prompt:x+' + '+y+' + '+z,answer:s,explanation:'まえから じゅんに。'+x+'+'+y+'='+(x+y)+'、'+(x+y)+'+'+z+'='+s+'。'});} ],
-    [()=>{if(g<=1){const x=this.rand(3,9),y=this.rand(3,9),z=this.rand(2,9),s=x+y+z;return make(x+y,z,{prompt:x+' + '+y+' + '+z,answer:s,explanation:'まえから じゅんに。'+x+'+'+y+'='+(x+y)+'、'+(x+y)+'+'+z+'='+s+'。'});}const a=this.rand(28,79),b=this.rand(12,Math.min(99-a,49));return make(a,b);}]
+    [()=>{if(g<=1){const x=this.rand(3,9),y=this.rand(3,9),z=this.rand(2,9),s=x+y+z;return make(x+y,z,{prompt:x+' + '+y+' + '+z,answer:s,explanation:'まえから じゅんに。'+x+'+'+y+'='+(x+y)+'、'+(x+y)+'+'+z+'='+s+'。'});}const a=this.rand(28,79),b=this.rand(12,Math.min(99-a,49));return make(a,b);},()=>{if(g<=1){const a=this.rand(0,20);return make(a,0,{prompt:a+' + 0',answer:a,explanation:'0を たしても 数は '+a+'の まま。'});}const a=this.rand(25,70),b=this.rand(12,Math.min(99-a,29));return make(a,b);}]
   ];return this.pickStage(stage,buckets,0);}
 """;
     }
@@ -23,7 +23,7 @@ genSub(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'sub'),make=(a,
     [()=>{const a=this.rand(11,18),b=this.rand(1,Math.max(1,a%10));return make(a,b);}],
     [()=>{let a=this.rand(21,89);if(a%10===0)a++;const b=this.rand(1,a%10);return make(a,b);},()=>{const a=this.rand(2,9)*10,b=this.rand(1,a/10-1)*10;return make(a,b);}],
     [()=>{const a=this.rand(30,99),b=this.rand(a%10+1,Math.min(19,a-1));return make(a,b);},()=>{const x=this.rand(12,28),y=this.rand(1,8),z=this.rand(1,Math.max(1,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});} ],
-    [()=>{if(g<=1){const x=this.rand(15,30),y=this.rand(2,8),z=this.rand(2,Math.max(2,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});}const a=this.rand(51,99),b=this.rand(12,a-10);return make(a,b);}]
+    [()=>{if(g<=1){const x=this.rand(15,30),y=this.rand(2,8),z=this.rand(2,Math.max(2,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});}const a=this.rand(51,99),b=this.rand(12,a-10);return make(a,b);},()=>{if(g<=1){const a=this.rand(0,20);return make(a,0,{prompt:a+' - 0',answer:a,explanation:'0を ひいても 数は '+a+'の まま。'});}const a=this.rand(51,99),b=this.rand(12,a-10);return make(a,b);}]
   ];return this.pickStage(stage,buckets,0);}
 """;
     }
@@ -43,7 +43,7 @@ pickMul(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'mul'),make=(a
     [fromPairs([[2,3],[3,2],[2,4],[4,2],[5,2],[2,5]])],
     [fromTables([1,2,3,4,5,10])],
     [fromTables([3,4,5,10])],
-    [fromTables([6,7,8,9])]
+    [fromTables([6,7,8,9]),()=>{const a=this.rand(2,9),b=this.rand(2,9),ans=a*b,swap=b+' × '+a;return{topic:'mul',mode:'choices',prompt:a+' × '+b+' と こたえが おなじ しきは？',answer:swap,choices:this.pick4(swap,[a+' + '+b,a+' × '+(b+1),b+' + '+a]),explanation:'かける 数と かけられる 数を いれかえても、こたえは '+ans+'。'};},()=>{const each=this.rand(2,9),groups=this.rand(2,9),ans=each*groups;return{topic:'mul',mode:'choices',op:'mul',a:each,b:groups,prompt:'1さらに りんごが '+each+'こずつ、'+groups+'さら。ぜんぶで？',answer:''+ans,choices:this.pick4(''+ans,[ans+each,Math.max(1,ans-each),each+groups,ans+1].map(String)),explanation:'同じ数ずつが いくつ分かは かけ算。'+each+'×'+groups+'='+ans+'。'};}]
   ];return this.pickStage(stage,buckets,0);}
 """;
     }
