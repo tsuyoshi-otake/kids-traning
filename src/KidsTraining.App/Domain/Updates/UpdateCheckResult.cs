@@ -6,6 +6,8 @@ internal sealed record UpdateCheckResult(UpdateCheckStatus Status, string Messag
 
     public static UpdateCheckResult UpdateStarted(string message) => new(UpdateCheckStatus.UpdateStarted, message);
 
+    public static UpdateCheckResult Cancelled(string message) => new(UpdateCheckStatus.Cancelled, message);
+
     public static UpdateCheckResult Failed(string message) => new(UpdateCheckStatus.Failed, message);
 }
 
@@ -13,5 +15,6 @@ internal enum UpdateCheckStatus
 {
     NoUpdate,
     UpdateStarted,
+    Cancelled,
     Failed
 }

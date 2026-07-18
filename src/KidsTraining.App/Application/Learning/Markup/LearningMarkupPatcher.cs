@@ -1,19 +1,21 @@
+using System.Globalization;
 using System.Text.Json;
 using KidsTraining.App.Domain.Learning;
+using KidsTraining.App.Domain.ParentControl;
 
 namespace KidsTraining.App.Application.Learning.Markup;
 
 internal static partial class LearningMarkupPatcher
 {
-    private const string BeginnerMasteryMarkup = LearningDefaults.BeginnerMasteryMarkup;
-    private const string DefaultEmergencyPin = LearningDefaults.DefaultEmergencyPin;
+    private static readonly string BeginnerMasteryObjectMarkup = BuildBeginnerMasteryObjectMarkup();
+    private static readonly string BeginnerMasteryMarkup = "mastery:" + BeginnerMasteryObjectMarkup;
 
     public static string Apply(string markup, string profileName, string parentPassword)
     {
         markup = ReplaceRequired(markup, "screen:'profile', profileIdx:0,", "screen:'start', profileIdx:0,", StringComparison.Ordinal);
         markup = ReplaceRequired(markup,
             "unlockPC(){this.sfx('unlock');this.setState({screen:'profile',session:null,combo:0,pin:'',emergencyDone:false});}",
-            "unlockPC(){this.sfx('unlock');this.setState({screen:'start',session:null,combo:0,pin:'',emergencyDone:false});}",
+            "unlockPC(){this.sfx('unlock');this.setState({screen:'start',session:null,combo:0,pin:'',emergencyDone:false});if(window.chrome&&window.chrome.webview&&typeof window.chrome.webview.postMessage==='function')window.chrome.webview.postMessage('kidsTraining.unlock');}",
             StringComparison.Ordinal);
         markup = PatchBeginnerProgression(markup);
         markup = PatchParentPassword(markup, parentPassword);
@@ -23,9 +25,7 @@ internal static partial class LearningMarkupPatcher
 
     private static string PatchParentPassword(string markup, string parentPassword)
     {
-        var password = parentPassword.Length == 4 && parentPassword.All(static character => character is >= '0' and <= '9')
-            ? parentPassword
-            : DefaultEmergencyPin;
+        var password = ParentPin.FromOrDefault(parentPassword).Value;
         markup = ReplaceRequired(markup,
             "pinPress(d){if(this.state.emergencyDone||this.state.pin.length>=4)return;",
             $"parentPin(){{try{{return localStorage.getItem('kt_parent_pin_v1')||'{password}';}}catch{{return '{password}';}}}}\n  pinPress(d){{if(this.state.emergencyDone||this.state.pin.length>=4)return;",
@@ -215,7 +215,22 @@ buildSession(p,attempt){this.ensureLearningProfile(p);const n=this.total(),allow
             markup,
             "componentDidMount(){",
             "\n  setSettings(",
-            "componentDidMount(){let profiles=this.state.profiles;try{const raw=localStorage.getItem('kt_profiles_v1');if(raw){const saved=JSON.parse(raw);if(Array.isArray(saved)&&saved.length)profiles=saved;}profiles=this.migrateProfiles(profiles);const migrated=JSON.stringify(profiles);this._lastSaved=migrated;localStorage.setItem('kt_profiles_v1',migrated);const m=localStorage.getItem('kt_muted_v1');if(m!=null)this.setState({muted:m==='1'});}catch(e){profiles=this.migrateProfiles(profiles);}let st=null;try{const r=localStorage.getItem('kt_settings_v1');if(r)st=JSON.parse(r);}catch(e){}const def=this.defaultSettings();this.setState({profiles:profiles,settings:st&&st.topics?{topics:{...def.topics,...st.topics},count:st.count||def.count,pass:st.pass||def.pass}:def});}");
+            BuildEducationalPersistenceScript());
+    }
+
+    private static string BuildEducationalPersistenceScript()
+    {
+        return $$$"""
+componentDidMount(){let profiles=this.state.profiles;const host=window.__kidsTrainingHost&&typeof window.__kidsTrainingHost==='object'?window.__kidsTrainingHost:{};const bundled=Array.isArray(profiles)&&profiles.length?profiles[0]:{};const profileName=typeof host.profileName==='string'&&host.profileName.length?host.profileName:String(bundled.name||'');const parentPin=typeof host.parentPin==='string'&&/^\d{4}$/.test(host.parentPin)?host.parentPin:this.parentPin();const beginnerMastery={{{BeginnerMasteryObjectMarkup}}},masteryKeys=Object.keys(beginnerMastery),numberOrDefault=(value,fallback)=>{const number=Number(value);return Number.isFinite(number)?number:fallback;},isDefaultishMastery=mastery=>masteryKeys.every(key=>{const value=Number(mastery&&mastery[key]);return !Number.isFinite(value)||Math.abs(value-.5)<.001||Math.abs(value-beginnerMastery[key])<.001;}),hasMeaningfulProgress=profile=>numberOrDefault(profile.stars,0)>0||numberOrDefault(profile.streak,0)>0||numberOrDefault(profile.xp,0)>0||!isDefaultishMastery(profile.mastery),defaultProfile={...bundled,name:profileName,grade:1,color:bundled.color||'#4ad991',streak:0,stars:0,xp:0,mastery:{...beginnerMastery}},normalizeProfile=source=>{const profile=source&&typeof source==='object'?source:{},mastery=profile.mastery&&typeof profile.mastery==='object'?profile.mastery:{},resetToBeginner=!hasMeaningfulProgress(profile)&&!profile.progressResetAt;return{...defaultProfile,...profile,name:profileName,grade:resetToBeginner?1:numberOrDefault(profile.grade,defaultProfile.grade),streak:numberOrDefault(profile.streak,defaultProfile.streak),stars:numberOrDefault(profile.stars,defaultProfile.stars),xp:numberOrDefault(profile.xp,defaultProfile.xp),color:profile.color||defaultProfile.color,mastery:resetToBeginner?{...beginnerMastery}:{...defaultProfile.mastery,...mastery}};};let savedProfile=bundled;try{const raw=localStorage.getItem('kt_profiles_v1');if(raw){const parsed=JSON.parse(raw);savedProfile=Array.isArray(parsed)?(parsed[0]||bundled):(parsed&&typeof parsed==='object'?parsed:bundled);}}catch(e){}profiles=[normalizeProfile(savedProfile)];profiles=this.migrateProfiles(profiles);const migrated=JSON.stringify(profiles);this._lastSaved=migrated;try{localStorage.setItem('kt_profiles_v1',migrated);}catch(e){}try{localStorage.setItem('kt_parent_pin_v1',parentPin);}catch(e){}let storedSettings=null;try{const raw=localStorage.getItem('kt_settings_v1');if(raw)storedSettings=JSON.parse(raw);}catch(e){}const def=this.defaultSettings(),sourceSettings=storedSettings&&typeof storedSettings==='object'?storedSettings:{},storedTopics=sourceSettings.topics&&typeof sourceSettings.topics==='object'?sourceSettings.topics:{},count=this.clamp(numberOrDefault(host.questionCount,numberOrDefault(sourceSettings.count,def.count)),20,40),pass=this.clamp(numberOrDefault(host.passLine,numberOrDefault(sourceSettings.pass,def.pass)),1,count),settings={...def,...sourceSettings,topics:{...def.topics,...storedTopics},count:count,pass:pass};try{localStorage.setItem('kt_settings_v1',JSON.stringify(settings));}catch(e){}let muted=this.state.muted;try{const value=localStorage.getItem('kt_muted_v1');if(value!=null)muted=value==='1';}catch(e){}this.setState({profiles:profiles,settings:settings,muted:muted});}
+""";
+    }
+
+    private static string BuildBeginnerMasteryObjectMarkup()
+    {
+        var mastery = LearningDefaults.BeginnerMastery
+            .ToString("0.##", CultureInfo.InvariantCulture)
+            .TrimStart('0');
+        return "{" + string.Join(',', CurriculumPolicy.AllTopics.Select(topic => topic + ":" + mastery)) + "}";
     }
 
 
@@ -225,9 +240,45 @@ buildSession(p,attempt){this.ensureLearningProfile(p);const n=this.total(),allow
         string newValue,
         StringComparison comparison)
     {
-        if (source.IndexOf(oldValue, comparison) < 0)
+        var index = FindUniqueAnchor(source, oldValue, comparison, "learning markup");
+        return source[..index] + newValue + source[(index + oldValue.Length)..];
+    }
+
+    private static string ReplaceRequiredOccurrences(
+        string source,
+        string oldValue,
+        string newValue,
+        StringComparison comparison,
+        int expectedOccurrences)
+    {
+        if (oldValue.Length == 0)
         {
-            throw new InvalidOperationException($"Required learning markup anchor was not found: {DescribeAnchor(oldValue)}");
+            throw new ArgumentException("A required learning markup anchor cannot be empty.", nameof(oldValue));
+        }
+
+        if (expectedOccurrences <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(expectedOccurrences));
+        }
+
+        var count = 0;
+        var searchIndex = 0;
+        while (searchIndex <= source.Length - oldValue.Length)
+        {
+            var index = source.IndexOf(oldValue, searchIndex, comparison);
+            if (index < 0)
+            {
+                break;
+            }
+
+            count++;
+            searchIndex = index + oldValue.Length;
+        }
+
+        if (count != expectedOccurrences)
+        {
+            throw new InvalidOperationException(
+                $"Required learning markup anchor must occur exactly {expectedOccurrences} times but occurred {count}: {DescribeAnchor(oldValue)}");
         }
 
         return source.Replace(oldValue, newValue, comparison);
@@ -235,19 +286,42 @@ buildSession(p,attempt){this.ensureLearningProfile(p);const n=this.total(),allow
 
     private static string ReplaceBlock(string source, string startToken, string endToken, string replacement)
     {
-        var start = source.IndexOf(startToken, StringComparison.Ordinal);
-        if (start < 0)
+        var start = FindUniqueAnchor(source, startToken, StringComparison.Ordinal, "learning block start");
+        var end = FindUniqueAnchor(source, endToken, StringComparison.Ordinal, "learning block end");
+        if (end < start + startToken.Length)
         {
-            throw new InvalidOperationException($"Required learning block start was not found: {DescribeAnchor(startToken)}");
-        }
-
-        var end = source.IndexOf(endToken, start + startToken.Length, StringComparison.Ordinal);
-        if (end < 0)
-        {
-            throw new InvalidOperationException($"Required learning block end was not found: {DescribeAnchor(endToken)}");
+            throw new InvalidOperationException(
+                $"Required learning block end occurs before its start: {DescribeAnchor(endToken)}");
         }
 
         return source[..start] + replacement + source[end..];
+    }
+
+    private static int FindUniqueAnchor(
+        string source,
+        string anchor,
+        StringComparison comparison,
+        string anchorRole)
+    {
+        if (anchor.Length == 0)
+        {
+            throw new ArgumentException("A required learning markup anchor cannot be empty.", nameof(anchor));
+        }
+
+        var first = source.IndexOf(anchor, comparison);
+        if (first < 0)
+        {
+            throw new InvalidOperationException($"Required {anchorRole} anchor was not found: {DescribeAnchor(anchor)}");
+        }
+
+        var duplicate = source.IndexOf(anchor, first + 1, comparison);
+        if (duplicate >= 0)
+        {
+            throw new InvalidOperationException(
+                $"Required {anchorRole} anchor must occur exactly once but was duplicated: {DescribeAnchor(anchor)}");
+        }
+
+        return first;
     }
 
     private static string DescribeAnchor(string anchor)
@@ -263,16 +337,12 @@ buildSession(p,attempt){this.ensureLearningProfile(p);const n=this.total(),allow
         const string startToken = "profiles:[\n";
         const string endToken = "\n    session:null";
 
-        var start = html.IndexOf(startToken, StringComparison.Ordinal);
-        if (start < 0)
+        var start = FindUniqueAnchor(html, startToken, StringComparison.Ordinal, "profiles block start");
+        var end = FindUniqueAnchor(html, endToken, StringComparison.Ordinal, "profiles block end");
+        if (end < start + startToken.Length)
         {
-            throw new InvalidOperationException($"Required profiles block start was not found: {DescribeAnchor(startToken)}");
-        }
-
-        var end = html.IndexOf(endToken, start, StringComparison.Ordinal);
-        if (end < 0)
-        {
-            throw new InvalidOperationException($"Required profiles block end was not found: {DescribeAnchor(endToken)}");
+            throw new InvalidOperationException(
+                $"Required profiles block end occurs before its start: {DescribeAnchor(endToken)}");
         }
 
         var escapedName = JsonSerializer.Serialize(profileName);

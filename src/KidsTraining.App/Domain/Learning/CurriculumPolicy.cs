@@ -2,6 +2,12 @@ namespace KidsTraining.App.Domain.Learning;
 
 internal static class CurriculumPolicy
 {
+    private static readonly string[] TopicKeys =
+    [
+        "add", "sub", "mul", "clock", "kokugo", "hissan", "moji", "measure", "kazu", "shape", "div",
+        "frac", "chart", "story", "bun", "goi", "dokkai", "eigo", "money", "groups", "order"
+    ];
+
     private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> TopicPrerequisites =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
@@ -60,6 +66,8 @@ internal static class CurriculumPolicy
         TopicLanesForGrade(grade).SelectMany(static lane => lane).Distinct(StringComparer.Ordinal).ToArray();
 
     public static IReadOnlyDictionary<string, IReadOnlyList<string>> PrerequisitesByTopic => TopicPrerequisites;
+
+    public static IReadOnlyList<string> AllTopics => TopicKeys;
 
     public static IReadOnlyList<string> PrerequisitesFor(string topic) =>
         TopicPrerequisites.TryGetValue(topic, out var prerequisites) ? prerequisites : [];

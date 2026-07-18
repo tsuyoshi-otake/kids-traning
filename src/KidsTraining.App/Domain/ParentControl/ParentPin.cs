@@ -1,9 +1,9 @@
-using KidsTraining.App.Domain.Learning;
-
 namespace KidsTraining.App.Domain.ParentControl;
 
 internal readonly record struct ParentPin
 {
+    private const string DefaultValue = "1234";
+
     private ParentPin(string value)
     {
         Value = value;
@@ -11,7 +11,7 @@ internal readonly record struct ParentPin
 
     public string Value { get; }
 
-    public static ParentPin Default { get; } = new(LearningDefaults.DefaultEmergencyPin);
+    public static ParentPin Default { get; } = new(DefaultValue);
 
     public static bool TryCreate(string? candidate, out ParentPin pin)
     {

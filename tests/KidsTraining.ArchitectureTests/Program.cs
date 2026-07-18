@@ -4,6 +4,8 @@ using KidsTraining.App.Application.Updates;
 using KidsTraining.App.Domain.ParentControl;
 using KidsTraining.App.Domain.Learning;
 using KidsTraining.App.Domain.Updates;
+using KidsTraining.App.Infrastructure.Lifecycle;
+using KidsTraining.App.Infrastructure.ParentControl;
 
 namespace KidsTraining.ArchitectureTests;
 
@@ -29,14 +31,17 @@ internal static class Program
         Run("Learning page builder rejects missing placeholder", () => TestMissingPlaceholder(repositoryRoot));
         Run("Learning page builder rejects duplicate placeholder", () => TestDuplicatePlaceholder(repositoryRoot));
         Run("Learning markup reports a missing required anchor", () => TestMissingRequiredAnchor(repositoryRoot));
+        Run("Learning markup rejects a duplicate required anchor", () => TestDuplicateRequiredAnchor(repositoryRoot));
         Run("Preparation result has explicit terminal states", TestPreparationTerminals);
         Run("Parent password changes reach explicit terminal states", TestPasswordServiceTerminals);
         Run("Parent learning settings reach explicit terminal states", TestLearningSettingsServiceTerminals);
         Run("Update checks reach explicit terminal states", TestUpdateServiceTerminals);
+        Run("Parent control server awaits actions and shuts down cleanly", TestParentControlServerLifecycle);
+        Run("Single-instance requests reach the primary instance", TestSingleInstanceCoordinator);
 
         if (Failures.Count == 0)
         {
-            Console.WriteLine("Architecture tests passed: 13");
+            Console.WriteLine("Architecture tests passed: 16");
             return 0;
         }
 
@@ -66,15 +71,30 @@ internal static class Program
             ParentPin.FromOrDefault("4456"));
 
         Assert(!html.Contains("<!--__KIDS_TRAINING_APP__-->", StringComparison.Ordinal), "placeholder remained");
-        Assert(html.Contains("screen:'start', profileIdx:0,", StringComparison.Ordinal), "start screen patch is missing");
-        Assert(html.Contains("name:\"Architecture Test\"", StringComparison.Ordinal), "profile patch is missing");
         Assert(html.Contains("localStorage.getItem('kt_parent_pin_v1')||'4456'", StringComparison.Ordinal), "parent PIN patch is missing");
         Assert(html.Contains("kids-training/scripts/runtime.js", StringComparison.Ordinal), "external runtime reference is missing");
-        Assert(html.Contains("class=\"kt-speech-button\"", StringComparison.Ordinal), "English speech patch is missing");
+        var failures = GeneratedLearningRuntimeContractValidator.Validate(html, "Architecture Test");
+        Assert(
+            failures.Count == 0,
+            "generated runtime contract failed: " +
+            string.Join("; ", failures.Select(static failure => $"{failure.Code}: {failure.Message}")));
+
+        var missingUnlockMessage = html.Replace(
+            "kidsTraining.unlock",
+            "kidsTraining.missingUnlock",
+            StringComparison.Ordinal);
+        var explicitFailures =
+            GeneratedLearningRuntimeContractValidator.Validate(missingUnlockMessage, "Architecture Test");
+        Assert(
+            explicitFailures.Any(static failure => failure.Code == "unlock-message"),
+            "a missing generated runtime marker did not produce an explicit contract failure");
     }
 
     private static void TestCurriculumPolicy()
     {
+        Assert(
+            Math.Abs(LearningDefaults.BeginnerMastery - 0.05) < double.Epsilon,
+            "beginner mastery is not represented as a structured domain value");
         Assert(CurriculumPolicy.NormalizeGrade(0) == 1, "grades below the implemented range were not clamped");
         Assert(CurriculumPolicy.NormalizeGrade(6) == 3, "grades above the implemented range were not clamped");
         Assert(CurriculumPolicy.IsAvailable(1, "kokugo"), "grade 1 Japanese was unexpectedly locked");
@@ -103,6 +123,9 @@ internal static class Program
         var allTopics = Enumerable.Range(1, 3)
             .SelectMany(static grade => CurriculumPolicy.TopicsForGrade(grade))
             .ToHashSet(StringComparer.Ordinal);
+        Assert(
+            CurriculumPolicy.AllTopics.ToHashSet(StringComparer.Ordinal).SetEquals(allTopics),
+            "the canonical topic list diverged from the implemented curriculum");
         var prerequisitesByTopic = CurriculumPolicy.PrerequisitesByTopic;
         Assert(
             prerequisitesByTopic.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(allTopics),
@@ -247,13 +270,40 @@ internal static class Program
             "Presentation",
             "WinForms",
             "TrainingForm.cs"));
-        Assert(trainingFormSource.Contains("!hasMeaningfulProgress(profile) && !profile.progressResetAt", StringComparison.Ordinal), "a reset profile loses its selected grade on the next launch");
-        Assert(trainingFormSource.Contains("'money', 'groups', 'order'", StringComparison.Ordinal), "profile bootstrap omits newly added resettable topics");
         Assert(
-            trainingFormSource.Contains("IParentLearningSettingsProvider", StringComparison.Ordinal) &&
-            trainingFormSource.Contains("parentQuestionCount = __QUESTION_COUNT__", StringComparison.Ordinal) &&
-            trainingFormSource.Contains("SetLearningSessionSettings", StringComparison.Ordinal),
-            "parent learning settings are not synchronized into WebView storage");
+            html.Contains("resetToBeginner=!hasMeaningfulProgress(profile)&&!profile.progressResetAt", StringComparison.Ordinal),
+            "a reset profile loses its selected grade on the next launch");
+        Assert(
+            html.Contains("profiles=[normalizeProfile(savedProfile)]", StringComparison.Ordinal) &&
+            html.Contains("topics:{...def.topics,...storedTopics}", StringComparison.Ordinal),
+            "the runtime migration does not retain one profile or merge newly introduced topics");
+        Assert(
+            html.Contains("numberOrDefault(host.questionCount", StringComparison.Ordinal) &&
+            html.Contains("numberOrDefault(host.passLine", StringComparison.Ordinal) &&
+            html.Contains("localStorage.setItem('kt_parent_pin_v1',parentPin)", StringComparison.Ordinal),
+            "host-owned parent settings are not authoritative during runtime migration");
+
+        var bootstrapStart = trainingFormSource.IndexOf(
+            "private string BuildProfileStorageScript()",
+            StringComparison.Ordinal);
+        Assert(bootstrapStart >= 0, "the host bootstrap source is missing");
+        var bootstrapSource = trainingFormSource[bootstrapStart..];
+        Assert(
+            bootstrapSource.Contains("window.__kidsTrainingHost = {", StringComparison.Ordinal) &&
+            bootstrapSource.Contains("profileName: __PROFILE_NAME__", StringComparison.Ordinal) &&
+            bootstrapSource.Contains("parentPin: __PARENT_PIN__", StringComparison.Ordinal) &&
+            bootstrapSource.Contains("questionCount: __QUESTION_COUNT__", StringComparison.Ordinal) &&
+            bootstrapSource.Contains("passLine: __PASS_LINE__", StringComparison.Ordinal) &&
+            !bootstrapSource.Contains("localStorage.", StringComparison.Ordinal),
+            "TrainingForm injects storage migration logic instead of only the host contract");
+        Assert(
+            trainingFormSource.Contains("SetLearningSessionSettingsAsync", StringComparison.Ordinal) &&
+            trainingFormSource.Contains("SetParentPasswordAsync", StringComparison.Ordinal),
+            "WebView setting synchronization does not expose an observable completion result");
+        Assert(
+            !trainingFormSource.Contains("CompletionBridgeScript", StringComparison.Ordinal) &&
+            !trainingFormSource.Contains("document.body.innerText", StringComparison.Ordinal),
+            "TrainingForm still derives completion from visible page text");
         Assert(html.Contains("補助活動：音声を聞き、声に出して", StringComparison.Ordinal) && html.Contains("ノートに漢字を書いて", StringComparison.Ordinal), "supplementary output practice is not identified");
         Assert(html.Contains("aria-label=\"答えと説明を見る\"", StringComparison.Ordinal) && html.Contains("outcome==='revealed'", StringComparison.Ordinal), "revealed-answer control is inaccessible or unscored");
         Assert(html.Contains("role=\"button\" tabindex=\"0\"", StringComparison.Ordinal) && html.Contains("document.addEventListener('keydown'", StringComparison.Ordinal) && html.Contains("aria-live=\"polite\"", StringComparison.Ordinal), "keyboard or live-region accessibility is missing");
@@ -391,6 +441,23 @@ internal static class Program
             "Required learning markup anchor was not found");
     }
 
+    private static void TestDuplicateRequiredAnchor(string repositoryRoot)
+    {
+        var (template, appDefinition) = ReadLearningSource(repositoryRoot);
+        const string anchor = "screen:'profile', profileIdx:0,";
+        var brokenDefinition = appDefinition.Replace(
+            anchor,
+            anchor + anchor,
+            StringComparison.Ordinal);
+        ExpectInvalidOperation(
+            () => new LearningPageBuilder().Build(
+                template,
+                brokenDefinition,
+                "Test",
+                ParentPin.Default),
+            "must occur exactly once");
+    }
+
     private static void TestPreparationTerminals()
     {
         var prepared = LearningPagePreparationResult.Prepared("runtime.html");
@@ -437,6 +504,14 @@ internal static class Program
         var installer = new RecordingUpdateInstaller();
         var service = new UpdateService(new Version(1, 0, 0, 0), releaseClient, installer);
 
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        releaseClient.ObserveCancellation = true;
+        Assert(
+            Check(service, cancellation.Token).Status == UpdateCheckStatus.Cancelled,
+            "a canceled update check did not reach the canceled terminal state");
+        releaseClient.ObserveCancellation = false;
+
         Assert(Check(service).Status == UpdateCheckStatus.Failed, "missing release did not fail");
         releaseClient.Release = new ReleaseInfo("v2.0.0", true, false, []);
         Assert(Check(service).Status == UpdateCheckStatus.NoUpdate, "draft release was not terminal");
@@ -454,8 +529,89 @@ internal static class Program
         Assert(Check(service).Status == UpdateCheckStatus.UpdateStarted && installer.StartCount == 1, "valid update did not start exactly once");
     }
 
-    private static UpdateCheckResult Check(UpdateService service) =>
-        service.CheckAndInstallLatestAsync(CancellationToken.None).GetAwaiter().GetResult();
+    private static void TestSingleInstanceCoordinator()
+    {
+        using var primary = SingleInstanceCoordinator.Acquire();
+        Assert(primary.IsPrimary, "the first coordinator did not become primary");
+
+        using var received = new ManualResetEventSlim();
+        primary.StartListening(received.Set);
+        using (var secondary = SingleInstanceCoordinator.Acquire())
+        {
+            Assert(!secondary.IsPrimary, "the second coordinator also became primary");
+            Assert(secondary.SignalTrainingRequest(), "the secondary coordinator could not signal a request");
+            Assert(
+                received.Wait(TimeSpan.FromSeconds(2)),
+                "the primary coordinator did not observe the secondary request");
+        }
+    }
+
+    private static void TestParentControlServerLifecycle()
+    {
+        var startCalls = 0;
+        var returnCalls = 0;
+        var server = new ParentControlServer(
+            _ =>
+            {
+                startCalls++;
+                return Task.FromResult(false);
+            },
+            _ =>
+            {
+                returnCalls++;
+                return Task.FromResult(true);
+            },
+            () => false,
+            (_, _, _) => Task.FromResult(PasswordChangeResult.Ok("ok")),
+            () => LearningSessionSettings.Default,
+            (_, _, _) => Task.FromResult(
+                new LearningSessionSettingsUpdateResult(
+                    true,
+                    "ok",
+                    LearningSessionSettings.Default)));
+
+        Assert(
+            server.Port == 0 && server.NetworkUrls.Count == 0 && server.PrimaryUrl.Length == 0,
+            "the parent control constructor bound a listener before Start");
+
+        try
+        {
+            server.Start();
+            var port = server.Port;
+            server.Start();
+            Assert(
+                port is >= ParentControlServer.DefaultPort and < ParentControlServer.DefaultPort + 10 &&
+                server.Port == port,
+                "Start did not bind once within the documented port window");
+
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+            using var startResponse = client
+                .PostAsync($"http://127.0.0.1:{port}/api/start", content: null)
+                .GetAwaiter()
+                .GetResult();
+            using var returnResponse = client
+                .PostAsync($"http://127.0.0.1:{port}/api/return", content: null)
+                .GetAwaiter()
+                .GetResult();
+            Assert(
+                startResponse.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable &&
+                returnResponse.StatusCode == System.Net.HttpStatusCode.OK,
+                "parent actions returned before their actual success results were known");
+            Assert(startCalls == 1 && returnCalls == 1, "parent actions were not invoked exactly once");
+        }
+        finally
+        {
+            server.Dispose();
+            server.Dispose();
+        }
+
+        ExpectObjectDisposed(server.Start, "a disposed parent control server restarted");
+    }
+
+    private static UpdateCheckResult Check(
+        UpdateService service,
+        CancellationToken cancellationToken = default) =>
+        service.CheckAndInstallLatestAsync(cancellationToken).GetAwaiter().GetResult();
 
     private static (string Template, string AppDefinition) ReadLearningSource(string repositoryRoot)
     {
@@ -474,6 +630,18 @@ internal static class Program
         }
         catch (InvalidOperationException exception) when (
             exception.Message.Contains(expectedMessage, StringComparison.OrdinalIgnoreCase))
+        {
+        }
+    }
+
+    private static void ExpectObjectDisposed(Action action, string message)
+    {
+        try
+        {
+            action();
+            throw new InvalidOperationException(message);
+        }
+        catch (ObjectDisposedException)
         {
         }
     }
@@ -541,8 +709,17 @@ internal static class Program
     {
         public ReleaseInfo? Release { get; set; }
 
-        public Task<ReleaseInfo?> GetLatestAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(Release);
+        public bool ObserveCancellation { get; set; }
+
+        public Task<ReleaseInfo?> GetLatestAsync(CancellationToken cancellationToken)
+        {
+            if (ObserveCancellation)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
+            return Task.FromResult(Release);
+        }
     }
 
     private sealed class RecordingUpdateInstaller : IUpdateInstaller

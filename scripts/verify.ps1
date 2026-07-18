@@ -1,5 +1,24 @@
 ﻿$ErrorActionPreference = "Stop"
 
+function Get-FileSha256([string]$Path) {
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        return [System.BitConverter]::ToString($sha256.ComputeHash($stream)).Replace("-", "")
+    }
+    finally {
+        $stream.Dispose()
+        $sha256.Dispose()
+    }
+}
+
+function Assert-SourceIconUnchanged([string]$Path, [string]$ExpectedHash, [datetime]$ExpectedLastWriteTimeUtc) {
+    $iconFile = Get-Item -LiteralPath $Path
+    if ((Get-FileSha256 $Path) -ne $ExpectedHash -or $iconFile.LastWriteTimeUtc -ne $ExpectedLastWriteTimeUtc) {
+        throw "Build or packaging must not overwrite the tracked application icon: $Path"
+    }
+}
+
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root "src\KidsTraining.App\KidsTraining.App.csproj"
 $publishDir = Join-Path $root "src\KidsTraining.App\bin\Release\net9.0-windows\win-x64\publish"
@@ -8,7 +27,19 @@ $msiPath = Join-Path $root "artifacts\KidsTraining.msi"
 $generatedWxs = Join-Path $root "artifacts\obj\installer\KidsTraining.generated.wxs"
 $decompiledDir = Join-Path $root "artifacts\msi-decompiled"
 $decompiledWxs = Join-Path $decompiledDir "KidsTraining.wxs"
-$version = "1.10.0"
+$sourceIcon = Join-Path (Split-Path -Parent $project) "app.ico"
+if (!(Test-Path -LiteralPath $sourceIcon -PathType Leaf)) {
+    throw "Missing tracked application icon: $sourceIcon"
+}
+$sourceIconFile = Get-Item -LiteralPath $sourceIcon
+$sourceIconHash = Get-FileSha256 $sourceIcon
+$sourceIconLastWriteTimeUtc = $sourceIconFile.LastWriteTimeUtc
+[xml]$projectDocument = Get-Content -Raw -Encoding UTF8 $project
+$versionNode = $projectDocument.SelectSingleNode("/Project/PropertyGroup/Version")
+if ($null -eq $versionNode -or [string]::IsNullOrWhiteSpace($versionNode.InnerText)) {
+    throw "Application version was not found in project file: $project"
+}
+$version = $versionNode.InnerText.Trim()
 
 $architectureSourceRoot = Join-Path $root "src\KidsTraining.App"
 $programSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Program.cs")
@@ -18,13 +49,11 @@ $updateSource = [string]::Join(
     @(Get-ChildItem -Path (Join-Path $architectureSourceRoot "Application\Updates"), (Join-Path $architectureSourceRoot "Domain\Updates"), (Join-Path $architectureSourceRoot "Infrastructure\Updates") -Filter "*.cs" -File -Recurse |
         Sort-Object FullName |
         ForEach-Object { Get-Content -Raw -Encoding UTF8 $_.FullName }))
-$runtimeSource = [string]::Join(
+$parentSource = [string]::Join(
     "`n",
-    @(Get-ChildItem -Path (Join-Path $architectureSourceRoot "Application\Learning"), (Join-Path $architectureSourceRoot "Domain\Learning") -Filter "*.cs" -File -Recurse |
+    @(Get-ChildItem -Path (Join-Path $architectureSourceRoot "Infrastructure\ParentControl") -Filter "*.cs" -File -Recurse |
         Sort-Object FullName |
         ForEach-Object { Get-Content -Raw -Encoding UTF8 $_.FullName }))
-$trainingSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Presentation\WinForms\TrainingForm.cs")
-$parentSource = Get-Content -Raw -Encoding UTF8 (Join-Path $root "src\KidsTraining.App\Infrastructure\ParentControl\ParentControlServer.cs")
 $parentSettingsSource = [string]::Join(
     "`n",
     @(Get-ChildItem -Path (Join-Path $architectureSourceRoot "Application\ParentControl"), (Join-Path $architectureSourceRoot "Domain\ParentControl"), (Join-Path $architectureSourceRoot "Infrastructure\Settings") -Filter "*.cs" -File -Recurse |
@@ -114,82 +143,8 @@ if ($parentSettingsSource -notmatch "parentPassword" -or $parentSettingsSource -
 if ($programSource -notmatch "ParentControlServer.BuildParentPage" -or $programSource -notmatch "192.168.1.10" -or $programSource -notmatch "8.8.8.8" -or $programSource -notmatch "ParentPin.TryCreate") {
     throw "Smoke test must validate parent control page, password validation, and LAN address filtering"
 }
-if ($runtimeSource -notmatch "add:\.05" -or $runtimeSource -notmatch "moji:\.05" -or $runtimeSource -notmatch "measure:\.05" -or $runtimeSource -notmatch "learningStage\(p\)" -or $runtimeSource -notmatch "effectiveGrade\(p\)" -or $runtimeSource -notmatch "genAdd\(p\)" -or $runtimeSource -notmatch "allowedTopics\(p\)" -or $runtimeSource -notmatch "weakKeys=this\.allowedTopics" -or $runtimeSource -notmatch "profileGrade:this\.gradeLabel") {
-    throw "Runtime HTML patch must start beginners at level 1 and stage topic difficulty"
-}
-if ($runtimeSource -notmatch "topicStage\(p,k\)" -or $runtimeSource -notmatch "topicComplete\(p,k\)" -or $runtimeSource -notmatch "topicReady\(p,k" -or $runtimeSource -notmatch "ensureLearningProfile\(p\)" -or $runtimeSource -notmatch "gradeTopics\(p\)" -or $runtimeSource -notmatch "CurriculumPolicy\.TopicsForGrade" -or $runtimeSource -notmatch "genHissan\(p\)" -or $runtimeSource -notmatch "fromPairs\(\[\[1,2\],\[2,1\],\[2,2\]" -or $runtimeSource -notmatch "stage<=1\?\['hiragana'\]" -or $runtimeSource -match [regex]::Escape("if(done('add'))staged.push")) {
-    throw "Runtime HTML patch must use independent grade-scoped curriculum lanes and evidence readiness"
-}
-if ($runtimeSource -notmatch "questionCount\?\?20" -or $runtimeSource -notmatch "passLine\?\?15") {
-    throw "Runtime HTML patch must default to 20 questions and 15 correct answers"
-}
-if ($trainingSource -notmatch "previousCount <= 10" -or $trainingSource -notmatch "Math\.max\(20, Math\.min\(40, previousCount\)\)" -or $runtimeSource -notmatch "this\.clamp\(\(Number\(s\.count\)\|\|20\)\+d,20,40\)") {
-    throw "Legacy 10-question settings must migrate to a minimum of 20 questions"
-}
-if ($runtimeSource -notmatch "if\(m<0\.20\)return 1" -or $runtimeSource -notmatch "if\(m<0\.40\)return 2" -or $runtimeSource -notmatch "if\(m<0\.60\)return 3" -or $runtimeSource -notmatch "if\(m<0\.80\)return 4" -or $runtimeSource -notmatch "Math\.min\(5,Number\(stage\)\|\|1\)" -or $runtimeSource -notmatch "SkillEvidence\.RequiredIndependentCorrect" -or $runtimeSource -notmatch "SkillEvidence\.RequiredAttempts" -or $runtimeSource -notmatch "SkillEvidence\.RequiredIndependentAccuracy") {
-    throw "Every topic must stage difficulty while requiring sufficient independent evidence for readiness"
-}
-if ($runtimeSource -notmatch "pickStage\(stage,buckets,reviewRate=\.25\)" -or $runtimeSource -notmatch "reviewStage\(p,k\)" -or $runtimeSource -notmatch "profileAtStage\(p,k,stage\)" -or $runtimeSource -notmatch [regex]::Escape("[()=>exact(2,1),()=>exact(2,2),()=>exact(2,3)]") -or $runtimeSource -match [regex]::Escape("prompt:a+' x '+b") -or $runtimeSource -match "b=this\.rand\(11,a-1\)" -or $runtimeSource -match "b=this\.rand\(1,40\)" -or $runtimeSource -match "b=this\.rand\(12,79\)" -or $runtimeSource -match "b=this\.rand\(11,79\)" -or $runtimeSource -match "b=this\.rand\(10,99-a\)" -or $runtimeSource -match "b=this\.rand\(20,a-1\)" -or $runtimeSource -match "Math\.min\(40,a-1\)") {
-    throw "Runtime HTML patch must keep non-hissan add/sub from generating two-digit-by-two-digit mental arithmetic"
-}
-if ($runtimeSource -notmatch "PatchArithmeticVisuals" -or $runtimeSource -notmatch "linear-gradient\(135deg,#ffdad4" -or $runtimeSource -notmatch "isMulViz" -or $runtimeSource -notmatch "pickMul\(p\)" -or $runtimeSource -notmatch "op:'div'") {
-    throw "Runtime HTML patch must render visual aids for non-hissan arithmetic"
-}
-if ($runtimeSource -notmatch "pickKokugo\(p\)" -or $runtimeSource -notmatch "subtype:'reading'" -or $runtimeSource -notmatch "subtype:'kanji-choice'" -or $runtimeSource -notmatch "kokuInstruction" -or $runtimeSource -notmatch "g:3") {
-    throw "Runtime HTML patch must include grade 1-3 kanji reading and correct-kanji choice prompts"
-}
-if ($runtimeSource -notmatch "pickMoji\(p\)" -or $runtimeSource -notmatch "subtype:'alphabet'" -or $runtimeSource -notmatch "subtype:'hiragana'" -or $runtimeSource -notmatch "subtype:'katakana'" -or $runtimeSource -notmatch "1cm.*10mm") {
-    throw "Runtime HTML patch must include alphabet, hiragana, katakana, and millimeter questions"
-}
-if ($runtimeSource -notmatch "pickMeasure\(p\)" -or $runtimeSource -notmatch "measureCompare\(\)" -or $runtimeSource -notmatch "どちらが ながい？" -or $runtimeSource -notmatch "1kg は 何g？" -or $runtimeSource -notmatch "1km は 何m？" -or $runtimeSource -notmatch "1L は 何dL？" -or $runtimeSource -notmatch "measure:\{label:'たんい'" -or $runtimeSource -notmatch "isMeasureViz" -or $runtimeSource -notmatch "pickTimeUnits") {
-    throw "Runtime HTML patch must include a curriculum-aligned measurement topic and keep time units in the clock topic"
-}
-if ($runtimeSource -notmatch "10のまとまりで かんがえる" -or $runtimeSource -notmatch [regex]::Escape("this.rand(1,8)*10")) {
-    throw "Runtime HTML patch must generate counting-in-tens addition and subtraction (20+30, 50-20)"
-}
-if ($runtimeSource -notmatch "pickKazu\(p\)" -or $runtimeSource -notmatch "pickShape\(p\)" -or $runtimeSource -notmatch "pickDiv\(p\)" -or $runtimeSource -notmatch "pickFrac\(p\)" -or $runtimeSource -notmatch "pickChart\(p\)" -or $runtimeSource -notmatch "pickStory\(p\)" -or $runtimeSource -notmatch "あまり" -or $runtimeSource -notmatch "正三角形" -or $runtimeSource -notmatch "subtype:'romaji'" -or $runtimeSource -notmatch "isShapeViz" -or $runtimeSource -notmatch "isFracViz" -or $runtimeSource -notmatch "isChart" -or $runtimeSource -notmatch "promptStyle") {
-    throw "Runtime HTML patch must cover large numbers, shapes, division with remainders, fractions/decimals, charts, word problems, and romaji"
-}
-if ($runtimeSource -notmatch "なんばんめ" -or $runtimeSource -notmatch "subtype:'kotoba'" -or $runtimeSource -notmatch "markCleared" -or $runtimeSource -notmatch "masteryLevel" -or $runtimeSource -notmatch "isOrder" -or $runtimeSource -notmatch [regex]::Escape("prompt:x+' + '+y+' + '+z")) {
-    throw "Runtime HTML patch must include ordinal positions, spelling words, three-number calculations, and sticky visible clears"
-}
-if ($runtimeSource -notmatch "pickBun\(p\)" -or $runtimeSource -notmatch "pickGoi\(p\)" -or $runtimeSource -notmatch "pickDokkai\(p\)" -or $runtimeSource -notmatch "bun:\.05" -or $runtimeSource -notmatch "goi:\.05" -or $runtimeSource -notmatch "dokkai:\.05" -or $runtimeSource -match [regex]::Escape("if(done('moji'))staged.push('kokugo','bun')")) {
-    throw "Runtime HTML patch must include independent particle/grammar, vocabulary, and reading-comprehension topics"
-}
-if ($runtimeSource -notmatch "topic:'dokkai'" -or $runtimeSource -notmatch "topic:'goi'" -or $runtimeSource -notmatch "topic:'bun'") {
-    throw "Runtime HTML patch must generate bun, goi, and dokkai questions"
-}
-if ($runtimeSource -notmatch "pickEigo\(p\)" -or $runtimeSource -notmatch "eigo:\.05" -or $runtimeSource -notmatch "topic:'eigo'" -or $runtimeSource -notmatch "CurriculumPolicy\.TopicsForGrade\(3\)" -or $runtimeSource -notmatch "補助活動：音声を聞き") {
-    throw "Runtime HTML patch must include independent supplementary English practice at grade 3"
-}
-if ($runtimeSource -notmatch "PatchEnglishSpeech" -or $runtimeSource -notmatch "speakEnglish\(text\)" -or $runtimeSource -notmatch [regex]::Escape("if(m)this.stopEnglishSpeech()") -or $runtimeSource -notmatch "SpeechSynthesisUtterance" -or $runtimeSource -notmatch "utterance\.lang='en-US'" -or $runtimeSource -notmatch "utterance\.rate=\.85" -or $runtimeSource -notmatch "speakChoices:!!speak" -or $runtimeSource -notmatch "kt-speech-button" -or $runtimeSource -notmatch "kt-choice-button") {
-    throw "English pronunciation controls are incomplete."
-}
-if ($runtimeSource -notmatch [regex]::Escape("&&this.topicStage(p,q.topic)<=2") -or $runtimeSource -notmatch [regex]::Escape("q.topic==='mul'&&this.topicStage(p,'mul')<=2") -or $runtimeSource -notmatch [regex]::Escape("q.topic==='div'&&this.topicStage(p,'div')<=2") -or $runtimeSource -notmatch [regex]::Escape("kokuShowMean=this.topicStage(p,'kokugo')<=2") -or $runtimeSource -notmatch "kokuShowMean:kokuShowMean") {
-    throw "Runtime HTML patch must gate visual hints (add/sub dots, multiplication/division groups, kokugo meaning) behind low topic mastery"
-}
-if ($trainingSource -notmatch "'kazu'" -or $trainingSource -notmatch "'story'" -or $trainingSource -notmatch "chart: true" -or $trainingSource -notmatch "'bun'" -or $trainingSource -notmatch "'goi'" -or $trainingSource -notmatch "'dokkai'" -or $trainingSource -notmatch "dokkai: true" -or $trainingSource -notmatch "'eigo'" -or $trainingSource -notmatch "eigo: true") {
-    throw "Training storage bootstrap must include the full curriculum topic set"
-}
-if ($runtimeSource -notmatch "PatchRewardSystem" -or $runtimeSource -notmatch "gainXp" -or $runtimeSource -notmatch "xpLevel" -or $runtimeSource -notmatch "fbXp" -or $runtimeSource -notmatch "earnedXp" -or $runtimeSource -notmatch "べんきょうを つづける") {
-    throw "Runtime HTML patch must include XP rewards without avatar customization"
-}
-if ($runtimeSource -match "avatarReady" -or $runtimeSource -match "avatarParts" -or $runtimeSource -match "finishAvatar" -or $runtimeSource -match "BuildAvatarPanelMarkup" -or $runtimeSource -match "アバター") {
-    throw "Runtime HTML patch must not include avatar setup or customization"
-}
-if ($trainingSource -notmatch "beginnerMastery" -or $trainingSource -notmatch "kt_settings_v1" -or $trainingSource -notmatch "hasMeaningfulProgress" -or $trainingSource -notmatch "count: 20" -or $trainingSource -notmatch "pass: 15" -or $trainingSource -notmatch "moji" -or $trainingSource -notmatch "xp") {
-    throw "Training storage bootstrap must migrate only unstarted profiles to beginner defaults"
-}
-if ($runtimeSource -notmatch "parentPin\(\)" -or $runtimeSource -notmatch "kt_parent_pin_v1" -or $runtimeSource -notmatch "const ok=np===this.parentPin\(\)") {
-    throw "Runtime HTML patch must use the configurable parent password for emergency unlock"
-}
-if ($trainingSource -notmatch "ReturnToComputer\(\)" -or $trainingSource -notmatch "ExitAfterUnlock" -or $trainingSource -notmatch "SetParentPassword" -or $trainingSource -notmatch "kt_parent_pin_v1") {
-    throw "Training form must allow parent control to return to the PC screen and sync parent password changes"
-}
-if ($trainingSource -match "defaultAvatar" -or $trainingSource -match "avatarReady") {
-    throw "Training storage bootstrap must not add avatar state"
-}
-
+# Generated learning behavior is validated once by the shared runtime contract in
+# the architecture harness and again by the published executable smoke tests below.
 $architectureTests = Join-Path $root "tests\KidsTraining.ArchitectureTests\KidsTraining.ArchitectureTests.csproj"
 & dotnet run --project $architectureTests -c Release -- $root
 if ($LASTEXITCODE -ne 0) {
@@ -200,6 +155,7 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE"
 }
+Assert-SourceIconUnchanged $sourceIcon $sourceIconHash $sourceIconLastWriteTimeUtc
 
 $publishedExe = Join-Path $publishDir "KidsTraining.App.exe"
 $publishedLearningDir = Join-Path $publishDir "assets\kids-training"
@@ -217,12 +173,18 @@ if (!(Test-Path $publishedHtml)) {
 if (Test-Path (Join-Path $publishDir "assets\kids-training.html")) {
     throw "Legacy single-file HTML remains in the publish output"
 }
+if (Test-Path (Join-Path $publishedLearningDir "CLAUDE.md")) {
+    throw "Repository guidance leaked into published learning assets"
+}
 if (!(Test-Path $publishedAppDefinition) -or !(Test-Path $publishedRuntimeScript) -or
     @(Get-ChildItem -Path $publishedFonts -Filter "*.woff2" -File).Count -ne 366) {
     throw "Published split learning assets are incomplete"
 }
 if (!(Test-Path $publishedFavicon)) {
     throw "Missing published favicon asset: $publishedFavicon"
+}
+if ((Get-FileSha256 $publishedFavicon) -ne $sourceIconHash) {
+    throw "Published favicon must be copied from the tracked application icon"
 }
 
 Add-Type -AssemblyName System.Drawing
@@ -241,6 +203,7 @@ if ($smoke.ExitCode -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     throw "MSI build failed with exit code $LASTEXITCODE"
 }
+Assert-SourceIconUnchanged $sourceIcon $sourceIconHash $sourceIconLastWriteTimeUtc
 
 if (!(Test-Path $msiPath)) {
     throw "Missing MSI artifact: $msiPath"
@@ -256,8 +219,15 @@ if (!(Test-Path (Join-Path $artifactsPublishDir "assets\kids-training\index.temp
 if (Test-Path (Join-Path $artifactsPublishDir "assets\kids-training.html")) {
     throw "Legacy single-file HTML remains in the artifacts publish output"
 }
-if (!(Test-Path (Join-Path $artifactsPublishDir "assets\favicon.ico"))) {
+if (Test-Path (Join-Path $artifactsPublishDir "assets\kids-training\CLAUDE.md")) {
+    throw "Repository guidance leaked into artifacts publish output"
+}
+$artifactsFavicon = Join-Path $artifactsPublishDir "assets\favicon.ico"
+if (!(Test-Path $artifactsFavicon)) {
     throw "Missing artifacts publish favicon"
+}
+if ((Get-FileSha256 $artifactsFavicon) -ne $sourceIconHash) {
+    throw "Artifacts publish favicon must be copied from the tracked application icon"
 }
 
 $artifactsSmoke = Start-Process -FilePath (Join-Path $artifactsPublishDir "KidsTraining.App.exe") -ArgumentList "--smoke-test" -Wait -PassThru
@@ -281,8 +251,15 @@ if ($generatedText -notmatch "--auto-training") {
 if ($generatedText -notmatch "--training") {
     throw "Generated MSI source must include a learning-mode shortcut"
 }
-if ($generatedText -notmatch "AppIcon.ico") {
-    throw "Generated MSI source must include the application icon"
+[xml]$generatedDocument = $generatedText
+$wixNamespace = New-Object System.Xml.XmlNamespaceManager($generatedDocument.NameTable)
+$wixNamespace.AddNamespace("wix", "http://wixtoolset.org/schemas/v4/wxs")
+$generatedIcon = $generatedDocument.SelectSingleNode("/wix:Wix/wix:Package/wix:Icon[@Id='AppIcon.ico']", $wixNamespace)
+if ($null -eq $generatedIcon -or
+    !([System.IO.Path]::GetFullPath($generatedIcon.SourceFile)).Equals(
+        [System.IO.Path]::GetFullPath($sourceIcon),
+        [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Generated MSI source must reuse the tracked application icon"
 }
 
 & wix msi validate $msiPath

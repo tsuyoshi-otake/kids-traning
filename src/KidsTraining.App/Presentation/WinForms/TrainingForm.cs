@@ -72,23 +72,45 @@ internal sealed class TrainingForm : Form
         ExitAfterUnlock();
     }
 
-    public void SetParentPassword(string password)
+    public async Task<bool> SetParentPasswordAsync(string password)
     {
         if (webView.CoreWebView2 is null)
         {
-            return;
+            return false;
         }
 
         var encodedPassword = System.Text.Json.JsonSerializer.Serialize(password);
-        _ = webView.CoreWebView2.ExecuteScriptAsync(
-            $"try {{ localStorage.setItem('kt_parent_pin_v1', {encodedPassword}); }} catch {{ }}");
+        try
+        {
+            var result = await webView.CoreWebView2.ExecuteScriptAsync(
+                $$"""
+                (() => {
+                  try {
+                    const password = {{encodedPassword}};
+                    localStorage.setItem('kt_parent_pin_v1', password);
+                    if (window.__kidsTrainingHost) {
+                      window.__kidsTrainingHost.parentPin = password;
+                    }
+                    return true;
+                  } catch {
+                    return false;
+                  }
+                })()
+                """);
+            return string.Equals(result, "true", StringComparison.Ordinal);
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Could not synchronize the parent PIN into WebView storage", exception);
+            return false;
+        }
     }
 
-    public void SetLearningSessionSettings(LearningSessionSettings settings)
+    public async Task<bool> SetLearningSessionSettingsAsync(LearningSessionSettings settings)
     {
         if (webView.CoreWebView2 is null)
         {
-            return;
+            return false;
         }
 
         var script =
@@ -99,11 +121,27 @@ internal sealed class TrainingForm : Form
               const current = raw ? JSON.parse(raw) : {};
               const next = { ...current, count: __QUESTION_COUNT__, pass: __PASS_LINE__ };
               localStorage.setItem(key, JSON.stringify(next));
-            } catch {}
+              if (window.__kidsTrainingHost) {
+                window.__kidsTrainingHost.questionCount = __QUESTION_COUNT__;
+                window.__kidsTrainingHost.passLine = __PASS_LINE__;
+              }
+              return true;
+            } catch {
+              return false;
+            }
             """
                 .Replace("__QUESTION_COUNT__", settings.QuestionCount.ToString(), StringComparison.Ordinal)
                 .Replace("__PASS_LINE__", settings.PassLine.ToString(), StringComparison.Ordinal);
-        _ = webView.CoreWebView2.ExecuteScriptAsync(script);
+        try
+        {
+            var result = await webView.CoreWebView2.ExecuteScriptAsync($"(() => {{ {script} }})()");
+            return string.Equals(result, "true", StringComparison.Ordinal);
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Could not synchronize learning settings into WebView storage", exception);
+            return false;
+        }
     }
 
     private async Task InitializeWebViewAsync()
@@ -144,7 +182,6 @@ internal sealed class TrainingForm : Form
             }
 
             await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(BuildProfileStorageScript());
-            await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(CompletionBridgeScript);
             webView.CoreWebView2.Navigate(new Uri(preparation.RuntimePagePath).AbsoluteUri);
         }
         catch (WebView2RuntimeNotFoundException)
@@ -254,138 +291,28 @@ internal sealed class TrainingForm : Form
     private string BuildProfileStorageScript()
     {
         var profileName = System.Text.Json.JsonSerializer.Serialize(profileNameProvider.GetProfileName());
-        var parentPassword = System.Text.Json.JsonSerializer.Serialize(parentPinProvider.GetCurrentPin().Value);
+        var parentPin = System.Text.Json.JsonSerializer.Serialize(parentPinProvider.GetCurrentPin().Value);
         var learningSettings = parentLearningSettingsProvider.GetCurrentSettings();
         return
             """
         (() => {
-          const key = 'kt_profiles_v1';
-          const settingsKey = 'kt_settings_v1';
-          const parentPinKey = 'kt_parent_pin_v1';
-          const profileName = __PROFILE_NAME__;
-          const parentPassword = __PARENT_PASSWORD__;
-          const parentQuestionCount = __QUESTION_COUNT__;
-          const parentPassLine = __PASS_LINE__;
-          const masteryKeys = ['add', 'sub', 'mul', 'clock', 'kokugo', 'hissan', 'moji', 'measure', 'kazu', 'shape', 'div', 'frac', 'chart', 'story', 'bun', 'goi', 'dokkai', 'eigo', 'money', 'groups', 'order'];
-          const beginnerMastery = { add: .05, sub: .05, mul: .05, clock: .05, kokugo: .05, hissan: .05, moji: .05, measure: .05, kazu: .05, shape: .05, div: .05, frac: .05, chart: .05, story: .05, bun: .05, goi: .05, dokkai: .05, eigo: .05, money: .05, groups: .05, order: .05 };
-          const beginnerSettings = {
-            count: 20,
-            pass: 15,
-            topics: { add: true, sub: true, mul: true, clock: true, kokugo: true, hissan: true, moji: true, measure: true, kazu: true, shape: true, div: true, frac: true, chart: true, story: true, bun: true, goi: true, dokkai: true, eigo: true, money: true, groups: true, order: true }
+          window.__kidsTrainingHost = {
+            profileName: __PROFILE_NAME__,
+            parentPin: __PARENT_PIN__,
+            questionCount: __QUESTION_COUNT__,
+            passLine: __PASS_LINE__
           };
-          const defaultProfile = {
-            name: profileName,
-            grade: 1,
-            color: '#4ad991',
-            streak: 0,
-            stars: 0,
-            xp: 0,
-            mastery: { ...beginnerMastery }
-          };
-
-          const numberOrDefault = (value, fallback) => {
-            const number = Number(value);
-            return Number.isFinite(number) ? number : fallback;
-          };
-
-          const isDefaultishMastery = mastery => masteryKeys.every(key => {
-            const value = Number(mastery && mastery[key]);
-            return !Number.isFinite(value) ||
-              Math.abs(value - .5) < .001 ||
-              Math.abs(value - beginnerMastery[key]) < .001;
-          });
-
-          const hasMeaningfulProgress = profile =>
-            numberOrDefault(profile.stars, 0) > 0 ||
-            numberOrDefault(profile.streak, 0) > 0 ||
-            numberOrDefault(profile.xp, 0) > 0 ||
-            !isDefaultishMastery(profile.mastery);
-
-          const normalizeProfile = source => {
-            const profile = source && typeof source === 'object' ? source : {};
-            const mastery = profile.mastery && typeof profile.mastery === 'object' ? profile.mastery : {};
-            const resetToBeginner = !hasMeaningfulProgress(profile) && !profile.progressResetAt;
-            return {
-              ...defaultProfile,
-              ...profile,
-              name: profileName,
-              grade: resetToBeginner ? 1 : numberOrDefault(profile.grade, defaultProfile.grade),
-              streak: numberOrDefault(profile.streak, defaultProfile.streak),
-              stars: numberOrDefault(profile.stars, defaultProfile.stars),
-              xp: numberOrDefault(profile.xp, defaultProfile.xp),
-              color: profile.color || defaultProfile.color,
-              mastery: resetToBeginner ? { ...beginnerMastery } : { ...defaultProfile.mastery, ...mastery }
-            };
-          };
-
-          try {
-            localStorage.setItem(parentPinKey, parentPassword);
-            const raw = localStorage.getItem(key);
-            const parsed = raw ? JSON.parse(raw) : null;
-            const source = Array.isArray(parsed) && parsed.length ? parsed[0] : parsed;
-            const normalized = normalizeProfile(source);
-            localStorage.setItem(key, JSON.stringify([normalized]));
-            const rawSettings = localStorage.getItem(settingsKey);
-            let parsedSettings = null;
-            try { parsedSettings = rawSettings ? JSON.parse(rawSettings) : null; } catch {}
-            const sourceSettings = parsedSettings && typeof parsedSettings === 'object' ? parsedSettings : {};
-            const previousCount = numberOrDefault(sourceSettings.count, beginnerSettings.count);
-            const migratedFromTen = previousCount <= 10;
-            const normalizedSettings = {
-              ...beginnerSettings,
-              ...sourceSettings,
-              topics: { ...beginnerSettings.topics, ...(sourceSettings.topics || {}) },
-              count: Math.max(20, Math.min(40, parentQuestionCount)),
-              pass: Math.max(1, Math.min(parentPassLine, Math.max(20, Math.min(40, parentQuestionCount))))
-            };
-            if (!hasMeaningfulProgress(normalized)) {
-              normalizedSettings.count = parentQuestionCount;
-              normalizedSettings.pass = parentPassLine;
-            }
-            localStorage.setItem(settingsKey, JSON.stringify(normalizedSettings));
-          } catch {
-            try {
-              localStorage.setItem(parentPinKey, parentPassword);
-              localStorage.setItem(key, JSON.stringify([defaultProfile]));
-              localStorage.setItem(settingsKey, JSON.stringify({ ...beginnerSettings, count: parentQuestionCount, pass: parentPassLine }));
-            } catch {}
-          }
         })();
         """
             .Replace("__PROFILE_NAME__", profileName, StringComparison.Ordinal)
-            .Replace("__PARENT_PASSWORD__", parentPassword, StringComparison.Ordinal)
-            .Replace("__QUESTION_COUNT__", learningSettings.QuestionCount.ToString(), StringComparison.Ordinal)
-            .Replace("__PASS_LINE__", learningSettings.PassLine.ToString(), StringComparison.Ordinal);
+            .Replace("__PARENT_PIN__", parentPin, StringComparison.Ordinal)
+            .Replace(
+                "__QUESTION_COUNT__",
+                learningSettings.QuestionCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                StringComparison.Ordinal)
+            .Replace(
+                "__PASS_LINE__",
+                learningSettings.PassLine.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                StringComparison.Ordinal);
     }
-
-    private const string CompletionBridgeScript =
-        """
-        (() => {
-          const unlockMessage = 'kidsTraining.unlock';
-          const pcText = '\u30d1\u30bd\u30b3\u30f3\u3092';
-          const useText = '\u3064\u304b\u3046';
-          let posted = false;
-
-          document.addEventListener('click', event => {
-            if (posted || !window.chrome || !window.chrome.webview) {
-              return;
-            }
-
-            const target = event.target;
-            const element = target && target.closest
-              ? target.closest('button, a, div, span, [onclick]')
-              : target;
-
-            if (!element) {
-              return;
-            }
-
-            const text = (element.innerText || element.textContent || '').replace(/\s+/g, ' ').trim();
-            if (text.includes(pcText) && text.includes(useText)) {
-              posted = true;
-              window.chrome.webview.postMessage(unlockMessage);
-            }
-          }, true);
-        })();
-        """;
 }

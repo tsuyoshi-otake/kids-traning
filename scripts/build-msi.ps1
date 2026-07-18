@@ -1,7 +1,7 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
-    [string]$Version = "1.14.0"
+    [string]$Version
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,7 +13,21 @@ $publishDir = Join-Path $artifacts "publish\$Runtime"
 $objDir = Join-Path $artifacts "obj\installer"
 $wxsPath = Join-Path $objDir "KidsTraining.generated.wxs"
 $msiPath = Join-Path $artifacts "KidsTraining.msi"
-$iconPath = Join-Path $objDir "app.ico"
+$iconPath = Join-Path (Split-Path -Parent $project) "app.ico"
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    [xml]$projectDocument = Get-Content -Raw -Encoding UTF8 $project
+    $versionNode = $projectDocument.SelectSingleNode("/Project/PropertyGroup/Version")
+    if ($null -eq $versionNode -or [string]::IsNullOrWhiteSpace($versionNode.InnerText)) {
+        throw "Application version was not found in project file: $project"
+    }
+
+    $Version = $versionNode.InnerText.Trim()
+}
+
+if (!(Test-Path -LiteralPath $iconPath -PathType Leaf)) {
+    throw "Application icon was not found: $iconPath"
+}
 
 $artifactsFullPath = [System.IO.Path]::GetFullPath($artifacts).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
 $publishFullPath = [System.IO.Path]::GetFullPath($publishDir)
@@ -24,11 +38,6 @@ if (Test-Path $publishFullPath) {
     Remove-Item -LiteralPath $publishFullPath -Recurse -Force
 }
 New-Item -ItemType Directory -Force -Path $publishFullPath, $objDir | Out-Null
-
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "generate-icon.ps1") -OutputPath $iconPath
-if ($LASTEXITCODE -ne 0) {
-    throw "icon generation failed with exit code $LASTEXITCODE"
-}
 
 & dotnet publish $project -c $Configuration -r $Runtime --self-contained true -o $publishDir /p:Version=$Version
 if ($LASTEXITCODE -ne 0) {

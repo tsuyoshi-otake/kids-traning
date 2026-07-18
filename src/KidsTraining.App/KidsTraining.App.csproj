@@ -16,7 +16,7 @@
     <DebugType>embedded</DebugType>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.14.0</Version>
+    <Version>1.15.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\..\kids-training\**\*" Link="assets\kids-training\%(RecursiveDir)%(Filename)%(Extension)">
+    <Content Include="..\..\kids-training\**\*" Exclude="..\..\kids-training\CLAUDE.md;..\..\kids-training\**\CLAUDE.md" Link="assets\kids-training\%(RecursiveDir)%(Filename)%(Extension)">
       <TargetPath>assets\kids-training\%(RecursiveDir)%(Filename)%(Extension)</TargetPath>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -38,7 +38,4 @@
     </Content>
   </ItemGroup>
 
-  <Target Name="GenerateApplicationIcon" BeforeTargets="CoreCompile">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\generate-icon.ps1&quot; -OutputPath &quot;$(MSBuildProjectDirectory)\app.ico&quot;" />
-  </Target>
 </Project>

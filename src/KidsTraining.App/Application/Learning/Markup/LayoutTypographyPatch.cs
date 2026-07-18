@@ -34,11 +34,12 @@ internal static partial class LearningMarkupPatcher
             "<div class=\"kt-numeric-layout\" style=\"flex:1; display:flex; gap:30px; margin-top:18px; align-items:stretch;\">",
             StringComparison.Ordinal);
 
-        markup = ReplaceRequired(
+        markup = ReplaceRequiredOccurrences(
             markup,
             "<div style=\"width:300px; flex:none; display:grid; grid-template-columns:repeat(3,1fr); gap:12px; align-content:start;\">",
             "<div class=\"kt-keypad\" style=\"width:300px; flex:none; display:grid; grid-template-columns:repeat(3,1fr); gap:12px; align-content:start;\">",
-            StringComparison.Ordinal);
+            StringComparison.Ordinal,
+            expectedOccurrences: 2);
 
         markup = ReplaceRequired(
             markup,

@@ -60,7 +60,7 @@ internal sealed class UpdateService
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return UpdateCheckResult.Failed("Update check was canceled.");
+            return UpdateCheckResult.Cancelled("Update check was canceled.");
         }
         catch (Exception exception)
         {

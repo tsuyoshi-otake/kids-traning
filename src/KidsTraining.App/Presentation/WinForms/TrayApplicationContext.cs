@@ -11,12 +11,14 @@ namespace KidsTraining.App.Presentation.WinForms;
 internal sealed class TrayApplicationContext : ApplicationContext
 {
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(1);
+    private static readonly TimeSpan WebViewSynchronizationTimeout = TimeSpan.FromSeconds(3);
 
     private readonly NotifyIcon notifyIcon;
     private readonly Control uiDispatcher = new();
     private readonly System.Windows.Forms.Timer startupTimer = new();
     private readonly System.Windows.Forms.Timer updateTimer = new();
     private readonly System.Windows.Forms.Timer autoTrainingTimer = new();
+    private readonly CancellationTokenSource lifetimeCancellation = new();
     private readonly UpdateService updateService;
     private readonly ILearningPagePreparer learningPagePreparer;
     private readonly IParentPinProvider parentPinProvider;
@@ -26,9 +28,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private readonly ParentControlServer? parentControlServer;
     private TrainingForm? trainingForm;
+    private Task<UpdateCheckResult>? activeUpdateCheck;
     private bool checkInProgress;
     private bool exitingForUpdate;
-    private volatile bool trainingActive;
+    private int trainingState = (int)TrainingSessionState.Inactive;
+    private int exitStarted;
 
     public TrayApplicationContext(
         bool startTrainingOnLaunch,
@@ -98,54 +102,121 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         menu.Items.Add("更新を確認", null, async (_, _) => await CheckForUpdatesAsync(showNoUpdate: true).ConfigureAwait(true));
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("終了", null, (_, _) => ExitTray());
+        menu.Items.Add("終了", null, async (_, _) => await ExitTrayAsync().ConfigureAwait(true));
         return menu;
     }
 
     private void StartTraining()
     {
-        if (trainingForm is { IsDisposed: false })
-        {
-            trainingActive = true;
-            trainingForm.WindowState = FormWindowState.Maximized;
-            trainingForm.Activate();
-            return;
-        }
-
-        trainingForm = new TrainingForm(
-            learningPagePreparer,
-            parentPinProvider,
-            profileNameProvider,
-            parentLearningSettingsService);
-        trainingActive = true;
-        trainingForm.FormClosed += (_, _) =>
-        {
-            trainingActive = false;
-            trainingForm = null;
-        };
-        trainingForm.Show();
+        _ = TryStartTraining();
     }
 
-    private void ReturnToComputer()
+    public void RequestTraining()
     {
-        if (trainingForm is { IsDisposed: false } form)
-        {
-            form.ReturnToComputer();
-        }
-        else
-        {
-            trainingActive = false;
-        }
+        _ = RequestTrainingAsync();
     }
 
-    private ParentControlServer? StartParentControlServer()
+    private async Task RequestTrainingAsync()
     {
         try
         {
-            var server = new ParentControlServer(
+            var started = await InvokeOnUiThreadAsync(TryStartTraining, CancellationToken.None).ConfigureAwait(false);
+            if (!started)
+            {
+                UpdateLogger.Info("A training request from another instance could not be completed.");
+            }
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Could not handle a training request from another instance", exception);
+        }
+    }
+
+    private bool TryStartTraining()
+    {
+        if (trainingForm is { IsDisposed: false })
+        {
+            SetTrainingState(TrainingSessionState.Active);
+            trainingForm.WindowState = FormWindowState.Maximized;
+            trainingForm.Activate();
+            return true;
+        }
+
+        SetTrainingState(TrainingSessionState.Starting);
+        try
+        {
+            var form = new TrainingForm(
+                learningPagePreparer,
+                parentPinProvider,
+                profileNameProvider,
+                parentLearningSettingsService);
+            trainingForm = form;
+            form.FormClosed += (_, _) =>
+            {
+                if (ReferenceEquals(trainingForm, form))
+                {
+                    trainingForm = null;
+                    SetTrainingState(TrainingSessionState.Inactive);
+                }
+            };
+            form.Show();
+            SetTrainingState(TrainingSessionState.Active);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            trainingForm?.Dispose();
+            trainingForm = null;
+            SetTrainingState(TrainingSessionState.Inactive);
+            UpdateLogger.Error("Could not start the training window", exception);
+            return false;
+        }
+    }
+
+    private bool ReturnToComputer()
+    {
+        if (trainingForm is { IsDisposed: false } form)
+        {
+            SetTrainingState(TrainingSessionState.Stopping);
+            try
+            {
+                form.ReturnToComputer();
+                if (form.IsDisposed)
+                {
+                    trainingForm = null;
+                    SetTrainingState(TrainingSessionState.Inactive);
+                }
+
+                return true;
+            }
+            catch (Exception exception)
+            {
+                SetTrainingState(TrainingSessionState.Active);
+                UpdateLogger.Error("Could not close the training window", exception);
+                return false;
+            }
+        }
+
+        trainingForm = null;
+        SetTrainingState(TrainingSessionState.Inactive);
+        return true;
+    }
+
+    private bool IsTrainingActive() =>
+        (TrainingSessionState)Volatile.Read(ref trainingState) != TrainingSessionState.Inactive;
+
+    private void SetTrainingState(TrainingSessionState state) =>
+        Volatile.Write(ref trainingState, (int)state);
+
+    private ParentControlServer? StartParentControlServer()
+    {
+        ParentControlServer? server = null;
+        try
+        {
+            server = new ParentControlServer(
                 StartTrainingFromParentControl,
                 ReturnToComputerFromParentControl,
-                () => trainingActive,
+                IsTrainingActive,
                 ChangeParentPasswordFromParentControl,
                 parentLearningSettingsService.GetCurrentSettings,
                 ChangeLearningSettingsFromParentControl);
@@ -155,61 +226,154 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
         catch (Exception ex)
         {
+            try
+            {
+                server?.Dispose();
+            }
+            catch (Exception disposeException)
+            {
+                UpdateLogger.Error("Partially started parent control server could not be disposed", disposeException);
+            }
+
             UpdateLogger.Error("Parent control server could not start", ex);
             return null;
         }
     }
 
-    private void StartTrainingFromParentControl()
-    {
-        trainingActive = true;
-        InvokeOnUiThread(StartTraining);
-    }
+    private Task<bool> StartTrainingFromParentControl(CancellationToken cancellationToken) =>
+        InvokeOnUiThreadAsync(TryStartTraining, cancellationToken);
 
-    private void ReturnToComputerFromParentControl()
-    {
-        trainingActive = false;
-        InvokeOnUiThread(ReturnToComputer);
-    }
+    private Task<bool> ReturnToComputerFromParentControl(CancellationToken cancellationToken) =>
+        InvokeOnUiThreadAsync(ReturnToComputer, cancellationToken);
 
-    private PasswordChangeResult ChangeParentPasswordFromParentControl(string? currentPassword, string? newPassword)
+    private async Task<PasswordChangeResult> ChangeParentPasswordFromParentControl(
+        string? currentPassword,
+        string? newPassword,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var result = parentPasswordService.Change(currentPassword, newPassword);
         if (result.Success)
         {
             var savedPassword = parentPasswordService.GetCurrentPin().Value;
-            InvokeOnUiThread(() => trainingForm?.SetParentPassword(savedPassword));
+            var synchronized = await SynchronizeActiveTrainingAsync(
+                form => form.SetParentPasswordAsync(savedPassword)).ConfigureAwait(false);
+            if (!synchronized)
+            {
+                return result with
+                {
+                    Message = "パスワードは保存しましたが、現在の学習画面には反映できませんでした。次回起動時に反映します。"
+                };
+            }
         }
 
         return result;
     }
 
-    private LearningSessionSettingsUpdateResult ChangeLearningSettingsFromParentControl(int? questionCount, int? passLine)
+    private async Task<LearningSessionSettingsUpdateResult> ChangeLearningSettingsFromParentControl(
+        int? questionCount,
+        int? passLine,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var result = parentLearningSettingsService.Update(questionCount, passLine);
         if (result.Success)
         {
-            InvokeOnUiThread(() => trainingForm?.SetLearningSessionSettings(result.Settings));
+            var synchronized = await SynchronizeActiveTrainingAsync(
+                form => form.SetLearningSessionSettingsAsync(result.Settings)).ConfigureAwait(false);
+            if (!synchronized)
+            {
+                return result with
+                {
+                    Message = "学習設定は保存しましたが、現在の学習画面には反映できませんでした。次回起動時に反映します。"
+                };
+            }
         }
 
         return result;
     }
 
-    private void InvokeOnUiThread(Action action)
+    private async Task<bool> SynchronizeActiveTrainingAsync(Func<TrainingForm, Task<bool>> synchronize)
     {
+        try
+        {
+            var synchronization = InvokeOnUiThreadAsync(
+                () => trainingForm is not { IsDisposed: false } form
+                    ? Task.FromResult(true)
+                    : synchronize(form),
+                lifetimeCancellation.Token);
+            return await synchronization
+                .WaitAsync(WebViewSynchronizationTimeout, lifetimeCancellation.Token)
+                .ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            UpdateLogger.Info(
+                $"WebView synchronization exceeded {WebViewSynchronizationTimeout.TotalSeconds:0} seconds.");
+            return false;
+        }
+        catch (OperationCanceledException) when (lifetimeCancellation.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Could not synchronize settings with the active training window", exception);
+            return false;
+        }
+    }
+
+    private Task<T> InvokeOnUiThreadAsync<T>(Func<T> action, CancellationToken cancellationToken) =>
+        InvokeOnUiThreadAsync(() => Task.FromResult(action()), cancellationToken);
+
+    private async Task<T> InvokeOnUiThreadAsync<T>(
+        Func<Task<T>> action,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (uiDispatcher.IsDisposed)
         {
-            return;
+            throw new ObjectDisposedException(nameof(uiDispatcher));
         }
 
-        if (uiDispatcher.InvokeRequired)
+        if (!uiDispatcher.InvokeRequired)
         {
-            uiDispatcher.BeginInvoke(action);
+            return await action().ConfigureAwait(true);
         }
-        else
+
+        var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var cancellationRegistration = cancellationToken.Register(
+            static state =>
+            {
+                var (source, token) = ((TaskCompletionSource<T>, CancellationToken))state!;
+                source.TrySetCanceled(token);
+            },
+            (completion, cancellationToken));
+        try
         {
-            action();
+            uiDispatcher.BeginInvoke(new Action(async () =>
+            {
+                if (completion.Task.IsCompleted)
+                {
+                    return;
+                }
+
+                try
+                {
+                    completion.TrySetResult(await action().ConfigureAwait(true));
+                }
+                catch (Exception exception)
+                {
+                    completion.TrySetException(exception);
+                }
+            }));
         }
+        catch (Exception exception)
+        {
+            completion.TrySetException(exception);
+        }
+
+        return await completion.Task.ConfigureAwait(false);
     }
 
     private void OpenParentControlPage()
@@ -257,19 +421,31 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         if (checkInProgress)
         {
+            if (showNoUpdate)
+            {
+                ShowBalloon("Kids Training", "更新確認はすでに実行中です。");
+            }
+
             return;
         }
 
         if (trainingForm is { IsDisposed: false })
         {
             UpdateLogger.Info("Update check skipped because learning mode is active.");
+            if (showNoUpdate)
+            {
+                ShowBalloon("Kids Training", "学習中は更新を確認できません。");
+            }
+
             return;
         }
 
         checkInProgress = true;
         try
         {
-            var result = await updateService.CheckAndInstallLatestAsync(CancellationToken.None).ConfigureAwait(true);
+            var updateCheck = updateService.CheckAndInstallLatestAsync(lifetimeCancellation.Token);
+            activeUpdateCheck = updateCheck;
+            var result = await updateCheck.ConfigureAwait(true);
             UpdateLogger.Info($"Update check result: {result.Status} {result.Message}");
 
             switch (result.Status)
@@ -281,6 +457,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 case UpdateCheckStatus.NoUpdate when showNoUpdate:
                     ShowBalloon("Kids Training", "最新バージョンです。");
                     break;
+                case UpdateCheckStatus.Cancelled:
+                    UpdateLogger.Info("Update check reached the cancelled terminal state.");
+                    break;
                 case UpdateCheckStatus.Failed when showNoUpdate:
                     ShowBalloon("Kids Training", $"更新確認に失敗しました: {result.Message}", ToolTipIcon.Warning);
                     break;
@@ -288,11 +467,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
         finally
         {
+            activeUpdateCheck = null;
             checkInProgress = false;
         }
     }
 
-    private void ExitTray()
+    private async Task ExitTrayAsync()
     {
         if (trainingForm is { IsDisposed: false })
         {
@@ -300,15 +480,43 @@ internal sealed class TrayApplicationContext : ApplicationContext
             return;
         }
 
+        lifetimeCancellation.Cancel();
+        var updateCheck = activeUpdateCheck;
+        if (updateCheck is not null)
+        {
+            try
+            {
+                var result = await updateCheck.ConfigureAwait(true);
+                UpdateLogger.Info($"Update check completed during tray exit: {result.Status} {result.Message}");
+            }
+            catch (Exception exception)
+            {
+                UpdateLogger.Error("Update check did not reach a clean terminal state during tray exit", exception);
+            }
+        }
+
         ExitThread();
     }
 
     protected override void ExitThreadCore()
     {
+        if (Interlocked.Exchange(ref exitStarted, 1) != 0)
+        {
+            return;
+        }
+
         startupTimer.Stop();
         updateTimer.Stop();
         autoTrainingTimer.Stop();
-        parentControlServer?.Dispose();
+        lifetimeCancellation.Cancel();
+        try
+        {
+            parentControlServer?.Dispose();
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Parent control server did not stop cleanly", exception);
+        }
         notifyIcon.Visible = false;
         notifyIcon.Dispose();
         uiDispatcher.Dispose();
@@ -343,5 +551,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             return SystemIcons.Application;
         }
+    }
+
+    private enum TrainingSessionState
+    {
+        Inactive,
+        Starting,
+        Active,
+        Stopping
     }
 }
