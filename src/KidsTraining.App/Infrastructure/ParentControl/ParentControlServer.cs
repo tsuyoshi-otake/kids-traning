@@ -3,6 +3,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using KidsTraining.App.Application.ParentControl;
 using KidsTraining.App.Domain.ParentControl;
 
 namespace KidsTraining.App.Infrastructure.ParentControl;
@@ -19,6 +20,8 @@ internal sealed class ParentControlServer : IDisposable
     private readonly Action returnToComputer;
     private readonly Func<bool> isTrainingActive;
     private readonly Func<string?, string?, PasswordChangeResult> changeParentPassword;
+    private readonly Func<LearningSessionSettings> getLearningSettings;
+    private readonly Func<int?, int?, LearningSessionSettingsUpdateResult> changeLearningSettings;
     private readonly CancellationTokenSource stop = new();
     private readonly SemaphoreSlim connectionSlots = new(4, 4);
     private readonly TcpListener listener;
@@ -29,12 +32,16 @@ internal sealed class ParentControlServer : IDisposable
         Action startTraining,
         Action returnToComputer,
         Func<bool> isTrainingActive,
-        Func<string?, string?, PasswordChangeResult> changeParentPassword)
+        Func<string?, string?, PasswordChangeResult> changeParentPassword,
+        Func<LearningSessionSettings> getLearningSettings,
+        Func<int?, int?, LearningSessionSettingsUpdateResult> changeLearningSettings)
     {
         this.startTraining = startTraining;
         this.returnToComputer = returnToComputer;
         this.isTrainingActive = isTrainingActive;
         this.changeParentPassword = changeParentPassword;
+        this.getLearningSettings = getLearningSettings;
+        this.changeLearningSettings = changeLearningSettings;
 
         listener = StartListener(out var port);
         Port = port;
@@ -93,12 +100,13 @@ internal sealed class ParentControlServer : IDisposable
             octets[0] == 192 && octets[1] == 168;
     }
 
-    public static string BuildParentPage(IReadOnlyList<string> urls, bool trainingActive)
+    public static string BuildParentPage(IReadOnlyList<string> urls, bool trainingActive, LearningSessionSettings? learningSettings = null)
     {
         var urlItems = string.Join(
             "",
             urls.Select(static url => $"<li><code>{WebUtility.HtmlEncode(url)}</code></li>"));
         var initialStatus = trainingActive ? "起動中" : "停止中";
+        var settings = learningSettings ?? LearningSessionSettings.Default;
 
         return $$"""
 <!doctype html>
@@ -108,7 +116,25 @@ internal sealed class ParentControlServer : IDisposable
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Kids Training 保護者画面</title>
   <style>
-    :root { color-scheme: light; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    :root {
+      color-scheme: light;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --page: #f5f7fb;
+      --panel: #fff;
+      --ink: #20242c;
+      --muted: #4f5b70;
+      --border: #d9e2f5;
+      --primary: #4f6fb7;
+      --primary-dark: #3f5d9e;
+      --focus: #2458c6;
+      --danger: #b42318;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --radius: 8px;
+    }
     body { margin: 0; min-height: 100vh; background: #f5f7fb; color: #20242c; }
     main { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 32px 0; }
     header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 24px; }
@@ -118,11 +144,23 @@ internal sealed class ParentControlServer : IDisposable
     .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
     button { border: 0; border-radius: 8px; padding: 18px; font-size: 20px; font-weight: 900; cursor: pointer; color: #fff; min-height: 68px; }
     button:disabled { cursor: not-allowed; opacity: .55; }
-    .start { background: #f47b20; }
-    .return { background: #218f55; }
+    .start { background: #bd4e0a; }
+    .return { background: #287e4d; }
     .refresh { background: #4f6fb7; font-size: 16px; min-height: 48px; padding: 12px 16px; }
     .message { min-height: 26px; margin-top: 14px; font-weight: 700; color: #4f5b70; }
     .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
+    h2 { margin: 0 0 var(--space-2); font-size: 20px; line-height: 1.4; }
+    .settings-copy { margin: 0 0 var(--space-4); color: var(--muted); line-height: 1.65; text-wrap: pretty; }
+    .learning-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+    .field-help { color: #667085; font-size: 13px; font-weight: 600; line-height: 1.5; }
+    .field-error { min-height: 22px; margin-top: var(--space-2); color: var(--danger); font-weight: 800; }
+    .message:empty, .field-error:empty { display: none; }
+    .save-settings { background: var(--primary); font-size: 17px; min-height: 48px; padding: 12px 16px; margin-top: var(--space-4); }
+    input:focus-visible, button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+    input[aria-invalid="true"] { border-color: var(--danger); }
+    button { transition: background-color .2s ease, transform .2s ease, box-shadow .2s ease; }
+    button:not(:disabled):hover { filter: brightness(.94); box-shadow: 0 4px 12px rgba(32, 36, 44, .16); transform: translateY(-1px); }
+    button:not(:disabled):active { transform: translateY(1px) scale(.99); box-shadow: none; }
     label { display: grid; gap: 6px; font-size: 14px; font-weight: 800; color: #4f5b70; }
     input { height: 44px; border: 2px solid #d9e2f5; border-radius: 8px; padding: 0 12px; font: inherit; font-size: 20px; letter-spacing: 0; }
     .save { background: #5d59b3; font-size: 17px; min-height: 48px; padding: 12px 16px; margin-top: 14px; }
@@ -135,8 +173,12 @@ internal sealed class ParentControlServer : IDisposable
       .status { margin-top: 14px; display: inline-block; }
       .actions { grid-template-columns: 1fr; }
       .fields { grid-template-columns: 1fr; }
+      .learning-fields { grid-template-columns: 1fr; }
       h1 { font-size: 24px; }
       button { font-size: 18px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
     }
   </style>
 </head>
@@ -158,6 +200,23 @@ internal sealed class ParentControlServer : IDisposable
     <section class="panel">
       <button class="refresh" id="refresh" type="button">状態を更新</button>
       <ul>{{urlItems}}</ul>
+    </section>
+    <section class="panel" aria-labelledby="learningSettingsHeading">
+      <h2 id="learningSettingsHeading">1回の学習設定</h2>
+      <p class="settings-copy">次に始める学習から使う出題数と合格点を設定します。</p>
+      <div class="learning-fields">
+        <label for="questionCount">1回の出題数
+          <input id="questionCount" type="number" inputmode="numeric" min="20" max="40" step="1" required aria-describedby="questionCountHelp settingsError" value="{{settings.QuestionCount}}">
+          <small class="field-help" id="questionCountHelp">20〜40問</small>
+        </label>
+        <label for="passLine">合格点
+          <input id="passLine" type="number" inputmode="numeric" min="1" max="{{settings.QuestionCount}}" step="1" required aria-describedby="passLineHelp settingsError" value="{{settings.PassLine}}">
+          <small class="field-help" id="passLineHelp">1点以上、出題数以下</small>
+        </label>
+      </div>
+      <button class="save-settings" id="saveLearningSettings" type="button">学習設定を保存</button>
+      <div class="field-error" id="settingsError" role="alert"></div>
+      <div class="message" id="settingsMessage" aria-live="polite"></div>
     </section>
     <section class="panel">
       <div class="fields">
@@ -184,6 +243,11 @@ internal sealed class ParentControlServer : IDisposable
     const currentPassword = document.getElementById('currentPassword');
     const newPassword = document.getElementById('newPassword');
     const confirmPassword = document.getElementById('confirmPassword');
+    const questionCount = document.getElementById('questionCount');
+    const passLine = document.getElementById('passLine');
+    const settingsError = document.getElementById('settingsError');
+    const settingsMessage = document.getElementById('settingsMessage');
+    const saveLearningSettingsButton = document.getElementById('saveLearningSettings');
 
     async function request(path, options) {
       const response = await fetch(path, options);
@@ -198,6 +262,9 @@ internal sealed class ParentControlServer : IDisposable
       const data = await request('/api/status', { cache: 'no-store' });
       state.textContent = data.trainingActive ? '起動中' : '停止中';
       returnButton.disabled = !data.trainingActive;
+      questionCount.value = data.questionCount;
+      passLine.value = data.passLine;
+      passLine.max = data.questionCount;
     }
 
     async function action(path, text) {
@@ -212,6 +279,57 @@ internal sealed class ParentControlServer : IDisposable
       } finally {
         await refresh().catch(() => {});
         startButton.disabled = false;
+      }
+    }
+
+    function showSettingsError(text, fieldId = '') {
+      settingsError.textContent = text;
+      const invalid = Boolean(text);
+      questionCount.setAttribute('aria-invalid', String(invalid && fieldId === 'questionCount'));
+      passLine.setAttribute('aria-invalid', String(invalid && fieldId === 'passLine'));
+      if (invalid && fieldId) {
+        document.getElementById(fieldId)?.focus();
+      }
+    }
+
+    function cleanLearningSettings() {
+      const count = Number(questionCount.value);
+      const pass = Number(passLine.value);
+      passLine.max = Number.isInteger(count) ? String(count) : '40';
+      if (!Number.isInteger(count) || count < 20 || count > 40) {
+        return { error: '1回の出題数は20〜40問にしてください。', fieldId: 'questionCount' };
+      }
+      if (!Number.isInteger(pass) || pass < 1 || pass > count) {
+        return { error: '合格点は1点以上、出題数以下にしてください。', fieldId: 'passLine' };
+      }
+      return { questionCount: count, passLine: pass };
+    }
+
+    async function saveLearningSettings() {
+      const values = cleanLearningSettings();
+      settingsMessage.textContent = '';
+      showSettingsError(values.error || '', values.fieldId || '');
+      if (values.error) {
+        return;
+      }
+
+      saveLearningSettingsButton.disabled = true;
+      saveLearningSettingsButton.textContent = '保存中...';
+      try {
+        const data = await request('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(values)
+        });
+        questionCount.value = data.questionCount;
+        passLine.value = data.passLine;
+        passLine.max = data.questionCount;
+        settingsMessage.textContent = data.message;
+      } catch (error) {
+        showSettingsError(error.message || '学習設定を保存できませんでした。');
+      } finally {
+        saveLearningSettingsButton.disabled = false;
+        saveLearningSettingsButton.textContent = '学習設定を保存';
       }
     }
 
@@ -256,6 +374,9 @@ internal sealed class ParentControlServer : IDisposable
     returnButton.addEventListener('click', () => action('/api/return', 'パソコンの画面に戻しました'));
     document.getElementById('refresh').addEventListener('click', () => refresh().catch(error => { message.textContent = error.message; }));
     document.getElementById('savePassword').addEventListener('click', changePassword);
+    saveLearningSettingsButton.addEventListener('click', saveLearningSettings);
+    questionCount.addEventListener('input', () => { showSettingsError(''); cleanLearningSettings(); });
+    passLine.addEventListener('input', () => showSettingsError(''));
     refresh().catch(error => { message.textContent = error.message; });
   </script>
 </body>
@@ -393,13 +514,18 @@ internal sealed class ParentControlServer : IDisposable
         switch (request)
         {
             case { Method: "GET", Path: "/" or "/index.html" }:
-                await WriteHtmlAsync(stream, BuildParentPage(NetworkUrls, isTrainingActive()), cancellationToken).ConfigureAwait(false);
+                await WriteHtmlAsync(stream, BuildParentPage(NetworkUrls, isTrainingActive(), getLearningSettings()), cancellationToken).ConfigureAwait(false);
                 break;
             case { Method: "GET", Path: "/favicon.ico" }:
                 await WriteResponseAsync(stream, HttpStatusCode.NoContent, "image/x-icon", "", cancellationToken).ConfigureAwait(false);
                 break;
             case { Method: "GET", Path: "/api/status" }:
-                await WriteJsonAsync(stream, HttpStatusCode.OK, new ApiResult(true, "OK", isTrainingActive()), cancellationToken).ConfigureAwait(false);
+                var statusSettings = getLearningSettings();
+                await WriteJsonAsync(
+                    stream,
+                    HttpStatusCode.OK,
+                    new ApiResult(true, "OK", isTrainingActive(), statusSettings.QuestionCount, statusSettings.PassLine),
+                    cancellationToken).ConfigureAwait(false);
                 break;
             case { Method: "POST", Path: "/api/start" }:
                 startTraining();
@@ -408,6 +534,35 @@ internal sealed class ParentControlServer : IDisposable
             case { Method: "POST", Path: "/api/return" }:
                 returnToComputer();
                 await WriteJsonAsync(stream, HttpStatusCode.OK, new ApiResult(true, "パソコンの画面に戻しました。", false), cancellationToken).ConfigureAwait(false);
+                break;
+            case { Method: "POST", Path: "/api/settings" }:
+                LearningSettingsRequest? settingsPayload;
+                try
+                {
+                    settingsPayload = JsonSerializer.Deserialize<LearningSettingsRequest>(request.Body, JsonOptions);
+                }
+                catch (JsonException)
+                {
+                    var current = getLearningSettings();
+                    await WriteJsonAsync(
+                        stream,
+                        HttpStatusCode.BadRequest,
+                        new ApiResult(false, "入力を読み取れませんでした。", isTrainingActive(), current.QuestionCount, current.PassLine),
+                        cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
+                var settingsResult = changeLearningSettings(settingsPayload?.QuestionCount, settingsPayload?.PassLine);
+                await WriteJsonAsync(
+                    stream,
+                    settingsResult.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest,
+                    new ApiResult(
+                        settingsResult.Success,
+                        settingsResult.Message,
+                        isTrainingActive(),
+                        settingsResult.Settings.QuestionCount,
+                        settingsResult.Settings.PassLine),
+                    cancellationToken).ConfigureAwait(false);
                 break;
             case { Method: "POST", Path: "/api/password" }:
                 PasswordChangeRequest? payload;
@@ -524,5 +679,12 @@ internal sealed class ParentControlServer : IDisposable
 
     private sealed record PasswordChangeRequest(string? CurrentPassword, string? NewPassword);
 
-    private sealed record ApiResult(bool Ok, string Message, bool TrainingActive);
+    private sealed record LearningSettingsRequest(int? QuestionCount, int? PassLine);
+
+    private sealed record ApiResult(
+        bool Ok,
+        string Message,
+        bool TrainingActive,
+        int? QuestionCount = null,
+        int? PassLine = null);
 }

@@ -6,11 +6,11 @@ internal static partial class LearningMarkupPatcher
     {
         return """
 genAdd(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'add'),make=(a,b,extra)=>{const ans=a+b;return{topic:'add',mode:'num',n1:a,n2:b,prompt:extra?extra.prompt:a+' + '+b,answer:''+(extra?extra.answer:ans),explanation:extra?extra.explanation:a+' + '+b+' = '+ans};};const buckets=[
-    [()=>{let a=this.rand(1,9),b=this.rand(1,9);if(a+b>10)b=Math.max(1,10-a);return make(a,b);}],
+    [()=>{let a=this.rand(1,9),b=this.rand(1,9);if(a+b>10)b=Math.max(1,10-a);return make(a,b);},()=>make(3,7,{prompt:'3 + 7',answer:10,explanation:'3 + 7 = 10。'}),()=>make(7,3,{prompt:'7 + 3',answer:10,explanation:'7 + 3 = 10。'})],
     [()=>{let a=this.rand(2,9),b=this.rand(1,9);if(a+b>18)b=Math.max(1,18-a);return make(a,b);}],
-    [()=>{const a=this.rand(10,89),max=Math.max(1,9-a%10),b=this.rand(1,max);return make(a,b);},()=>{const a=this.rand(1,8)*10,b=this.rand(1,9-a/10)*10,ans=a+b;return make(a,b,{prompt:a+' + '+b,answer:ans,explanation:'10のまとまりで かんがえる。'+a+' + '+b+' = '+ans+'。'});}],
+    [()=>{const a=this.rand(10,89),max=Math.max(1,9-a%10),b=this.rand(1,max);return make(a,b);},()=>{const a=this.rand(1,8)*10,b=this.rand(1,9-a/10)*10,ans=a+b;return make(a,b,{prompt:a+' + '+b,answer:ans,explanation:'10のまとまりで かんがえる。'+a+' + '+b+' = '+ans+'。'});},()=>make(10,2,{prompt:'10 + 2',answer:12,explanation:'10 + 2 = 12。'}),()=>make(10,5,{prompt:'10 + 5',answer:15,explanation:'10 + 5 = 15。'})],
     [()=>{const a=this.rand(18,89),b=this.rand(2,9);return make(a,b);},()=>{const x=this.rand(1,9),y=this.rand(1,9),z=this.rand(1,9),s=x+y+z;return make(x+y,z,{prompt:x+' + '+y+' + '+z,answer:s,explanation:'まえから じゅんに。'+x+'+'+y+'='+(x+y)+'、'+(x+y)+'+'+z+'='+s+'。'});} ],
-    [()=>{if(g<=1){const x=this.rand(3,9),y=this.rand(3,9),z=this.rand(2,9),s=x+y+z;return make(x+y,z,{prompt:x+' + '+y+' + '+z,answer:s,explanation:'まえから じゅんに。'+x+'+'+y+'='+(x+y)+'、'+(x+y)+'+'+z+'='+s+'。'});}const a=this.rand(28,79),b=this.rand(12,Math.min(99-a,49));return make(a,b);},()=>{if(g<=1){const a=this.rand(0,20);return make(a,0,{prompt:a+' + 0',answer:a,explanation:'0を たしても 数は '+a+'の まま。'});}const a=this.rand(25,70),b=this.rand(12,Math.min(99-a,29));return make(a,b);}]
+    g<=1?[()=>{const x=this.rand(3,9),y=this.rand(3,9),z=this.rand(2,9),s=x+y+z;return make(x+y,z,{prompt:x+' + '+y+' + '+z,answer:s,explanation:'まえから じゅんに。'+x+'+'+y+'='+(x+y)+'、'+(x+y)+'+'+z+'='+s+'。'});},()=>{const a=this.rand(0,20);return make(a,0,{prompt:a+' + 0',answer:a,explanation:'0を たしても 数は '+a+'の まま。'});}]:[()=>{const a=this.rand(28,79),b=this.rand(12,Math.min(99-a,49));return make(a,b);},()=>{const a=this.rand(25,70),b=this.rand(12,Math.min(99-a,29));return make(a,b);},()=>make(58,29,{prompt:'58 + 29',answer:87,explanation:'58 + 29 = 87。'}),()=>make(68,22,{prompt:'68 + 22',answer:90,explanation:'68 + 22 = 90。'}),()=>make(35,25,{prompt:'35 + 25',answer:60,explanation:'35 + 25 = 60。'}),()=>make(19,43,{prompt:'19 + 43',answer:62,explanation:'19 + 43 = 62。'})]
   ];return this.pickStage(stage,buckets,0);}
 """;
     }
@@ -18,12 +18,12 @@ genAdd(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'add'),make=(a,
     private static string BuildGenSubScript()
     {
         return """
-genSub(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'sub'),make=(a,b,extra)=>{const ans=a-b;return{topic:'sub',mode:'num',a:a,b:b,prompt:extra?extra.prompt:a+' - '+b,answer:''+(extra?extra.answer:ans),explanation:extra?extra.explanation:a+' - '+b+' = '+ans};};const buckets=[
+genSub(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'sub'),make=(a,b,extra)=>{const ans=a-b;return{topic:'sub',mode:'num',a:a,b:b,prompt:extra?extra.prompt:a+' - '+b,answer:''+(extra?extra.answer:ans),explanation:extra?extra.explanation:a+' - '+b+' = '+ans};},mixed=()=>({topic:'sub',mode:'num',prompt:'16 - 6 + 7',answer:'17',explanation:'まえから じゅんに。16−6=10、10+7=17。'});const buckets=[
     [()=>{const a=this.rand(2,10),b=this.rand(1,a-1);return make(a,b);}],
     [()=>{const a=this.rand(11,18),b=this.rand(1,Math.max(1,a%10));return make(a,b);}],
     [()=>{let a=this.rand(21,89);if(a%10===0)a++;const b=this.rand(1,a%10);return make(a,b);},()=>{const a=this.rand(2,9)*10,b=this.rand(1,a/10-1)*10;return make(a,b);}],
-    [()=>{const a=this.rand(30,99),b=this.rand(a%10+1,Math.min(19,a-1));return make(a,b);},()=>{const x=this.rand(12,28),y=this.rand(1,8),z=this.rand(1,Math.max(1,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});} ],
-    [()=>{if(g<=1){const x=this.rand(15,30),y=this.rand(2,8),z=this.rand(2,Math.max(2,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});}const a=this.rand(51,99),b=this.rand(12,a-10);return make(a,b);},()=>{if(g<=1){const a=this.rand(0,20);return make(a,0,{prompt:a+' - 0',answer:a,explanation:'0を ひいても 数は '+a+'の まま。'});}const a=this.rand(51,99),b=this.rand(12,a-10);return make(a,b);}]
+    [()=>{const a=this.rand(30,99),b=this.rand(a%10+1,Math.min(19,a-1));return make(a,b);},()=>{const x=this.rand(12,28),y=this.rand(1,8),z=this.rand(1,Math.max(1,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});},()=>({topic:'sub',mode:'num',prompt:'9 - 3 - 2',answer:'4',explanation:'まえから じゅんに。9−3=6、6−2=4。'})],
+    [()=>{if(g<=1){const x=this.rand(15,30),y=this.rand(2,8),z=this.rand(2,Math.max(2,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});}const a=this.rand(51,99),b=this.rand(12,a-10);return make(a,b);},()=>{if(g<=1){const a=this.rand(0,20);return make(a,0,{prompt:a+' - 0',answer:a,explanation:'0を ひいても 数は '+a+'の まま。'});}const a=this.rand(51,99),b=this.rand(12,a-10);return make(a,b);},mixed]
   ];return this.pickStage(stage,buckets,0);}
 """;
     }

@@ -189,6 +189,8 @@ internal static partial class LearningMarkupPatcher
         markup = PatchArithmeticVisuals(markup);
         markup = PatchEnglishSpeech(markup);
         markup = PatchLearningAccessibility(markup);
+        markup = PatchQuestionFurigana(markup);
+        markup = PatchLayoutAndTypography(markup);
 
         return markup;
     }

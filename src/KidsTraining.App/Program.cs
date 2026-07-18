@@ -45,7 +45,8 @@ internal static class Program
             System.Windows.Forms.Application.Run(new TrainingForm(
                 services.LearningPagePreparer,
                 services.ParentPinProvider,
-                services.ProfileNameProvider));
+                services.ProfileNameProvider,
+                services.ParentLearningSettingsService));
         }
         else
         {
@@ -55,6 +56,7 @@ internal static class Program
                 services.ParentPinProvider,
                 services.ProfileNameProvider,
                 services.ParentPasswordService,
+                services.ParentLearningSettingsService,
                 services.UpdateService));
         }
 
@@ -245,11 +247,21 @@ internal static class Program
                 return 16;
             }
 
-            var parentPage = ParentControlServer.BuildParentPage(["http://127.0.0.1:44567/"], trainingActive: false);
+            var parentPage = ParentControlServer.BuildParentPage(
+                ["http://127.0.0.1:44567/"],
+                trainingActive: false,
+                new LearningSessionSettings(28, 21));
             if (!parentPage.Contains("Kids Training 保護者画面", StringComparison.Ordinal) ||
                 !parentPage.Contains("/api/start", StringComparison.Ordinal) ||
                 !parentPage.Contains("/api/return", StringComparison.Ordinal) ||
                 !parentPage.Contains("/api/password", StringComparison.Ordinal) ||
+                !parentPage.Contains("/api/settings", StringComparison.Ordinal) ||
+                !parentPage.Contains("id=\"questionCount\"", StringComparison.Ordinal) ||
+                !parentPage.Contains("value=\"28\"", StringComparison.Ordinal) ||
+                !parentPage.Contains("id=\"passLine\"", StringComparison.Ordinal) ||
+                !parentPage.Contains("value=\"21\"", StringComparison.Ordinal) ||
+                !parentPage.Contains("saveLearningSettings", StringComparison.Ordinal) ||
+                !parentPage.Contains("@media (prefers-reduced-motion: reduce)", StringComparison.Ordinal) ||
                 !parentPage.Contains("勉強を開始", StringComparison.Ordinal) ||
                 !parentPage.Contains("パソコンの画面に戻す", StringComparison.Ordinal) ||
                 !parentPage.Contains("パスワードを変更", StringComparison.Ordinal))
@@ -287,7 +299,9 @@ internal static class Program
 
     private static ApplicationServices CreateApplicationServices()
     {
-        var parentPasswordService = new ParentPasswordService(new JsonParentPinStore());
+        var parentSettingsStore = new JsonParentSettingsStore();
+        var parentPasswordService = new ParentPasswordService(parentSettingsStore);
+        var parentLearningSettingsService = new ParentLearningSettingsService(parentSettingsStore);
         IParentPinProvider parentPinProvider = parentPasswordService;
         var profileNameProvider = new WindowsUserProfileNameProvider();
         var learningPagePreparer = new FileLearningPagePreparer(
@@ -305,6 +319,7 @@ internal static class Program
             parentPinProvider,
             profileNameProvider,
             parentPasswordService,
+            parentLearningSettingsService,
             updateService);
     }
 
@@ -313,5 +328,6 @@ internal static class Program
         IParentPinProvider ParentPinProvider,
         IUserProfileNameProvider ProfileNameProvider,
         ParentPasswordService ParentPasswordService,
+        ParentLearningSettingsService ParentLearningSettingsService,
         UpdateService UpdateService);
 }

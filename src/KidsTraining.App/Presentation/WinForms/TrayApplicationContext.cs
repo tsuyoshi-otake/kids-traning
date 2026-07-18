@@ -22,6 +22,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly IParentPinProvider parentPinProvider;
     private readonly IUserProfileNameProvider profileNameProvider;
     private readonly ParentPasswordService parentPasswordService;
+    private readonly ParentLearningSettingsService parentLearningSettingsService;
 
     private readonly ParentControlServer? parentControlServer;
     private TrainingForm? trainingForm;
@@ -35,12 +36,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
         IParentPinProvider parentPinProvider,
         IUserProfileNameProvider profileNameProvider,
         ParentPasswordService parentPasswordService,
+        ParentLearningSettingsService parentLearningSettingsService,
         UpdateService updateService)
     {
         this.learningPagePreparer = learningPagePreparer;
         this.parentPinProvider = parentPinProvider;
         this.profileNameProvider = profileNameProvider;
         this.parentPasswordService = parentPasswordService;
+        this.parentLearningSettingsService = parentLearningSettingsService;
         this.updateService = updateService;
         AppPaths.EnsureRuntimeDirectories();
         uiDispatcher.CreateControl();
@@ -112,7 +115,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         trainingForm = new TrainingForm(
             learningPagePreparer,
             parentPinProvider,
-            profileNameProvider);
+            profileNameProvider,
+            parentLearningSettingsService);
         trainingActive = true;
         trainingForm.FormClosed += (_, _) =>
         {
@@ -142,7 +146,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 StartTrainingFromParentControl,
                 ReturnToComputerFromParentControl,
                 () => trainingActive,
-                ChangeParentPasswordFromParentControl);
+                ChangeParentPasswordFromParentControl,
+                parentLearningSettingsService.GetCurrentSettings,
+                ChangeLearningSettingsFromParentControl);
             server.Start();
             UpdateLogger.Info($"Parent control server started: {string.Join(", ", server.NetworkUrls)}");
             return server;
@@ -173,6 +179,17 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             var savedPassword = parentPasswordService.GetCurrentPin().Value;
             InvokeOnUiThread(() => trainingForm?.SetParentPassword(savedPassword));
+        }
+
+        return result;
+    }
+
+    private LearningSessionSettingsUpdateResult ChangeLearningSettingsFromParentControl(int? questionCount, int? passLine)
+    {
+        var result = parentLearningSettingsService.Update(questionCount, passLine);
+        if (result.Success)
+        {
+            InvokeOnUiThread(() => trainingForm?.SetLearningSessionSettings(result.Settings));
         }
 
         return result;

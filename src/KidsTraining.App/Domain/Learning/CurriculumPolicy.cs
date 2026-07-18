@@ -2,6 +2,32 @@ namespace KidsTraining.App.Domain.Learning;
 
 internal static class CurriculumPolicy
 {
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> TopicPrerequisites =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            ["kazu"] = [],
+            ["shape"] = [],
+            ["add"] = ["kazu"],
+            ["sub"] = ["add"],
+            ["clock"] = ["kazu"],
+            ["measure"] = ["kazu"],
+            ["chart"] = ["kazu"],
+            ["hissan"] = ["add", "sub"],
+            ["story"] = ["add", "sub"],
+            ["money"] = ["kazu"],
+            ["groups"] = ["add"],
+            ["order"] = ["add", "sub"],
+            ["mul"] = ["groups"],
+            ["div"] = ["mul"],
+            ["frac"] = ["groups", "shape"],
+            ["moji"] = [],
+            ["bun"] = ["moji"],
+            ["kokugo"] = ["moji"],
+            ["goi"] = ["moji"],
+            ["dokkai"] = ["bun", "kokugo", "goi"],
+            ["eigo"] = []
+        };
+
     private static readonly string[][] GradeOneLanes =
     [
         ["kazu", "shape", "add", "sub", "clock", "measure", "story", "money", "groups", "chart"],
@@ -32,6 +58,11 @@ internal static class CurriculumPolicy
 
     public static IReadOnlyList<string> TopicsForGrade(int grade) =>
         TopicLanesForGrade(grade).SelectMany(static lane => lane).Distinct(StringComparer.Ordinal).ToArray();
+
+    public static IReadOnlyDictionary<string, IReadOnlyList<string>> PrerequisitesByTopic => TopicPrerequisites;
+
+    public static IReadOnlyList<string> PrerequisitesFor(string topic) =>
+        TopicPrerequisites.TryGetValue(topic, out var prerequisites) ? prerequisites : [];
 
     public static bool IsAvailable(int grade, string topic) =>
         TopicsForGrade(grade).Contains(topic, StringComparer.Ordinal);

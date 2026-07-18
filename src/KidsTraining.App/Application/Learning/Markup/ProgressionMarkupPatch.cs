@@ -10,6 +10,7 @@ internal static partial class LearningMarkupPatcher
         var gradeOneLanes = ToJavaScriptNestedArray(CurriculumPolicy.TopicLanesForGrade(1));
         var gradeTwoLanes = ToJavaScriptNestedArray(CurriculumPolicy.TopicLanesForGrade(2));
         var gradeThreeLanes = ToJavaScriptNestedArray(CurriculumPolicy.TopicLanesForGrade(3));
+        var prerequisiteMap = ToJavaScriptDependencyMap(CurriculumPolicy.PrerequisitesByTopic);
         var reviewIntervals = string.Join(',', Enumerable.Range(0, ReviewSchedule.MaximumStep + 1)
             .Select(step => ((long)ReviewSchedule.IntervalAt(step).TotalMilliseconds).ToString(CultureInfo.InvariantCulture)));
         var requiredAccuracy = SkillEvidence.RequiredIndependentAccuracy.ToString(CultureInfo.InvariantCulture);
@@ -35,13 +36,17 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
   hissanComplete(p){return this.topicReady(p,'hissan');}
   curriculumLanes(p){const g=this.effectiveGrade(p),g1={{{gradeOneLanes}}},g2={{{gradeTwoLanes}}},g3={{{gradeThreeLanes}}},raw=g===1?g1:(g===2?g2:g3),cfg=this.state.settings,configured=cfg&&cfg.topics;return raw.map(lane=>configured?lane.filter(k=>configured[k]!==false):lane.slice()).filter(lane=>lane.length);}
   gradeTopics(p){const out=[];for(const lane of this.curriculumLanes(p))for(const k of lane)if(!out.includes(k))out.push(k);return out;}
+  curriculumPrerequisites(){return {{{prerequisiteMap}}};}
+  directPrerequisites(p,k){const graph=this.curriculumPrerequisites(),available=new Set(this.gradeTopics(p));return (graph[k]||[]).filter(req=>available.has(req));}
+  topicNeedsSupport(p,k){const s=this.topicStat(p,k);return s.attempts>0&&(Number(s.confidence)<.5||this.topicDue(p,k));}
+  remediationTopics(p,k){if(!this.topicNeedsSupport(p,k))return[];const out=[],emitted=new Set(),visiting=new Set(),walk=(topic,isRoot)=>{if(visiting.has(topic))return false;visiting.add(topic);const pending=this.directPrerequisites(p,topic).filter(req=>!this.topicReady(p,req));let found=false;for(const req of pending)found=walk(req,false)||found;visiting.delete(topic);if(!isRoot&&!found){if(!emitted.has(topic)){emitted.add(topic);out.push(topic);}return true;}return found;};walk(k,true);return out;}
   introducedTopics(p){const out=[];for(const lane of this.curriculumLanes(p)){let frontier=lane.findIndex(k=>!this.topicComplete(p,k));if(frontier<0)frontier=lane.length-1;for(let i=0;i<=frontier;i++)if(!out.includes(lane[i]))out.push(lane[i]);}for(const k of this.gradeTopics(p)){const s=this.topicStat(p,k);if((s.attempts>0||s.masteredAt)&&!out.includes(k))out.push(k);}return out;}
-  allowedTopics(p){const introduced=this.introducedTopics(p);return introduced.length?introduced:this.gradeTopics(p);}
-  frontierTopics(p){const out=[];for(const lane of this.curriculumLanes(p)){const next=lane.find(k=>!this.topicComplete(p,k));if(next&&!out.includes(next))out.push(next);}return out.length?out:this.allowedTopics(p);}
+  allowedTopics(p){const introduced=this.introducedTopics(p),base=introduced.length?introduced:this.gradeTopics(p),out=base.slice();for(const k of base)for(const req of this.remediationTopics(p,k))if(!out.includes(req))out.push(req);return out;}
+  frontierTopics(p){const out=[];for(const lane of this.curriculumLanes(p)){const next=lane.find(k=>!this.topicComplete(p,k));if(next&&!out.includes(next))out.push(next);}const allowed=this.allowedTopics(p),candidates=out.slice();for(const k of allowed)if(this.topicNeedsSupport(p,k)&&!candidates.includes(k))candidates.push(k);const remedial=[];for(const k of candidates)for(const req of this.remediationTopics(p,k))if(!remedial.includes(req))remedial.push(req);return remedial.length?remedial:(out.length?out:allowed);}
   laneProgress(p,k){const lane=this.curriculumLanes(p).find(x=>x.includes(k))||[k],done=lane.filter(x=>this.topicComplete(p,x)).length;return done/Math.max(1,lane.length);}
   nextCurriculumTopic(p){const front=this.frontierTopics(p);return front.slice().sort((a,b)=>this.laneProgress(p,a)-this.laneProgress(p,b))[0]||this.weakestTopic(p,this.allowedTopics(p));}
   dueTopics(p,now=Date.now()){return this.allowedTopics(p).filter(k=>this.topicDue(p,k,now));}
-  weightedPick(p,pool){const ks=pool&&pool.length?pool:this.allowedTopics(p),w=ks.map(k=>.25+(1-this.topicStat(p,k).confidence)*1.75+(this.topicDue(p,k)?1:0));let sum=w.reduce((a,b)=>a+b,0),r=Math.random()*sum;for(let i=0;i<ks.length;i++){r-=w[i];if(r<=0)return ks[i];}return ks[0];}
+  weightedPick(p,pool){const source=pool&&pool.length?pool:this.allowedTopics(p),preferred=[];for(const k of source){const remedial=this.remediationTopics(p,k),candidates=remedial.length?remedial:[k];for(const candidate of candidates)if(!preferred.includes(candidate))preferred.push(candidate);}const ks=preferred.length?preferred:source;if(!ks.length)throw new Error('No enabled curriculum topics');const w=ks.map(k=>.25+(1-this.topicStat(p,k).confidence)*1.75+(this.topicDue(p,k)?1:0));let sum=w.reduce((a,b)=>a+b,0),r=Math.random()*sum;for(let i=0;i<ks.length;i++){r-=w[i];if(r<=0)return ks[i];}return ks[0];}
   weakestTopic(p,pool){const ks=pool&&pool.length?pool:this.allowedTopics(p);return ks.slice().sort((a,b)=>this.topicStat(p,a).confidence-this.topicStat(p,b).confidence||this.topicStat(p,a).independent-this.topicStat(p,b).independent)[0];}
 """;
     }
@@ -51,4 +56,8 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
 
     private static string ToJavaScriptNestedArray(IEnumerable<IReadOnlyList<string>> values) =>
         "[" + string.Join(',', values.Select(ToJavaScriptArray)) + "]";
+
+    private static string ToJavaScriptDependencyMap(
+        IEnumerable<KeyValuePair<string, IReadOnlyList<string>>> values) =>
+        "{" + string.Join(',', values.Select(pair => "'" + pair.Key + "':" + ToJavaScriptArray(pair.Value))) + "}";
 }

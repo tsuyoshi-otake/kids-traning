@@ -31,11 +31,12 @@ internal static class Program
         Run("Learning markup reports a missing required anchor", () => TestMissingRequiredAnchor(repositoryRoot));
         Run("Preparation result has explicit terminal states", TestPreparationTerminals);
         Run("Parent password changes reach explicit terminal states", TestPasswordServiceTerminals);
+        Run("Parent learning settings reach explicit terminal states", TestLearningSettingsServiceTerminals);
         Run("Update checks reach explicit terminal states", TestUpdateServiceTerminals);
 
         if (Failures.Count == 0)
         {
-            Console.WriteLine("Architecture tests passed: 12");
+            Console.WriteLine("Architecture tests passed: 13");
             return 0;
         }
 
@@ -98,6 +99,70 @@ internal static class Program
             Assert(flattened.Length == flattened.Distinct(StringComparer.Ordinal).Count(), $"grade {grade} repeats a topic across curriculum lanes");
             Assert(flattened.ToHashSet(StringComparer.Ordinal).SetEquals(CurriculumPolicy.TopicsForGrade(grade)), $"grade {grade} lanes and available topics diverged");
         }
+
+        var allTopics = Enumerable.Range(1, 3)
+            .SelectMany(static grade => CurriculumPolicy.TopicsForGrade(grade))
+            .ToHashSet(StringComparer.Ordinal);
+        var prerequisitesByTopic = CurriculumPolicy.PrerequisitesByTopic;
+        Assert(
+            prerequisitesByTopic.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(allTopics),
+            "the prerequisite graph does not define every curriculum topic exactly once");
+        foreach (var (topic, prerequisites) in prerequisitesByTopic)
+        {
+            Assert(allTopics.Contains(topic), $"unknown prerequisite graph topic: {topic}");
+            Assert(prerequisites.All(allTopics.Contains), $"{topic} references an unknown prerequisite");
+            Assert(
+                prerequisites.Count == prerequisites.Distinct(StringComparer.Ordinal).Count(),
+                $"{topic} repeats a prerequisite");
+            Assert(!prerequisites.Contains(topic, StringComparer.Ordinal), $"{topic} depends on itself");
+        }
+
+        foreach (var grade in new[] { 1, 2, 3 })
+        {
+            foreach (var topic in CurriculumPolicy.TopicsForGrade(grade))
+            {
+                Assert(
+                    CurriculumPolicy.PrerequisitesFor(topic).All(prerequisite => CurriculumPolicy.IsAvailable(grade, prerequisite)),
+                    $"grade {grade} topic {topic} depends on an unavailable prerequisite");
+            }
+        }
+
+        var visiting = new HashSet<string>(StringComparer.Ordinal);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        bool IsAcyclic(string topic)
+        {
+            if (visited.Contains(topic))
+            {
+                return true;
+            }
+
+            if (!visiting.Add(topic))
+            {
+                return false;
+            }
+
+            foreach (var prerequisite in CurriculumPolicy.PrerequisitesFor(topic))
+            {
+                if (!IsAcyclic(prerequisite))
+                {
+                    return false;
+                }
+            }
+
+            visiting.Remove(topic);
+            visited.Add(topic);
+            return true;
+        }
+
+        foreach (var topic in allTopics)
+        {
+            Assert(IsAcyclic(topic), $"the prerequisite graph contains a cycle through {topic}");
+        }
+
+        Assert(CurriculumPolicy.PrerequisitesFor("mul").SequenceEqual(["groups"]), "multiplication does not depend on equal groups");
+        Assert(CurriculumPolicy.PrerequisitesFor("div").SequenceEqual(["mul"]), "division does not depend on multiplication");
+        Assert(CurriculumPolicy.PrerequisitesFor("hissan").ToHashSet(StringComparer.Ordinal).SetEquals(["add", "sub"]), "written arithmetic prerequisites are incomplete");
+        Assert(CurriculumPolicy.PrerequisitesFor("dokkai").ToHashSet(StringComparer.Ordinal).SetEquals(["bun", "kokugo", "goi"]), "reading prerequisites are incomplete");
     }
 
     private static void TestLearningEvidence()
@@ -151,6 +216,11 @@ internal static class Program
         Assert(html.Contains("score=(!r||!r.attempts)?0.05", StringComparison.Ordinal), "untested skills are not initialized conservatively");
         Assert(html.Contains("q.sessionRole=role", StringComparison.Ordinal) && html.Contains("'review'", StringComparison.Ordinal) && html.Contains("'target'", StringComparison.Ordinal) && html.Contains("'mixed'", StringComparison.Ordinal) && html.Contains("'exit'", StringComparison.Ordinal), "session roles are incomplete");
         Assert(html.Contains("nextCurriculumTopic(p)", StringComparison.Ordinal) && html.Contains("frontierTopics(p)", StringComparison.Ordinal), "curriculum frontier selection is missing");
+        Assert(html.Contains("curriculumPrerequisites(){return", StringComparison.Ordinal) && html.Contains("'mul':['groups']", StringComparison.Ordinal) && html.Contains("'dokkai':['bun','kokugo','goi']", StringComparison.Ordinal), "the curriculum prerequisite graph is missing from generated markup");
+        Assert(html.Contains("s.attempts>0&&(Number(s.confidence)<.5||this.topicDue(p,k))", StringComparison.Ordinal), "unattempted upper topics are incorrectly treated as remediation triggers");
+        Assert(html.Contains("visiting.has(topic)", StringComparison.Ordinal) && html.Contains("emitted.has(topic)", StringComparison.Ordinal) && html.Contains("filter(req=>!this.topicReady(p,req))", StringComparison.Ordinal), "prerequisite remediation is not cycle-safe, deduplicated, and readiness-aware");
+        Assert(html.Contains("for(const k of base)for(const req of this.remediationTopics(p,k))", StringComparison.Ordinal) && html.Contains("return remedial.length?remedial:(out.length?out:allowed)", StringComparison.Ordinal), "allowed topics or curriculum frontier do not prioritize remediation");
+        Assert(html.Contains("candidates=remedial.length?remedial:[k]", StringComparison.Ordinal) && html.Contains("if(!ks.length)throw new Error('No enabled curriculum topics')", StringComparison.Ordinal), "weighted selection does not fall back explicitly after prerequisite remediation");
         Assert(html.Contains("configured[k]!==false", StringComparison.Ordinal), "new curriculum topics are disabled for migrated settings");
         Assert(html.Contains("reviewCount=due.length?", StringComparison.Ordinal) && html.Contains("this.weightedPick(p,due),'review'", StringComparison.Ordinal), "fresh sessions can start with unscheduled random review questions");
         Assert(!html.Contains("this.shuffle(planned);add(target,'exit')", StringComparison.Ordinal), "session roles are still shuffled out of curriculum order");
@@ -179,9 +249,117 @@ internal static class Program
             "TrainingForm.cs"));
         Assert(trainingFormSource.Contains("!hasMeaningfulProgress(profile) && !profile.progressResetAt", StringComparison.Ordinal), "a reset profile loses its selected grade on the next launch");
         Assert(trainingFormSource.Contains("'money', 'groups', 'order'", StringComparison.Ordinal), "profile bootstrap omits newly added resettable topics");
+        Assert(
+            trainingFormSource.Contains("IParentLearningSettingsProvider", StringComparison.Ordinal) &&
+            trainingFormSource.Contains("parentQuestionCount = __QUESTION_COUNT__", StringComparison.Ordinal) &&
+            trainingFormSource.Contains("SetLearningSessionSettings", StringComparison.Ordinal),
+            "parent learning settings are not synchronized into WebView storage");
         Assert(html.Contains("補助活動：音声を聞き、声に出して", StringComparison.Ordinal) && html.Contains("ノートに漢字を書いて", StringComparison.Ordinal), "supplementary output practice is not identified");
         Assert(html.Contains("aria-label=\"答えと説明を見る\"", StringComparison.Ordinal) && html.Contains("outcome==='revealed'", StringComparison.Ordinal), "revealed-answer control is inaccessible or unscored");
         Assert(html.Contains("role=\"button\" tabindex=\"0\"", StringComparison.Ordinal) && html.Contains("document.addEventListener('keydown'", StringComparison.Ordinal) && html.Contains("aria-live=\"polite\"", StringComparison.Ordinal), "keyboard or live-region accessibility is missing");
+
+        var requiredExpressions = new[]
+        {
+            "3 + 7",
+            "7 + 3",
+            "10 + 2",
+            "10 + 5",
+            "9 - 3 - 2",
+            "16 - 6 + 7",
+            "58 + 29",
+            "68 + 22",
+            "35 + 25",
+            "19 + 43"
+        };
+        foreach (var expression in requiredExpressions)
+        {
+            Assert(html.Contains($"prompt:'{expression}'", StringComparison.Ordinal), $"required arithmetic question is missing: {expression}");
+        }
+
+        Assert(
+            html.Contains("prompt:'大人が 7人、子供が 9人 います。あわせて 何人 いますか？'", StringComparison.Ordinal) &&
+            html.Contains("prompt:'切手が 6枚、封筒が 15枚 あります。どちらが 何枚 おおいですか？'", StringComparison.Ordinal) &&
+            html.Contains("answer:'封筒が 9枚 おおい'", StringComparison.Ordinal),
+            "requested people or stationery story question is missing");
+        Assert(
+            html.Contains("isPlainEq=modeNumeric&&q.topic!=='story';", StringComparison.Ordinal) &&
+            html.Contains("""<sc-if value="{{ isPlainEq }}" hint-placeholder-val="{{ true }}"> = ?</sc-if>""", StringComparison.Ordinal),
+            "numeric story questions do not conditionally suppress the equation suffix");
+        Assert(
+            html.Contains("it.t+'\\nもんだい： '+it.q", StringComparison.Ordinal) &&
+            !html.Contains("it.t+'　◆　'+it.q", StringComparison.Ordinal),
+            "reading-comprehension text and its explicit question label are not separated");
+        Assert(
+            html.Contains("React.createElement('ruby'", StringComparison.Ordinal) &&
+            html.Contains("React.createElement('rt'", StringComparison.Ordinal),
+            "question furigana does not render semantic ruby markup");
+        Assert(
+            html.Contains("kokuPre:this.withFurigana(kokuPre), kokuWord:kokuWord, kokuPost:this.withFurigana(kokuPost)", StringComparison.Ordinal) &&
+            html.Contains("calibKokuPre:this.withFurigana(calibKokuPre), calibKokuWord:calibKokuWord, calibKokuPost:this.withFurigana(calibKokuPost)", StringComparison.Ordinal),
+            "kanji-reading targets expose their answer through furigana");
+        Assert(
+            html.Contains("(q.topic==='kokugo'&&q.subtype==='kanji-choice')?c:this.withFurigana(c)", StringComparison.Ordinal) &&
+            html.Contains("(cq.topic==='kokugo'&&cq.subtype==='kanji-choice')?c:this.withFurigana(c)", StringComparison.Ordinal),
+            "kanji-selection choices expose their readings through furigana");
+        Assert(html.Contains("interrogative=before.endsWith('なん')", StringComparison.Ordinal), "interrogative counter readings are missing");
+        Assert(
+            html.Contains("""<html lang="ja"><head>""", StringComparison.Ordinal) &&
+            !html.Contains("<html><head>", StringComparison.Ordinal),
+            "assembled learning HTML does not declare Japanese");
+        Assert(
+            html.Contains("""<style id="kt-layout-typography">""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-question-prompt""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-choice-grid""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-feedback-answer""", StringComparison.Ordinal) &&
+            html.Contains("@media (max-width: 720px)", StringComparison.Ordinal) &&
+            html.Contains("button:focus-visible", StringComparison.Ordinal) &&
+            html.Contains("select:focus-visible", StringComparison.Ordinal) &&
+            html.Contains("@media (prefers-reduced-motion: reduce)", StringComparison.Ordinal),
+            "responsive typography, focus, or reduced-motion markup is missing");
+
+        var markupRoot = Path.Combine(
+            repositoryRoot,
+            "src",
+            "KidsTraining.App",
+            "Application",
+            "Learning",
+            "Markup");
+        var arithmeticSource = File.ReadAllText(Path.Combine(markupRoot, "ArithmeticQuestionPatch.cs"));
+        var subGeneratorStart = arithmeticSource.IndexOf("genSub(p)", StringComparison.Ordinal);
+        var hissanGeneratorStart = arithmeticSource.IndexOf("private static string BuildGenHissanScript()", StringComparison.Ordinal);
+        Assert(subGeneratorStart > 0 && hissanGeneratorStart > subGeneratorStart, "arithmetic generator source boundaries are missing");
+        var addGeneratorSource = arithmeticSource[..subGeneratorStart];
+        var subGeneratorSource = arithmeticSource[subGeneratorStart..hissanGeneratorStart];
+        Assert(
+            !addGeneratorSource.Contains("16 - 6 + 7", StringComparison.Ordinal) &&
+            subGeneratorSource.Contains("prompt:'16 - 6 + 7'", StringComparison.Ordinal) &&
+            subGeneratorSource.Contains(",mixed]", StringComparison.Ordinal),
+            "mixed subtraction/addition is not assigned to subtraction stage 5");
+
+        var generatorFiles = new[]
+        {
+            "ArithmeticQuestionPatch.cs",
+            "SupplementalMathQuestionPatch.cs",
+            "ClockQuestionPatch.cs",
+            "JapaneseQuestionPatch.cs"
+        };
+        var generatorCharacters = CjkCharacters(string.Concat(
+            generatorFiles.Select(file => File.ReadAllText(Path.Combine(markupRoot, file)))));
+        var furiganaCharacters = CjkCharacters(
+            File.ReadAllText(Path.Combine(markupRoot, "QuestionFuriganaPatch.cs")));
+        var missingCharacters = generatorCharacters
+            .Except(furiganaCharacters)
+            .OrderBy(static character => character)
+            .ToArray();
+        Assert(
+            missingCharacters.Length == 0,
+            "question generator CJK characters missing from furigana source: " + new string(missingCharacters));
+
+        static HashSet<char> CjkCharacters(string source) =>
+            source
+                .Where(static character =>
+                    (character >= '\u4E00' && character <= '\u9FFF') || character == '々')
+                .ToHashSet();
     }
 
     private static void TestMissingPlaceholder(string repositoryRoot)
@@ -232,6 +410,25 @@ internal static class Program
         store.ThrowOnWrite = true;
         var failure = service.Change("4456", "6677");
         Assert(!failure.Success && store.Read().Value == "4456", "write failure did not reach a failed terminal state");
+    }
+
+    private static void TestLearningSettingsServiceTerminals()
+    {
+        var store = new InMemoryParentLearningSettingsStore(LearningSessionSettings.Default);
+        var service = new ParentLearningSettingsService(store);
+
+        Assert(!service.Update(19, 15).Success, "question counts below 20 were accepted");
+        Assert(!service.Update(41, 15).Success, "question counts above 40 were accepted");
+        Assert(!service.Update(30, 31).Success, "a pass line above the question count was accepted");
+        Assert(service.GetCurrentSettings() == LearningSessionSettings.Default, "invalid input changed saved learning settings");
+
+        var saved = service.Update(30, 24);
+        Assert(saved.Success && saved.Settings == new LearningSessionSettings(30, 24), "valid learning settings were rejected");
+        Assert(store.ReadLearningSettings() == saved.Settings, "valid learning settings were not persisted");
+
+        store.ThrowOnWrite = true;
+        var failed = service.Update(32, 25);
+        Assert(!failed.Success && failed.Settings == saved.Settings, "write failure did not preserve the prior learning settings");
     }
 
     private static void TestUpdateServiceTerminals()
@@ -317,6 +514,26 @@ internal static class Program
             }
 
             pin = nextPin;
+        }
+    }
+
+    private sealed class InMemoryParentLearningSettingsStore(LearningSessionSettings initialSettings)
+        : IParentLearningSettingsStore
+    {
+        private LearningSessionSettings settings = initialSettings;
+
+        public bool ThrowOnWrite { get; set; }
+
+        public LearningSessionSettings ReadLearningSettings() => settings;
+
+        public void WriteLearningSettings(LearningSessionSettings nextSettings)
+        {
+            if (ThrowOnWrite)
+            {
+                throw new IOException("simulated write failure");
+            }
+
+            settings = nextSettings;
         }
     }
 
