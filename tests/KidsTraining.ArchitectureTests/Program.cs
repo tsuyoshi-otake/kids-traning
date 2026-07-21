@@ -104,6 +104,12 @@ internal static class Program
         Assert(CurriculumPolicy.IsAvailable(2, "mul") && CurriculumPolicy.IsAvailable(2, "order"), "grade 2 calculation order or multiplication was unavailable");
         Assert(!CurriculumPolicy.IsAvailable(2, "eigo"), "supplementary English started before grade 3");
         Assert(CurriculumPolicy.IsAvailable(3, "div") && CurriculumPolicy.IsAvailable(3, "eigo"), "grade 3 scope is incomplete");
+        Assert(
+            CurriculumPolicy.IsAvailable(1, "keyboard") &&
+            CurriculumPolicy.IsAvailable(2, "keyboard") &&
+            CurriculumPolicy.IsAvailable(3, "keyboard"),
+            "physical keyboard practice is not independently available in every implemented grade");
+        Assert(CurriculumPolicy.PrerequisitesFor("keyboard").Count == 0, "keyboard practice unexpectedly has a prerequisite");
 
         var gradeOneLanes = CurriculumPolicy.TopicLanesForGrade(1);
         var gradeTwoLanes = CurriculumPolicy.TopicLanesForGrade(2);
@@ -254,6 +260,21 @@ internal static class Program
         Assert(html.Contains("const a=this.rand(12,89),b=this.rand(11,39)", StringComparison.Ordinal) && html.Contains("const a=this.rand(1234,7899)", StringComparison.Ordinal), "advanced grade 3 written arithmetic is missing");
         Assert(html.Contains("pickMoney(p)", StringComparison.Ordinal) && html.Contains("pickGroups(p)", StringComparison.Ordinal), "grade 1 money or equal-group foundations are missing");
         Assert(html.Contains("pickOrder(p)", StringComparison.Ordinal) && html.Contains("（ ）の なかを さきに", StringComparison.Ordinal), "parentheses or inequalities are missing");
+        Assert(
+            html.Contains("pickKeyboard(p)", StringComparison.Ordinal) &&
+            html.Contains("mode:'type'", StringComparison.Ordinal) &&
+            html.Contains("keyboard:{label:'キーボード'", StringComparison.Ordinal),
+            "the physical keyboard topic or typing question mode is missing");
+        Assert(
+            html.Contains("this._typeKeyHandler", StringComparison.Ordinal) &&
+            html.Contains("e.repeat", StringComparison.Ordinal) &&
+            html.Contains("e.isComposing", StringComparison.Ordinal) &&
+            html.Contains("e.key==='Process'", StringComparison.Ordinal),
+            "typing input does not guard repeat or IME key events");
+        Assert(
+            html.Contains("['neko','ねこ']", StringComparison.Ordinal) &&
+            html.Contains("['tokei','とけい']", StringComparison.Ordinal),
+            "representative four- and five-letter romaji words are missing");
         Assert(html.Contains("isTape:true", StringComparison.Ordinal) && html.Contains("isTable:true", StringComparison.Ordinal), "tape-diagram or table questions are missing");
         Assert(html.Contains("pickDiv(p)", StringComparison.Ordinal) && html.Contains("等分除", StringComparison.Ordinal) && html.Contains("包含除", StringComparison.Ordinal), "division concepts are incomplete");
         Assert(html.Contains("difficulty:5", StringComparison.Ordinal) && html.Contains("コンパス", StringComparison.Ordinal), "staged grade 3 written arithmetic or circle work is missing");

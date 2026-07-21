@@ -5,7 +5,7 @@ internal static class CurriculumPolicy
     private static readonly string[] TopicKeys =
     [
         "add", "sub", "mul", "clock", "kokugo", "hissan", "moji", "measure", "kazu", "shape", "div",
-        "frac", "chart", "story", "bun", "goi", "dokkai", "eigo", "money", "groups", "order"
+        "frac", "chart", "story", "bun", "goi", "dokkai", "eigo", "money", "groups", "order", "keyboard"
     ];
 
     private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> TopicPrerequisites =
@@ -31,26 +31,30 @@ internal static class CurriculumPolicy
             ["kokugo"] = ["moji"],
             ["goi"] = ["moji"],
             ["dokkai"] = ["bun", "kokugo", "goi"],
-            ["eigo"] = []
+            ["eigo"] = [],
+            ["keyboard"] = []
         };
 
     private static readonly string[][] GradeOneLanes =
     [
         ["kazu", "shape", "add", "sub", "clock", "measure", "story", "money", "groups", "chart"],
-        ["moji", "bun", "kokugo", "goi", "dokkai"]
+        ["moji", "bun", "kokugo", "goi", "dokkai"],
+        ["keyboard"]
     ];
 
     private static readonly string[][] GradeTwoLanes =
     [
         ["chart", "clock", "add", "sub", "measure", "hissan", "story", "kazu", "money", "order", "groups", "mul", "shape", "frac"],
-        ["kokugo", "bun", "goi", "dokkai", "moji"]
+        ["kokugo", "bun", "goi", "dokkai", "moji"],
+        ["keyboard"]
     ];
 
     private static readonly string[][] GradeThreeLanes =
     [
         ["mul", "div", "shape", "hissan", "kazu", "add", "sub", "clock", "measure", "story", "order", "chart", "frac", "money", "groups"],
         ["kokugo", "bun", "goi", "dokkai", "moji"],
-        ["eigo"]
+        ["eigo"],
+        ["keyboard"]
     ];
 
     public static int NormalizeGrade(int grade) => Math.Clamp(grade, 1, 3);
