@@ -78,10 +78,10 @@ rtk dotnet run --project tests\KidsTraining.ArchitectureTests\KidsTraining.Archi
 Build new releases with a version that matches the release tag:
 
 ```powershell
-rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.15.0
+rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.16.0
 ```
 
-Publish a GitHub Release such as `v1.15.0` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
+Publish a GitHub Release such as `v1.16.0` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
 
 Tracking issues:
 - Initial app and installer: https://github.com/tsuyoshi-otake/kids-traning/issues/1
