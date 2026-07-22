@@ -2,8 +2,8 @@ namespace KidsTraining.App.Domain.ParentControl;
 
 internal sealed record LearningSessionSettings(int QuestionCount, int PassLine)
 {
-    public const int MinimumQuestionCount = 20;
-    public const int MaximumQuestionCount = 40;
+    public const int MinimumQuestionCount = 10;
+    public const int MaximumQuestionCount = 30;
     public const int MinimumPassLine = 1;
 
     public static LearningSessionSettings Default { get; } = new(20, 15);

@@ -20,7 +20,7 @@ internal sealed class ParentLearningSettingsService : IParentLearningSettingsPro
         {
             return new LearningSessionSettingsUpdateResult(
                 false,
-                "1回の出題数は20〜40問にしてください。",
+                "1回の出題数は10〜30問にしてください。",
                 current);
         }
 

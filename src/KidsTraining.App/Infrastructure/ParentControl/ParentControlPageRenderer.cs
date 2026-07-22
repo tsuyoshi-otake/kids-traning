@@ -12,6 +12,7 @@ internal static class ParentControlPageRenderer
             "",
             urls.Select(static url => $"<li><code>{WebUtility.HtmlEncode(url)}</code></li>"));
         var initialStatus = trainingActive ? "起動中" : "停止中";
+        var inactiveDisabled = trainingActive ? string.Empty : " disabled";
         var settings = learningSettings ?? LearningSessionSettings.Default;
 
         return $$"""
@@ -47,11 +48,12 @@ internal static class ParentControlPageRenderer
     h1 { margin: 0; font-size: 28px; line-height: 1.25; }
     .status { border: 2px solid #d9e2f5; background: #fff; border-radius: 8px; padding: 10px 14px; font-weight: 800; white-space: nowrap; }
     .panel { background: #fff; border: 2px solid #d9e2f5; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
-    .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
     button { border: 0; border-radius: 8px; padding: 18px; font-size: 20px; font-weight: 900; cursor: pointer; color: #fff; min-height: 68px; }
     button:disabled { cursor: not-allowed; opacity: .55; }
     .start { background: #bd4e0a; }
-    .return { background: #287e4d; }
+    .return { background: #5d6677; }
+    .pause { background: #287e4d; }
     .refresh { background: #4f6fb7; font-size: 16px; min-height: 48px; padding: 12px 16px; }
     .message { min-height: 26px; margin-top: 14px; font-weight: 700; color: #4f5b70; }
     .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
@@ -70,6 +72,9 @@ internal static class ParentControlPageRenderer
     label { display: grid; gap: 6px; font-size: 14px; font-weight: 800; color: #4f5b70; }
     input { height: 44px; border: 2px solid #d9e2f5; border-radius: 8px; padding: 0 12px; font: inherit; font-size: 20px; letter-spacing: 0; }
     .save { background: #5d59b3; font-size: 17px; min-height: 48px; padding: 12px 16px; margin-top: 14px; }
+    .reset-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .reset-history { background: #8b5a21; font-size: 17px; min-height: 54px; padding: 12px 16px; }
+    .reset-full { background: #b42318; font-size: 17px; min-height: 54px; padding: 12px 16px; }
     ul { margin: 10px 0 0; padding-left: 22px; }
     li { margin: 8px 0; }
     code { background: #eef3ff; border: 1px solid #d9e2f5; border-radius: 6px; padding: 3px 6px; word-break: break-all; }
@@ -80,6 +85,7 @@ internal static class ParentControlPageRenderer
       .actions { grid-template-columns: 1fr; }
       .fields { grid-template-columns: 1fr; }
       .learning-fields { grid-template-columns: 1fr; }
+      .reset-actions { grid-template-columns: 1fr; }
       h1 { font-size: 24px; }
       button { font-size: 18px; }
     }
@@ -99,9 +105,22 @@ internal static class ParentControlPageRenderer
     <section class="panel">
       <div class="actions">
         <button class="start" id="start" type="button">勉強を開始</button>
-        <button class="return" id="return" type="button">パソコンの画面に戻す</button>
+        <button class="pause" id="pause" type="button"{{inactiveDisabled}}>一時停止して戻る</button>
+        <button class="return" id="return" type="button"{{inactiveDisabled}}>パソコンの画面に戻す</button>
       </div>
       <div class="message" id="message" aria-live="polite"></div>
+    </section>
+    <section class="panel" aria-labelledby="resetHeading">
+      <h2 id="resetHeading">学習データのリセット</h2>
+      <p class="settings-copy">操作には現在の保護者パスワードが必要です。学習画面が閉じているときは、次回起動時にリセットします。</p>
+      <label for="resetPassword">いまのパスワード
+        <input id="resetPassword" inputmode="numeric" autocomplete="current-password" maxlength="4" type="password" aria-describedby="resetMessage">
+      </label>
+      <div class="reset-actions">
+        <button class="reset-history" id="resetHistory" type="button">履歴のみリセット<br><small>レベル・XP・星は維持</small></button>
+        <button class="reset-full" id="resetFull" type="button">すべてリセット<br><small>レベル・XP・星も削除</small></button>
+      </div>
+      <div class="message" id="resetMessage" aria-live="polite"></div>
     </section>
     <section class="panel">
       <button class="refresh" id="refresh" type="button">状態を更新</button>
@@ -112,8 +131,8 @@ internal static class ParentControlPageRenderer
       <p class="settings-copy">次に始める学習から使う出題数と合格点を設定します。</p>
       <div class="learning-fields">
         <label for="questionCount">1回の出題数
-          <input id="questionCount" type="number" inputmode="numeric" min="20" max="40" step="1" required aria-describedby="questionCountHelp settingsError" value="{{settings.QuestionCount}}">
-          <small class="field-help" id="questionCountHelp">20〜40問</small>
+          <input id="questionCount" type="number" inputmode="numeric" min="10" max="30" step="1" required aria-describedby="questionCountHelp settingsError" value="{{settings.QuestionCount}}">
+          <small class="field-help" id="questionCountHelp">10〜30問</small>
         </label>
         <label for="passLine">合格点
           <input id="passLine" type="number" inputmode="numeric" min="1" max="{{settings.QuestionCount}}" step="1" required aria-describedby="passLineHelp settingsError" value="{{settings.PassLine}}">
@@ -146,6 +165,7 @@ internal static class ParentControlPageRenderer
     const passwordMessage = document.getElementById('passwordMessage');
     const startButton = document.getElementById('start');
     const returnButton = document.getElementById('return');
+    const pauseButton = document.getElementById('pause');
     const currentPassword = document.getElementById('currentPassword');
     const newPassword = document.getElementById('newPassword');
     const confirmPassword = document.getElementById('confirmPassword');
@@ -154,6 +174,10 @@ internal static class ParentControlPageRenderer
     const settingsError = document.getElementById('settingsError');
     const settingsMessage = document.getElementById('settingsMessage');
     const saveLearningSettingsButton = document.getElementById('saveLearningSettings');
+    const resetPassword = document.getElementById('resetPassword');
+    const resetMessage = document.getElementById('resetMessage');
+    const resetHistoryButton = document.getElementById('resetHistory');
+    const resetFullButton = document.getElementById('resetFull');
 
     async function request(path, options) {
       const response = await fetch(path, options);
@@ -168,23 +192,37 @@ internal static class ParentControlPageRenderer
       const data = await request('/api/status', { cache: 'no-store' });
       state.textContent = data.trainingActive ? '起動中' : '停止中';
       returnButton.disabled = !data.trainingActive;
+      pauseButton.disabled = !data.trainingActive;
       questionCount.value = data.questionCount;
       passLine.value = data.passLine;
       passLine.max = data.questionCount;
     }
 
     async function action(path, text) {
+      const actionButton = path === '/api/start' ? startButton : path === '/api/pause' ? pauseButton : returnButton;
+      const actionLabel = actionButton.textContent;
+      const wasActive = !returnButton.disabled;
+      let nextActive = wasActive;
       startButton.disabled = true;
       returnButton.disabled = true;
+      pauseButton.disabled = true;
+      actionButton.textContent = '処理中...';
       message.textContent = '処理中...';
       try {
         await request(path, { method: 'POST' });
+        nextActive = path === '/api/start';
         message.textContent = text;
       } catch (error) {
         message.textContent = error.message || '操作に失敗しました';
       } finally {
-        await refresh().catch(() => {});
+        actionButton.textContent = actionLabel;
         startButton.disabled = false;
+        try {
+          await refresh();
+        } catch {
+          returnButton.disabled = !nextActive;
+          pauseButton.disabled = !nextActive;
+        }
       }
     }
 
@@ -201,9 +239,9 @@ internal static class ParentControlPageRenderer
     function cleanLearningSettings() {
       const count = Number(questionCount.value);
       const pass = Number(passLine.value);
-      passLine.max = Number.isInteger(count) ? String(count) : '40';
-      if (!Number.isInteger(count) || count < 20 || count > 40) {
-        return { error: '1回の出題数は20〜40問にしてください。', fieldId: 'questionCount' };
+      passLine.max = Number.isInteger(count) ? String(count) : '30';
+      if (!Number.isInteger(count) || count < 10 || count > 30) {
+        return { error: '1回の出題数は10〜30問にしてください。', fieldId: 'questionCount' };
       }
       if (!Number.isInteger(pass) || pass < 1 || pass > count) {
         return { error: '合格点は1点以上、出題数以下にしてください。', fieldId: 'passLine' };
@@ -246,6 +284,46 @@ internal static class ParentControlPageRenderer
     [currentPassword, newPassword, confirmPassword].forEach(input => {
       input.addEventListener('input', () => cleanPin(input));
     });
+    resetPassword.addEventListener('input', () => {
+      cleanPin(resetPassword);
+      resetPassword.setAttribute('aria-invalid', 'false');
+      resetMessage.textContent = '';
+    });
+
+    async function resetLearning(mode) {
+      cleanPin(resetPassword);
+      if (resetPassword.value.length !== 4) {
+        resetPassword.setAttribute('aria-invalid', 'true');
+        resetMessage.textContent = 'いまのパスワードを4桁で入力してください';
+        resetPassword.focus();
+        return;
+      }
+      const historyOnly = mode === 'history';
+      const warning = historyOnly
+        ? '習熟度・復習予定・クリア履歴をリセットします。レベル・XP・星は残します。続けますか？'
+        : 'レベル・XP・星を含むすべての学習データをリセットします。この操作は取り消せません。続けますか？';
+      if (!window.confirm(warning)) return;
+
+      resetPassword.setAttribute('aria-invalid', 'false');
+      resetHistoryButton.disabled = true;
+      resetFullButton.disabled = true;
+      resetMessage.textContent = '処理中...';
+      try {
+        const data = await request('/api/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword: resetPassword.value, mode })
+        });
+        resetMessage.textContent = data.message;
+        resetPassword.value = '';
+      } catch (error) {
+        resetPassword.setAttribute('aria-invalid', 'true');
+        resetMessage.textContent = error.message || 'リセットできませんでした';
+      } finally {
+        resetHistoryButton.disabled = false;
+        resetFullButton.disabled = false;
+      }
+    }
 
     async function changePassword() {
       cleanPin(currentPassword);
@@ -277,10 +355,13 @@ internal static class ParentControlPageRenderer
     }
 
     startButton.addEventListener('click', () => action('/api/start', '勉強画面を起動しました'));
+    pauseButton.addEventListener('click', () => action('/api/pause', '学習を一時停止してパソコンの画面に戻しました'));
     returnButton.addEventListener('click', () => action('/api/return', 'パソコンの画面に戻しました'));
     document.getElementById('refresh').addEventListener('click', () => refresh().catch(error => { message.textContent = error.message; }));
     document.getElementById('savePassword').addEventListener('click', changePassword);
     saveLearningSettingsButton.addEventListener('click', saveLearningSettings);
+    resetHistoryButton.addEventListener('click', () => resetLearning('history'));
+    resetFullButton.addEventListener('click', () => resetLearning('full'));
     questionCount.addEventListener('input', () => { showSettingsError(''); cleanLearningSettings(); });
     passLine.addEventListener('input', () => showSettingsError(''));
     refresh().catch(error => { message.textContent = error.message; });

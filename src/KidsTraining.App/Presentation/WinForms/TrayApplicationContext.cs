@@ -25,6 +25,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly IUserProfileNameProvider profileNameProvider;
     private readonly ParentPasswordService parentPasswordService;
     private readonly ParentLearningSettingsService parentLearningSettingsService;
+    private readonly ParentLearningResetService parentLearningResetService;
 
     private readonly ParentControlServer? parentControlServer;
     private TrainingForm? trainingForm;
@@ -41,6 +42,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         IUserProfileNameProvider profileNameProvider,
         ParentPasswordService parentPasswordService,
         ParentLearningSettingsService parentLearningSettingsService,
+        ParentLearningResetService parentLearningResetService,
         UpdateService updateService)
     {
         this.learningPagePreparer = learningPagePreparer;
@@ -48,6 +50,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         this.profileNameProvider = profileNameProvider;
         this.parentPasswordService = parentPasswordService;
         this.parentLearningSettingsService = parentLearningSettingsService;
+        this.parentLearningResetService = parentLearningResetService;
         this.updateService = updateService;
         AppPaths.EnsureRuntimeDirectories();
         uiDispatcher.CreateControl();
@@ -149,7 +152,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 learningPagePreparer,
                 parentPinProvider,
                 profileNameProvider,
-                parentLearningSettingsService);
+                parentLearningSettingsService,
+                parentLearningResetService);
             trainingForm = form;
             form.FormClosed += (_, _) =>
             {
@@ -173,14 +177,19 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
-    private bool ReturnToComputer()
+    private async Task<bool> ReturnToComputerAsync()
     {
         if (trainingForm is { IsDisposed: false } form)
         {
             SetTrainingState(TrainingSessionState.Stopping);
             try
             {
-                form.ReturnToComputer();
+                var returned = await form.ReturnToComputerAsync().ConfigureAwait(true);
+                if (!returned)
+                {
+                    SetTrainingState(TrainingSessionState.Active);
+                    return false;
+                }
                 if (form.IsDisposed)
                 {
                     trainingForm = null;
@@ -216,10 +225,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
             server = new ParentControlServer(
                 StartTrainingFromParentControl,
                 ReturnToComputerFromParentControl,
+                PauseTrainingFromParentControl,
                 IsTrainingActive,
                 ChangeParentPasswordFromParentControl,
                 parentLearningSettingsService.GetCurrentSettings,
-                ChangeLearningSettingsFromParentControl);
+                ChangeLearningSettingsFromParentControl,
+                RequestLearningResetFromParentControl);
             server.Start();
             UpdateLogger.Info($"Parent control server started: {string.Join(", ", server.NetworkUrls)}");
             return server;
@@ -244,7 +255,28 @@ internal sealed class TrayApplicationContext : ApplicationContext
         InvokeOnUiThreadAsync(TryStartTraining, cancellationToken);
 
     private Task<bool> ReturnToComputerFromParentControl(CancellationToken cancellationToken) =>
-        InvokeOnUiThreadAsync(ReturnToComputer, cancellationToken);
+        InvokeOnUiThreadAsync(ReturnToComputerAsync, cancellationToken);
+
+    private Task<bool> PauseTrainingFromParentControl(CancellationToken cancellationToken) =>
+        InvokeOnUiThreadAsync(async () =>
+        {
+            if (trainingForm is not { IsDisposed: false } form)
+            {
+                trainingForm = null;
+                SetTrainingState(TrainingSessionState.Inactive);
+                return false;
+            }
+
+            SetTrainingState(TrainingSessionState.Stopping);
+            var paused = await form.PauseLearningAsync().ConfigureAwait(true);
+            SetTrainingState(paused ? TrainingSessionState.Inactive : TrainingSessionState.Active);
+            if (paused && form.IsDisposed)
+            {
+                trainingForm = null;
+            }
+
+            return paused;
+        }, cancellationToken);
 
     private async Task<PasswordChangeResult> ChangeParentPasswordFromParentControl(
         string? currentPassword,
@@ -293,13 +325,55 @@ internal sealed class TrayApplicationContext : ApplicationContext
         return result;
     }
 
-    private async Task<bool> SynchronizeActiveTrainingAsync(Func<TrainingForm, Task<bool>> synchronize)
+    private async Task<LearningResetResult> RequestLearningResetFromParentControl(
+        string? currentPassword,
+        string? resetMode,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = parentLearningResetService.Request(currentPassword, resetMode);
+        if (!result.Success)
+        {
+            return result;
+        }
+
+        var applied = await SynchronizeActiveTrainingAsync(
+            form => form.ApplyLearningResetAsync(result.Mode),
+            succeedWhenInactive: false).ConfigureAwait(false);
+        if (!applied)
+        {
+            return result with
+            {
+                Message = result.Message + " 学習画面が閉じている場合は、次回起動時に反映します。"
+            };
+        }
+
+        if (!parentLearningResetService.CompleteAppliedReset(result.Mode))
+        {
+            return result with
+            {
+                Message = "リセットは反映しましたが、予約状態を解除できませんでした。アプリを再起動する前にもう一度お試しください。"
+            };
+        }
+
+        return result with
+        {
+            Message = result.Mode == LearningResetMode.HistoryOnly
+                ? "学習履歴をリセットしました。レベル・XP・星は維持されています。"
+                : "すべての学習データをリセットしました。",
+            Pending = false
+        };
+    }
+
+    private async Task<bool> SynchronizeActiveTrainingAsync(
+        Func<TrainingForm, Task<bool>> synchronize,
+        bool succeedWhenInactive = true)
     {
         try
         {
             var synchronization = InvokeOnUiThreadAsync(
                 () => trainingForm is not { IsDisposed: false } form
-                    ? Task.FromResult(true)
+                    ? Task.FromResult(succeedWhenInactive)
                     : synchronize(form),
                 lifetimeCancellation.Token);
             return await synchronization

@@ -9,6 +9,8 @@ namespace KidsTraining.App.Presentation.WinForms;
 internal sealed class TrainingForm : Form
 {
     private const string UnlockMessage = "kidsTraining.unlock";
+    private const string PauseMessage = "kidsTraining.pause";
+    private const string ResetAppliedMessagePrefix = "kidsTraining.resetApplied:";
 
     private readonly WebView2 webView = new();
     private readonly System.Windows.Forms.Timer lockTimer = new();
@@ -16,6 +18,7 @@ internal sealed class TrainingForm : Form
     private readonly IParentPinProvider parentPinProvider;
     private readonly IUserProfileNameProvider profileNameProvider;
     private readonly IParentLearningSettingsProvider parentLearningSettingsProvider;
+    private readonly ParentLearningResetService parentLearningResetService;
     private bool canExit;
     private bool webViewInitialized;
 
@@ -23,12 +26,14 @@ internal sealed class TrainingForm : Form
         ILearningPagePreparer learningPagePreparer,
         IParentPinProvider parentPinProvider,
         IUserProfileNameProvider profileNameProvider,
-        IParentLearningSettingsProvider parentLearningSettingsProvider)
+        IParentLearningSettingsProvider parentLearningSettingsProvider,
+        ParentLearningResetService parentLearningResetService)
     {
         this.learningPagePreparer = learningPagePreparer;
         this.parentPinProvider = parentPinProvider;
         this.profileNameProvider = profileNameProvider;
         this.parentLearningSettingsProvider = parentLearningSettingsProvider;
+        this.parentLearningResetService = parentLearningResetService;
         Text = "Kids Training";
         ApplyWindowIcon();
         FormBorderStyle = FormBorderStyle.None;
@@ -67,9 +72,75 @@ internal sealed class TrainingForm : Form
         EnforceLock();
     }
 
-    public void ReturnToComputer()
+    public async Task<bool> ReturnToComputerAsync()
     {
+        if (webView.CoreWebView2 is not null)
+        {
+            try
+            {
+                var result = await webView.CoreWebView2.ExecuteScriptAsync(
+                    "(() => { try { if (typeof window.__kidsTrainingDiscard === 'function') return window.__kidsTrainingDiscard() === true; localStorage.removeItem('kt_session_checkpoint_v1'); return true; } catch { return false; } })()");
+                if (!string.Equals(result, "true", StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+            catch (Exception exception)
+            {
+                UpdateLogger.Error("Could not discard the active learning session", exception);
+                return false;
+            }
+        }
+
         ExitAfterUnlock();
+        return true;
+    }
+
+    public async Task<bool> PauseLearningAsync()
+    {
+        if (webView.CoreWebView2 is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var result = await webView.CoreWebView2.ExecuteScriptAsync(
+                "(() => typeof window.__kidsTrainingPause === 'function' && window.__kidsTrainingPause(false) === true)()");
+            if (!string.Equals(result, "true", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            ExitAfterUnlock();
+            return true;
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Could not pause the active learning session", exception);
+            return false;
+        }
+    }
+
+    public async Task<bool> ApplyLearningResetAsync(LearningResetMode mode)
+    {
+        if (webView.CoreWebView2 is null || mode == LearningResetMode.None)
+        {
+            return false;
+        }
+
+        var encodedMode = System.Text.Json.JsonSerializer.Serialize(mode.ToWireValue());
+        try
+        {
+            var result = await webView.CoreWebView2.ExecuteScriptAsync(
+                $"(() => typeof window.__kidsTrainingReset === 'function' && window.__kidsTrainingReset({encodedMode}) === true)()");
+            return string.Equals(result, "true", StringComparison.Ordinal);
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Could not apply a learning reset in the active WebView", exception);
+            return false;
+        }
     }
 
     public async Task<bool> SetParentPasswordAsync(string password)
@@ -217,9 +288,19 @@ internal sealed class TrainingForm : Form
 
         core.WebMessageReceived += (_, args) =>
         {
-            if (string.Equals(args.TryGetWebMessageAsString(), UnlockMessage, StringComparison.Ordinal))
+            var message = args.TryGetWebMessageAsString();
+            if (string.Equals(message, UnlockMessage, StringComparison.Ordinal) ||
+                string.Equals(message, PauseMessage, StringComparison.Ordinal))
             {
                 ExitAfterUnlock();
+                return;
+            }
+
+            if (message.StartsWith(ResetAppliedMessagePrefix, StringComparison.Ordinal) &&
+                LearningResetModeValues.TryParse(message[ResetAppliedMessagePrefix.Length..], out var appliedMode) &&
+                !parentLearningResetService.CompleteAppliedReset(appliedMode))
+            {
+                UpdateLogger.Info("A pending learning reset was applied, but its completion marker could not be cleared.");
             }
         };
 
@@ -293,6 +374,8 @@ internal sealed class TrainingForm : Form
         var profileName = System.Text.Json.JsonSerializer.Serialize(profileNameProvider.GetProfileName());
         var parentPin = System.Text.Json.JsonSerializer.Serialize(parentPinProvider.GetCurrentPin().Value);
         var learningSettings = parentLearningSettingsProvider.GetCurrentSettings();
+        var pendingLearningReset = System.Text.Json.JsonSerializer.Serialize(
+            parentLearningResetService.GetPendingReset().ToWireValue());
         return
             """
         (() => {
@@ -300,7 +383,8 @@ internal sealed class TrainingForm : Form
             profileName: __PROFILE_NAME__,
             parentPin: __PARENT_PIN__,
             questionCount: __QUESTION_COUNT__,
-            passLine: __PASS_LINE__
+            passLine: __PASS_LINE__,
+            pendingLearningReset: __PENDING_LEARNING_RESET__
           };
         })();
         """
@@ -313,6 +397,7 @@ internal sealed class TrainingForm : Form
             .Replace(
                 "__PASS_LINE__",
                 learningSettings.PassLine.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                StringComparison.Ordinal);
+                StringComparison.Ordinal)
+            .Replace("__PENDING_LEARNING_RESET__", pendingLearningReset, StringComparison.Ordinal);
     }
 }

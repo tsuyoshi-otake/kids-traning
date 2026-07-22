@@ -24,10 +24,12 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
 
     private readonly Func<CancellationToken, Task<bool>> startTraining;
     private readonly Func<CancellationToken, Task<bool>> returnToComputer;
+    private readonly Func<CancellationToken, Task<bool>> pauseTraining;
     private readonly Func<bool> isTrainingActive;
     private readonly Func<string?, string?, CancellationToken, Task<PasswordChangeResult>> changeParentPassword;
     private readonly Func<LearningSessionSettings> getLearningSettings;
     private readonly Func<int?, int?, CancellationToken, Task<LearningSessionSettingsUpdateResult>> changeLearningSettings;
+    private readonly Func<string?, string?, CancellationToken, Task<LearningResetResult>> requestLearningReset;
     private readonly object lifecycleGate = new();
     private readonly object clientTasksGate = new();
     private readonly CancellationTokenSource stop = new();
@@ -41,24 +43,30 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
     public ParentControlServer(
         Func<CancellationToken, Task<bool>> startTraining,
         Func<CancellationToken, Task<bool>> returnToComputer,
+        Func<CancellationToken, Task<bool>> pauseTraining,
         Func<bool> isTrainingActive,
         Func<string?, string?, CancellationToken, Task<PasswordChangeResult>> changeParentPassword,
         Func<LearningSessionSettings> getLearningSettings,
-        Func<int?, int?, CancellationToken, Task<LearningSessionSettingsUpdateResult>> changeLearningSettings)
+        Func<int?, int?, CancellationToken, Task<LearningSessionSettingsUpdateResult>> changeLearningSettings,
+        Func<string?, string?, CancellationToken, Task<LearningResetResult>> requestLearningReset)
     {
         ArgumentNullException.ThrowIfNull(startTraining);
         ArgumentNullException.ThrowIfNull(returnToComputer);
+        ArgumentNullException.ThrowIfNull(pauseTraining);
         ArgumentNullException.ThrowIfNull(isTrainingActive);
         ArgumentNullException.ThrowIfNull(changeParentPassword);
         ArgumentNullException.ThrowIfNull(getLearningSettings);
         ArgumentNullException.ThrowIfNull(changeLearningSettings);
+        ArgumentNullException.ThrowIfNull(requestLearningReset);
 
         this.startTraining = startTraining;
         this.returnToComputer = returnToComputer;
+        this.pauseTraining = pauseTraining;
         this.isTrainingActive = isTrainingActive;
         this.changeParentPassword = changeParentPassword;
         this.getLearningSettings = getLearningSettings;
         this.changeLearningSettings = changeLearningSettings;
+        this.requestLearningReset = requestLearningReset;
     }
 
     public int Port { get; private set; }
@@ -427,6 +435,15 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
                     cancellationToken,
                     shutdownToken).ConfigureAwait(false);
                 break;
+            case { Method: "POST", Path: "/api/pause" }:
+                await WriteControlActionResultAsync(
+                    stream,
+                    pauseTraining,
+                    "学習を一時停止してパソコンの画面に戻しました。",
+                    "一時停止できませんでした。学習画面が起動しているか確認してください。",
+                    cancellationToken,
+                    shutdownToken).ConfigureAwait(false);
+                break;
             case { Method: "POST", Path: "/api/settings" }:
                 LearningSettingsRequest? settingsPayload;
                 try
@@ -499,6 +516,46 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
                     stream,
                     changeResult.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest,
                     new ApiResult(changeResult.Success, changeResult.Message, isTrainingActive()),
+                    cancellationToken).ConfigureAwait(false);
+                break;
+            case { Method: "POST", Path: "/api/reset" }:
+                LearningResetRequest? resetPayload;
+                try
+                {
+                    resetPayload = JsonSerializer.Deserialize<LearningResetRequest>(request.Body, JsonOptions);
+                }
+                catch (JsonException)
+                {
+                    await WriteJsonAsync(
+                        stream,
+                        HttpStatusCode.BadRequest,
+                        new ApiResult(false, "入力を読み取れませんでした。", isTrainingActive()),
+                        cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
+                var resetResult = await InvokeApiActionAsync(
+                    stream,
+                    token => requestLearningReset(
+                        resetPayload?.CurrentPassword,
+                        resetPayload?.Mode,
+                        token),
+                    "学習データをリセットできませんでした。",
+                    cancellationToken,
+                    shutdownToken).ConfigureAwait(false);
+                if (resetResult is null)
+                {
+                    break;
+                }
+
+                await WriteJsonAsync(
+                    stream,
+                    resetResult.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest,
+                    new ApiResult(
+                        resetResult.Success,
+                        resetResult.Message,
+                        isTrainingActive(),
+                        Pending: resetResult.Pending),
                     cancellationToken).ConfigureAwait(false);
                 break;
             default:
@@ -684,10 +741,13 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
 
     private sealed record LearningSettingsRequest(int? QuestionCount, int? PassLine);
 
+    private sealed record LearningResetRequest(string? CurrentPassword, string? Mode);
+
     private sealed record ApiResult(
         bool Ok,
         string Message,
         bool TrainingActive,
         int? QuestionCount = null,
-        int? PassLine = null);
+        int? PassLine = null,
+        bool? Pending = null);
 }

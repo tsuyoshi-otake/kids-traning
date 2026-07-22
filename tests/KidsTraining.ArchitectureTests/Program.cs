@@ -6,6 +6,7 @@ using KidsTraining.App.Domain.Learning;
 using KidsTraining.App.Domain.Updates;
 using KidsTraining.App.Infrastructure.Lifecycle;
 using KidsTraining.App.Infrastructure.ParentControl;
+using System.Text;
 
 namespace KidsTraining.ArchitectureTests;
 
@@ -35,13 +36,14 @@ internal static class Program
         Run("Preparation result has explicit terminal states", TestPreparationTerminals);
         Run("Parent password changes reach explicit terminal states", TestPasswordServiceTerminals);
         Run("Parent learning settings reach explicit terminal states", TestLearningSettingsServiceTerminals);
+        Run("Parent learning resets reach explicit terminal states", TestLearningResetServiceTerminals);
         Run("Update checks reach explicit terminal states", TestUpdateServiceTerminals);
         Run("Parent control server awaits actions and shuts down cleanly", TestParentControlServerLifecycle);
         Run("Single-instance requests reach the primary instance", TestSingleInstanceCoordinator);
 
         if (Failures.Count == 0)
         {
-            Console.WriteLine("Architecture tests passed: 16");
+            Console.WriteLine("Architecture tests passed: 17");
             return 0;
         }
 
@@ -244,6 +246,42 @@ internal static class Program
         Assert(html.Contains("for(let round=0;round<3;round++)", StringComparison.Ordinal), "calibration does not repeat core skills three times");
         Assert(html.Contains("score=(!r||!r.attempts)?0.05", StringComparison.Ordinal), "untested skills are not initialized conservatively");
         Assert(html.Contains("q.sessionRole=role", StringComparison.Ordinal) && html.Contains("'review'", StringComparison.Ordinal) && html.Contains("'target'", StringComparison.Ordinal) && html.Contains("'mixed'", StringComparison.Ordinal) && html.Contains("'exit'", StringComparison.Ordinal), "session roles are incomplete");
+        Assert(
+            html.Contains("rolePlan=[]", StringComparison.Ordinal) &&
+            html.Contains("session.questions.push(this.generateSessionQuestion(p,session,rolePlan[0]))", StringComparison.Ordinal) &&
+            html.Contains("this.generateSessionQuestion(p,s,s.rolePlan[nextIndex])", StringComparison.Ordinal),
+            "learning questions are not generated lazily from the latest evidence");
+        Assert(
+            html.Contains("questionIdentity(q)", StringComparison.Ordinal) &&
+            html.Contains("for(let attempt=0;attempt<24;attempt++)", StringComparison.Ordinal) &&
+            html.Contains("questionCounts[key]", StringComparison.Ordinal) &&
+            html.Contains("if(!best)throw new Error('Unable to generate a learning question')", StringComparison.Ordinal),
+            "session question deduplication is missing a bounded terminal fallback");
+        Assert(
+            html.Contains("support=s.supportTopics[topic]?1:0", StringComparison.Ordinal) &&
+            html.Contains("delete sess.supportTopics[q.topic]", StringComparison.Ordinal) &&
+            html.Contains("else sess.supportTopics[q.topic]=true", StringComparison.Ordinal),
+            "assisted or incorrect outcomes do not adapt the next question difficulty");
+        Assert(
+            html.Contains("q.difficulty=this.clamp(Number(q.difficulty)||stage,1,5);q.grade=this.effectiveGrade(sp)", StringComparison.Ordinal),
+            "generated questions do not retain their actual difficulty and grade snapshots");
+        Assert(
+            html.Contains("data-question-grade=\"{{ questionGradeLabel }}\"", StringComparison.Ordinal) &&
+            html.Contains("学年：{{ questionGradeLabel }}", StringComparison.Ordinal) &&
+            html.Contains("カテゴリ：{{ questionCategoryLabel }}", StringComparison.Ordinal) &&
+            html.Contains("難易度：{{ questionDifficultyLabel }}", StringComparison.Ordinal),
+            "quiz questions do not display grade, category, and difficulty metadata");
+        Assert(
+            html.Contains("data-calibration-grade=\"{{ calibGradeLabel }}\"", StringComparison.Ordinal) &&
+            html.Contains("学年：{{ calibGradeLabel }}", StringComparison.Ordinal) &&
+            html.Contains("カテゴリ：{{ calibTopicLabel }}", StringComparison.Ordinal) &&
+            html.Contains("難易度：{{ calibDifficultyLabel }}", StringComparison.Ordinal),
+            "calibration questions do not display grade, category, and difficulty metadata");
+        Assert(
+            html.Contains("refreshSessionTarget(p,s)", StringComparison.Ordinal) &&
+            html.Contains("current&&!this.topicComplete(p,current)", StringComparison.Ordinal) &&
+            html.Contains("s.activeTargetTopic=next||current", StringComparison.Ordinal),
+            "a mastered target topic does not advance during the active session");
         Assert(html.Contains("nextCurriculumTopic(p)", StringComparison.Ordinal) && html.Contains("frontierTopics(p)", StringComparison.Ordinal), "curriculum frontier selection is missing");
         Assert(html.Contains("curriculumPrerequisites(){return", StringComparison.Ordinal) && html.Contains("'mul':['groups']", StringComparison.Ordinal) && html.Contains("'dokkai':['bun','kokugo','goi']", StringComparison.Ordinal), "the curriculum prerequisite graph is missing from generated markup");
         Assert(html.Contains("s.attempts>0&&(Number(s.confidence)<.5||this.topicDue(p,k))", StringComparison.Ordinal), "unattempted upper topics are incorrectly treated as remediation triggers");
@@ -251,14 +289,38 @@ internal static class Program
         Assert(html.Contains("for(const k of base)for(const req of this.remediationTopics(p,k))", StringComparison.Ordinal) && html.Contains("return remedial.length?remedial:(out.length?out:allowed)", StringComparison.Ordinal), "allowed topics or curriculum frontier do not prioritize remediation");
         Assert(html.Contains("candidates=remedial.length?remedial:[k]", StringComparison.Ordinal) && html.Contains("if(!ks.length)throw new Error('No enabled curriculum topics')", StringComparison.Ordinal), "weighted selection does not fall back explicitly after prerequisite remediation");
         Assert(html.Contains("configured[k]!==false", StringComparison.Ordinal), "new curriculum topics are disabled for migrated settings");
-        Assert(html.Contains("reviewCount=due.length?", StringComparison.Ordinal) && html.Contains("this.weightedPick(p,due),'review'", StringComparison.Ordinal), "fresh sessions can start with unscheduled random review questions");
-        Assert(!html.Contains("this.shuffle(planned);add(target,'exit')", StringComparison.Ordinal), "session roles are still shuffled out of curriculum order");
+        Assert(
+            html.Contains("reviewCount=due.length?", StringComparison.Ordinal) &&
+            html.Contains("s.reviewTopics.length?s.reviewTopics:allowed", StringComparison.Ordinal),
+            "fresh sessions can start with unscheduled random review questions");
+        Assert(
+            html.Contains("targetTotal=Math.max(4,Math.floor(n*.25))", StringComparison.Ordinal) &&
+            html.Contains("mixedCount=n-reviewCount-targetCount-1", StringComparison.Ordinal),
+            "adaptive sessions do not reserve diverse mixed work while keeping target evidence");
+        Assert(!html.Contains("for(let i=0;i<n;i++)qs.push", StringComparison.Ordinal), "all session questions are still generated before the first answer");
         Assert(html.Contains("globalPass&&targetPass", StringComparison.Ordinal), "session completion ignores target-skill evidence");
         Assert(html.Contains("const gradeOpts=[1,2,3].map", StringComparison.Ordinal), "UI still claims unsupported grades");
         Assert(!html.Contains("if(done('add'))staged.push", StringComparison.Ordinal), "cross-subject prerequisite chain remains");
         Assert(html.Contains("1000万を 10こ", StringComparison.Ordinal) && html.Contains("const scale=(g>=3&&stage>=4)?5", StringComparison.Ordinal), "key grade 3 number/chart content is missing");
+        Assert(html.Contains("pickWeekday(stage)", StringComparison.Ordinal) && html.Contains("subtype:'weekday'", StringComparison.Ordinal) && html.Contains("月曜日", StringComparison.Ordinal) && html.Contains("日曜日", StringComparison.Ordinal), "weekday names, order, or calendar offsets are missing");
+        Assert(html.Contains("subtype:'number-sequence'", StringComparison.Ordinal) && html.Contains("subtype:'number-compose'", StringComparison.Ordinal), "number sequence or composition variants are missing");
+        Assert(html.Contains("subtype:'missing-add'", StringComparison.Ordinal) && html.Contains("subtype:'missing-sub'", StringComparison.Ordinal), "missing-number addition or subtraction variants are missing");
         Assert(html.Contains("const a=this.rand(12,89),b=this.rand(11,39)", StringComparison.Ordinal) && html.Contains("const a=this.rand(1234,7899)", StringComparison.Ordinal), "advanced grade 3 written arithmetic is missing");
         Assert(html.Contains("pickMoney(p)", StringComparison.Ordinal) && html.Contains("pickGroups(p)", StringComparison.Ordinal), "grade 1 money or equal-group foundations are missing");
+        Assert(html.Contains("subtype:'counter'", StringComparison.Ordinal) && html.Contains("subtype:'greeting'", StringComparison.Ordinal) && html.Contains("subtype:'feeling-reason'", StringComparison.Ordinal), "counter, greeting, or feeling-reason language variants are missing");
+        const string grade1Kanji = "一右雨円王音下火花貝学気九休玉金空月犬見五口校左三山子四糸字耳七車手十出女小上森人水正生青夕石赤千川先早草足村大男竹中虫町天田土二日入年白八百文木本名目立力林六";
+        const string grade2Kanji = "引羽雲園遠何科夏家歌画回会海絵外角楽活間丸岩顔汽記帰弓牛魚京強教近兄形計元言原戸古午後語工公広交光考行高黄合谷国黒今才細作算止市矢姉思紙寺自時室社弱首秋週春書少場色食心新親図数西声星晴切雪船線前組走多太体台地池知茶昼長鳥朝直通弟店点電刀冬当東答頭同道読内南肉馬売買麦半番父風分聞米歩母方北毎妹万明鳴毛門夜野友用曜来里理話";
+        const string grade3Kanji = "悪安暗医委意育員院飲運泳駅央横屋温化荷界階寒感漢館岸起期客究急級宮球去橋業曲局銀区苦具君係軽血決研県庫湖向幸港号根祭皿仕死使始指歯詩次事持式実写者主守取酒受州拾終習集住重宿所暑助昭消商章勝乗植申身神真深進世整昔全相送想息速族他打対待代第題炭短談着注柱丁帳調追定庭笛鉄転都度投豆島湯登等動童農波配倍箱畑発反坂板皮悲美鼻筆氷表秒病品負部服福物平返勉放味命面問役薬由油有遊予羊洋葉陽様落流旅両緑礼列練路和開";
+        Assert(grade1Kanji.Length == 80 && grade1Kanji.Distinct().Count() == 80, "grade 1 canonical kanji allocation is not exactly 80 unique characters");
+        Assert(grade2Kanji.Length == 160 && grade2Kanji.Distinct().Count() == 160, "grade 2 canonical kanji allocation is not exactly 160 unique characters");
+        Assert(grade3Kanji.Length == 200 && grade3Kanji.Distinct().Count() == 200, "grade 3 canonical kanji allocation is not exactly 200 unique characters");
+        Assert((grade1Kanji + grade2Kanji + grade3Kanji).Distinct().Count() == 440, "kanji allocations overlap across grades");
+        Assert(html.Contains("const kanjiGrade1='" + grade1Kanji + "';", StringComparison.Ordinal), "grade 1 canonical kanji allocation differs from the official set");
+        Assert(html.Contains("const kanjiGrade2='" + grade2Kanji + "';", StringComparison.Ordinal), "grade 2 canonical kanji allocation differs from the official set");
+        Assert(html.Contains("const kanjiGrade3='" + grade3Kanji + "';", StringComparison.Ordinal), "grade 3 canonical kanji allocation differs from the official set");
+        Assert(html.Contains("return kanji.map((k,index)=>({g:g,k:k,r:readings[index]", StringComparison.Ordinal), "canonical kanji are not converted into independently selectable question targets");
+        Assert(html.Contains("const L=this.kanjiCurriculumEntries().concat([", StringComparison.Ordinal), "canonical kanji are not included in the Japanese question pool");
+        Assert(html.Split("{g:1,t:'", StringSplitOptions.None).Length - 1 + html.Split("{g:2,t:'", StringSplitOptions.None).Length - 1 + html.Split("{g:3,t:'", StringSplitOptions.None).Length - 1 >= 32, "reading passages were not doubled");
         Assert(html.Contains("pickOrder(p)", StringComparison.Ordinal) && html.Contains("（ ）の なかを さきに", StringComparison.Ordinal), "parentheses or inequalities are missing");
         Assert(
             html.Contains("pickKeyboard(p)", StringComparison.Ordinal) &&
@@ -279,11 +341,14 @@ internal static class Program
         Assert(html.Contains("pickDiv(p)", StringComparison.Ordinal) && html.Contains("等分除", StringComparison.Ordinal) && html.Contains("包含除", StringComparison.Ordinal), "division concepts are incomplete");
         Assert(html.Contains("difficulty:5", StringComparison.Ordinal) && html.Contains("コンパス", StringComparison.Ordinal), "staged grade 3 written arithmetic or circle work is missing");
         Assert(html.Contains("q.isMoney", StringComparison.Ordinal) && html.Contains("q.isGroups", StringComparison.Ordinal) && html.Contains("q.isTape", StringComparison.Ordinal), "new visual scaffolding is missing");
-        Assert(html.Contains("requestLearningReset()", StringComparison.Ordinal) && html.Contains("if(!this.state.resetConfirming)return", StringComparison.Ordinal), "learning reset bypasses two-step confirmation");
-        Assert(html.Contains("streak:0,stars:0,xp:0", StringComparison.Ordinal) && html.Contains("level:1,stageAttempts:0,stageIndependent:0", StringComparison.Ordinal) && html.Contains("cleared:{}", StringComparison.Ordinal), "learning reset does not clear all progress evidence");
+        Assert(html.Contains("requestLearningReset('history')", StringComparison.Ordinal) && html.Contains("this.state.resetPin!==this.parentPin()", StringComparison.Ordinal), "learning reset bypasses PIN confirmation");
+        Assert(html.Contains("stars:mode==='full'?0:(Number(current.stars)||0)", StringComparison.Ordinal) && html.Contains("xp:mode==='full'?0:(Number(current.xp)||0)", StringComparison.Ordinal), "history-only and full reset reward semantics are not separated");
+        Assert(html.Contains("level:1,stageAttempts:0,stageIndependent:0", StringComparison.Ordinal) && html.Contains("cleared:{}", StringComparison.Ordinal), "learning reset does not clear all progress evidence");
         Assert(html.Contains("const reset={...current", StringComparison.Ordinal) && html.Contains("progressResetAt:Date.now()", StringComparison.Ordinal), "learning reset does not preserve profile identity and grade");
         Assert(html.Contains("localStorage.setItem('kt_profiles_v1',persisted)", StringComparison.Ordinal) && !html.Contains("localStorage.clear()", StringComparison.Ordinal), "learning reset is not scoped to profile progress");
         Assert(html.Contains("aria-modal=", StringComparison.Ordinal) && html.Contains("cancelLearningReset", StringComparison.Ordinal), "learning reset confirmation is inaccessible or cannot be cancelled");
+        Assert(html.Contains("kt_session_checkpoint_v1", StringComparison.Ordinal) && html.Contains("restoreLearningCheckpoint()", StringComparison.Ordinal), "in-progress learning cannot be resumed");
+        Assert(html.Contains("n===1?0.5:(n===2?0.25:0)", StringComparison.Ordinal) && html.Contains("if(miss>=3)", StringComparison.Ordinal), "three-attempt fractional scoring is missing");
         var trainingFormSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
             "src",
@@ -336,16 +401,20 @@ internal static class Program
             "10 + 2",
             "10 + 5",
             "9 - 3 - 2",
-            "16 - 6 + 7",
-            "58 + 29",
-            "68 + 22",
-            "35 + 25",
-            "19 + 43"
+            "16 - 6 + 7"
         };
         foreach (var expression in requiredExpressions)
         {
             Assert(html.Contains($"prompt:'{expression}'", StringComparison.Ordinal), $"required arithmetic question is missing: {expression}");
         }
+        foreach (var expression in new[] { "58,29", "68,22", "35,25", "19,43" })
+        {
+            Assert(html.Contains($"makeHissan({expression})", StringComparison.Ordinal), $"required two-digit written-arithmetic question is missing: {expression}");
+        }
+        Assert(
+            html.Contains("q.topic='add';q.difficulty=5", StringComparison.Ordinal) &&
+            html.Contains("q.topic='sub';q.difficulty=5", StringComparison.Ordinal),
+            "two-digit addition or subtraction is not routed through written-arithmetic steps");
 
         Assert(
             html.Contains("prompt:'大人が 7人、子供が 9人 います。あわせて 何人 いますか？'", StringComparison.Ordinal) &&
@@ -412,12 +481,19 @@ internal static class Program
             "ArithmeticQuestionPatch.cs",
             "SupplementalMathQuestionPatch.cs",
             "ClockQuestionPatch.cs",
-            "JapaneseQuestionPatch.cs"
+            "JapaneseQuestionPatch.cs",
+            "KanjiCurriculumPatch.cs"
         };
         var generatorCharacters = CjkCharacters(string.Concat(
             generatorFiles.Select(file => File.ReadAllText(Path.Combine(markupRoot, file)))));
-        var furiganaCharacters = CjkCharacters(
-            File.ReadAllText(Path.Combine(markupRoot, "QuestionFuriganaPatch.cs")));
+        var furiganaSource = File.ReadAllText(Path.Combine(markupRoot, "QuestionFuriganaPatch.cs"));
+        var curriculumSource = File.ReadAllText(Path.Combine(markupRoot, "KanjiCurriculumPatch.cs"));
+        Assert(
+            furiganaSource.Contains("this.kanjiCurriculumEntries().map(entry=>[entry.k,entry.r])", StringComparison.Ordinal),
+            "canonical kanji readings are not included in the furigana dictionary");
+        var furiganaCharacters = CjkCharacters(furiganaSource)
+            .Union(CjkCharacters(curriculumSource))
+            .ToHashSet();
         var missingCharacters = generatorCharacters
             .Except(furiganaCharacters)
             .OrderBy(static character => character)
@@ -505,18 +581,58 @@ internal static class Program
         var store = new InMemoryParentLearningSettingsStore(LearningSessionSettings.Default);
         var service = new ParentLearningSettingsService(store);
 
-        Assert(!service.Update(19, 15).Success, "question counts below 20 were accepted");
-        Assert(!service.Update(41, 15).Success, "question counts above 40 were accepted");
+        Assert(!service.Update(9, 9).Success, "question counts below 10 were accepted");
+        Assert(!service.Update(31, 15).Success, "question counts above 30 were accepted");
         Assert(!service.Update(30, 31).Success, "a pass line above the question count was accepted");
         Assert(service.GetCurrentSettings() == LearningSessionSettings.Default, "invalid input changed saved learning settings");
 
+        var minimum = service.Update(10, 8);
+        Assert(minimum.Success && minimum.Settings == new LearningSessionSettings(10, 8), "minimum learning settings were rejected");
+
         var saved = service.Update(30, 24);
-        Assert(saved.Success && saved.Settings == new LearningSessionSettings(30, 24), "valid learning settings were rejected");
+        Assert(saved.Success && saved.Settings == new LearningSessionSettings(30, 24), "maximum learning settings were rejected");
         Assert(store.ReadLearningSettings() == saved.Settings, "valid learning settings were not persisted");
 
+        var page = ParentControlPageRenderer.Build([], false, saved.Settings);
+        Assert(page.Contains("min=\"10\" max=\"30\"", StringComparison.Ordinal) && page.Contains("10〜30問", StringComparison.Ordinal), "parent page does not expose the 10-to-30 fixed question range");
+
         store.ThrowOnWrite = true;
-        var failed = service.Update(32, 25);
+        var failed = service.Update(25, 20);
         Assert(!failed.Success && failed.Settings == saved.Settings, "write failure did not preserve the prior learning settings");
+    }
+
+    private static void TestLearningResetServiceTerminals()
+    {
+        var store = new InMemoryParentResetStore(ParentPin.FromOrDefault("1234"));
+        var service = new ParentLearningResetService(store, store);
+
+        Assert(!service.Request("9999", LearningResetModeValues.HistoryOnly).Success, "wrong current PIN queued a reset");
+        Assert(!service.Request("1234", "unknown").Success, "unknown reset mode was accepted");
+        Assert(service.GetPendingReset() == LearningResetMode.None, "invalid reset input changed pending state");
+
+        var history = service.Request("1234", LearningResetModeValues.HistoryOnly);
+        Assert(
+            history is { Success: true, Pending: true, Mode: LearningResetMode.HistoryOnly } &&
+            service.GetPendingReset() == LearningResetMode.HistoryOnly,
+            "history-only reset did not reach the queued terminal state");
+        Assert(
+            !service.CompleteAppliedReset(LearningResetMode.Full) &&
+            service.GetPendingReset() == LearningResetMode.HistoryOnly,
+            "a mismatched completion cleared the pending reset");
+        Assert(
+            service.CompleteAppliedReset(LearningResetMode.HistoryOnly) &&
+            service.GetPendingReset() == LearningResetMode.None,
+            "the applied history-only reset did not clear its pending marker");
+
+        var full = service.Request("1234", LearningResetModeValues.Full);
+        Assert(
+            full is { Success: true, Pending: true, Mode: LearningResetMode.Full } &&
+            service.CompleteAppliedReset(LearningResetMode.Full),
+            "full reset did not reach queued and completed terminal states");
+
+        store.ThrowOnWrite = true;
+        var failed = service.Request("1234", LearningResetModeValues.HistoryOnly);
+        Assert(!failed.Success && service.GetPendingReset() == LearningResetMode.None, "reset-store failure did not remain failed");
     }
 
     private static void TestUpdateServiceTerminals()
@@ -571,6 +687,10 @@ internal static class Program
     {
         var startCalls = 0;
         var returnCalls = 0;
+        var pauseCalls = 0;
+        var resetCalls = 0;
+        string? resetPassword = null;
+        string? resetMode = null;
         var server = new ParentControlServer(
             _ =>
             {
@@ -582,6 +702,11 @@ internal static class Program
                 returnCalls++;
                 return Task.FromResult(true);
             },
+            _ =>
+            {
+                pauseCalls++;
+                return Task.FromResult(true);
+            },
             () => false,
             (_, _, _) => Task.FromResult(PasswordChangeResult.Ok("ok")),
             () => LearningSessionSettings.Default,
@@ -589,7 +714,19 @@ internal static class Program
                 new LearningSessionSettingsUpdateResult(
                     true,
                     "ok",
-                    LearningSessionSettings.Default)));
+                    LearningSessionSettings.Default)),
+            (currentPassword, mode, _) =>
+            {
+                resetCalls++;
+                resetPassword = currentPassword;
+                resetMode = mode;
+                return Task.FromResult(
+                    new LearningResetResult(
+                        true,
+                        "ok",
+                        LearningResetMode.HistoryOnly,
+                        true));
+            });
 
         Assert(
             server.Port == 0 && server.NetworkUrls.Count == 0 && server.PrimaryUrl.Length == 0,
@@ -614,11 +751,30 @@ internal static class Program
                 .PostAsync($"http://127.0.0.1:{port}/api/return", content: null)
                 .GetAwaiter()
                 .GetResult();
+            using var pauseResponse = client
+                .PostAsync($"http://127.0.0.1:{port}/api/pause", content: null)
+                .GetAwaiter()
+                .GetResult();
+            using var resetContent = new StringContent(
+                """{"currentPassword":"1234","mode":"history"}""",
+                Encoding.UTF8,
+                "application/json");
+            using var resetResponse = client
+                .PostAsync($"http://127.0.0.1:{port}/api/reset", resetContent)
+                .GetAwaiter()
+                .GetResult();
             Assert(
                 startResponse.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable &&
-                returnResponse.StatusCode == System.Net.HttpStatusCode.OK,
+                returnResponse.StatusCode == System.Net.HttpStatusCode.OK &&
+                pauseResponse.StatusCode == System.Net.HttpStatusCode.OK &&
+                resetResponse.StatusCode == System.Net.HttpStatusCode.OK,
                 "parent actions returned before their actual success results were known");
-            Assert(startCalls == 1 && returnCalls == 1, "parent actions were not invoked exactly once");
+            Assert(
+                startCalls == 1 && returnCalls == 1 && pauseCalls == 1 && resetCalls == 1,
+                "parent actions were not invoked exactly once");
+            Assert(
+                resetPassword == "1234" && resetMode == LearningResetModeValues.HistoryOnly,
+                "parent reset request did not preserve its PIN or reset mode");
         }
         finally
         {
@@ -723,6 +879,30 @@ internal static class Program
             }
 
             settings = nextSettings;
+        }
+    }
+
+    private sealed class InMemoryParentResetStore(ParentPin initialPin)
+        : IParentPinStore, IParentLearningResetStore
+    {
+        private LearningResetMode pendingReset;
+
+        public bool ThrowOnWrite { get; set; }
+
+        public ParentPin Read() => initialPin;
+
+        public void Write(ParentPin pin) => throw new NotSupportedException();
+
+        public LearningResetMode ReadPendingLearningReset() => pendingReset;
+
+        public void WritePendingLearningReset(LearningResetMode mode)
+        {
+            if (ThrowOnWrite)
+            {
+                throw new IOException("simulated write failure");
+            }
+
+            pendingReset = mode;
         }
     }
 

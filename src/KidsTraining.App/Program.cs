@@ -70,7 +70,8 @@ internal static class Program
                 services.LearningPagePreparer,
                 services.ParentPinProvider,
                 services.ProfileNameProvider,
-                services.ParentLearningSettingsService));
+                services.ParentLearningSettingsService,
+                services.ParentLearningResetService));
         }
         else
         {
@@ -81,6 +82,7 @@ internal static class Program
                 services.ProfileNameProvider,
                 services.ParentPasswordService,
                 services.ParentLearningSettingsService,
+                services.ParentLearningResetService,
                 services.UpdateService);
             singleInstance.StartListening(context.RequestTraining);
             System.Windows.Forms.Application.Run(context);
@@ -165,6 +167,8 @@ internal static class Program
             if (!parentPage.Contains("Kids Training 保護者画面", StringComparison.Ordinal) ||
                 !parentPage.Contains("/api/start", StringComparison.Ordinal) ||
                 !parentPage.Contains("/api/return", StringComparison.Ordinal) ||
+                !parentPage.Contains("/api/pause", StringComparison.Ordinal) ||
+                !parentPage.Contains("/api/reset", StringComparison.Ordinal) ||
                 !parentPage.Contains("/api/password", StringComparison.Ordinal) ||
                 !parentPage.Contains("/api/settings", StringComparison.Ordinal) ||
                 !parentPage.Contains("id=\"questionCount\"", StringComparison.Ordinal) ||
@@ -174,6 +178,9 @@ internal static class Program
                 !parentPage.Contains("saveLearningSettings", StringComparison.Ordinal) ||
                 !parentPage.Contains("@media (prefers-reduced-motion: reduce)", StringComparison.Ordinal) ||
                 !parentPage.Contains("勉強を開始", StringComparison.Ordinal) ||
+                !parentPage.Contains("学習を一時停止", StringComparison.Ordinal) ||
+                !parentPage.Contains("履歴のみリセット", StringComparison.Ordinal) ||
+                !parentPage.Contains("すべてリセット", StringComparison.Ordinal) ||
                 !parentPage.Contains("パソコンの画面に戻す", StringComparison.Ordinal) ||
                 !parentPage.Contains("パスワードを変更", StringComparison.Ordinal))
             {
@@ -213,6 +220,7 @@ internal static class Program
         var parentSettingsStore = new JsonParentSettingsStore();
         var parentPasswordService = new ParentPasswordService(parentSettingsStore);
         var parentLearningSettingsService = new ParentLearningSettingsService(parentSettingsStore);
+        var parentLearningResetService = new ParentLearningResetService(parentSettingsStore, parentSettingsStore);
         IParentPinProvider parentPinProvider = parentPasswordService;
         var profileNameProvider = new WindowsUserProfileNameProvider();
         var learningPagePreparer = new FileLearningPagePreparer(
@@ -231,6 +239,7 @@ internal static class Program
             profileNameProvider,
             parentPasswordService,
             parentLearningSettingsService,
+            parentLearningResetService,
             updateService);
     }
 
@@ -240,5 +249,6 @@ internal static class Program
         IUserProfileNameProvider ProfileNameProvider,
         ParentPasswordService ParentPasswordService,
         ParentLearningSettingsService ParentLearningSettingsService,
+        ParentLearningResetService ParentLearningResetService,
         UpdateService UpdateService);
 }

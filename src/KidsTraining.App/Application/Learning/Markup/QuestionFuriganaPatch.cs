@@ -76,7 +76,7 @@ internal static partial class LearningMarkupPatcher
     private static string BuildQuestionFuriganaScript()
     {
         return """
-  furiganaEntries(){return [
+  furiganaEntries(){const curriculum=this.kanjiCurriculumEntries().map(entry=>[entry.k,entry.r]);return curriculum.concat([
     ['何本','なんぼん'],['何日','なんにち'],
     ['一ねんせい','いちねんせい'],['校てい','こうてい'],['花だん','はなだん'],['国語じてん','こくごじてん'],['ちょう点','ちょうてん'],['テープ図','テープず'],['気もち','きもち'],
     ['家ぞく','かぞく'],['まい日','まいにち'],['三つ','みっつ'],['会を','かいを'],['問題','もんだい'],['祭り','まつり'],
@@ -113,8 +113,19 @@ internal static partial class LearningMarkupPatcher
     ['馬','うま'],['白','しろ'],['悲','かな'],['百','ひゃく'],['表','ひょう'],['秒','びょう'],['風','かぜ'],['分','ぶん'],['聞','き'],
     ['歩','ある'],['母','かあ'],['方','かた'],['本','ほん'],['妹','いもうと'],['万','まん'],['名','な'],['明','あか'],['面','めん'],
     ['木','き'],['目','め'],['夜','よる'],['役','やく'],['薬','くすり'],['友','とも'],['葉','は'],['落','お'],['立','た'],
-    ['力','ちから'],['緑','みどり'],['話','はなし'],['枚','まい'],['左','ひだり'],['順','じゅん'],['答','こた']
-  ];}
+    ['力','ちから'],['緑','みどり'],['話','はなし'],['枚','まい'],['左','ひだり'],['順','じゅん'],['答','こた'],
+    ['七','なな'],['丸','まる'],['交','まじ'],['京','きょう'],['今','いま'],['仕','し'],['使','つか'],['係','かかり'],['光','ひかり'],['入','はい'],
+    ['八','やっ'],['公','こう'],['具','ぐ'],['冷','ひ'],['区','く'],['午','ご'],['去','さ'],['取','と'],['古','ふる'],['右','みぎ'],
+    ['号','ごう'],['君','きみ'],['味','み'],['品','ひん'],['員','いん'],['園','えん'],['場','ば'],['夕','ゆう'],['外','そと'],['天','てん'],
+    ['央','おう'],['委','い'],['安','あん'],['客','きゃく'],['宮','みや'],['寒','さむ'],['寺','てら'],['屋','や'],['岸','きし'],['工','こう'],
+    ['市','し'],['幸','しあわ'],['広','ひろ'],['庫','こ'],['引','ひ'],['意','い'],['感','かん'],['戸','と'],['所','ところ'],['支','ささ'],
+    ['暗','くら'],['曲','きょく'],['期','き'],['村','むら'],['来','く'],['東','とう'],['林','はやし'],['根','ね'],['植','しょく'],['業','ぎょう'],
+    ['横','よこ'],['歌','うた'],['止','と'],['段','だん'],['決','き'],['波','なみ'],['温','あたた'],['火','ひ'],['牛','うし'],['王','おう'],
+    ['田','た'],['番','ばん'],['的','てき'],['県','けん'],['科','か'],['級','きゅう'],['細','ほそ'],['絵','え'],['羽','はね'],['育','そだ'],
+    ['自','じ'],['苦','くる'],['菜','さい'],['血','ち'],['言','い'],['計','はか'],['記','しる'],['谷','たに'],['赤','あか'],['起','お'],
+    ['転','てん'],['軽','かる'],['農','のう'],['道','みち'],['金','かね'],['銀','ぎん'],['開','ひら'],['階','かい'],['青','あお'],['飲','の'],
+    ['養','よう'],['黄','き'],['黒','くろ']
+  ]);}
   furiganaTrie(){if(this._furiganaTrie)return this._furiganaTrie;const root=Object.create(null);for(const entry of this.furiganaEntries()){let node=root;for(const ch of entry[0]){if(!node[ch])node[ch]=Object.create(null);node=node[ch];}node.$=entry;}this._furiganaTrie=root;return root;}
   contextualFurigana(surface,reading,text,index){const before=text.slice(0,index),after=text.slice(index+surface.length),number=(before.match(/(\d+)$/)||[])[1],interrogative=before.endsWith('なん');if(surface==='何')return /^[をがに]/.test(after)?'なに':'なん';if(surface==='本'&&interrogative)return 'ぼん';if(surface==='分'&&interrogative)return 'ぷん';if(surface==='分後'&&interrogative)return 'ぷんご';if(surface==='人'&&interrogative)return 'にん';if(surface==='日'&&interrogative)return 'にち';if(surface==='人'){if(number==='1')return 'ひとり';if(number==='2')return 'ふたり';return number?'にん':'ひと';}if(surface==='人分'&&number==='1')return 'ひとりぶん';if(surface==='日')return number?'にち':'ひ';if(surface==='数'&&after.startsWith('え'))return 'かぞ';if(surface==='話'&&after.startsWith('す'))return 'はな';if(surface==='生'){if(after.startsWith('ま'))return 'う';if(after.startsWith('き'))return 'い';}if(surface==='分'&&after.startsWith('け'))return 'わ';if((surface==='分'||surface==='分後')&&number){const last=Number(number.slice(-1)),pun=last===0||last===1||last===3||last===4||last===6||last===8;return (pun?'ぷん':'ふん')+(surface==='分後'?'ご':'');}if(surface==='本'&&number){const last=Number(number.slice(-1));return last===3?'ぼん':(last===0||last===1||last===6||last===8?'ぽん':'ほん');}return reading;}
   withFurigana(value,skip){if(value===null||value===undefined)return '';if(skip||Array.isArray(value)||React.isValidElement(value))return value;const text=String(value);if(!/[一-龯々]/.test(text))return text;const trie=this.furiganaTrie(),out=[];let plain='',i=0;const flush=()=>{if(plain){out.push(plain);plain='';}};while(i<text.length){let node=trie,j=i,best=null;while(j<text.length&&node[text[j]]){node=node[text[j]];j++;if(node.$)best=node.$;}if(!best){plain+=text[i];i++;continue;}flush();const surface=best[0],reading=this.contextualFurigana(surface,best[1],text,i),key='ruby-'+i+'-'+out.length;out.push(React.createElement('ruby',{key:key,style:{rubyPosition:'over'}},surface,React.createElement('rt',{'aria-hidden':true,style:{fontSize:'.46em',fontWeight:700,lineHeight:1}},reading)));i+=surface.length;}flush();return out;}

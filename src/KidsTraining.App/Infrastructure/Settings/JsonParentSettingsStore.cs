@@ -6,7 +6,7 @@ using KidsTraining.App.Domain.ParentControl;
 
 namespace KidsTraining.App.Infrastructure.Settings;
 
-internal sealed class JsonParentSettingsStore : IParentPinStore, IParentLearningSettingsStore
+internal sealed class JsonParentSettingsStore : IParentPinStore, IParentLearningSettingsStore, IParentLearningResetStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -29,6 +29,16 @@ internal sealed class JsonParentSettingsStore : IParentPinStore, IParentLearning
         {
             var stored = ReadStoredOrDefault();
             return LearningSessionSettings.Normalize(stored.QuestionCount, stored.PassLine);
+        }
+    }
+
+    public LearningResetMode ReadPendingLearningReset()
+    {
+        lock (gate)
+        {
+            return LearningResetModeValues.TryParse(ReadStoredOrDefault().PendingLearningReset, out var mode)
+                ? mode
+                : LearningResetMode.None;
         }
     }
 
@@ -70,6 +80,23 @@ internal sealed class JsonParentSettingsStore : IParentPinStore, IParentLearning
         }
     }
 
+    public void WritePendingLearningReset(LearningResetMode mode)
+    {
+        lock (gate)
+        {
+            try
+            {
+                var current = ReadStoredOrDefault();
+                WriteStored(current with { PendingLearningReset = mode.ToWireValue() });
+            }
+            catch (Exception exception)
+            {
+                UpdateLogger.Error("Could not write pending learning reset", exception);
+                throw;
+            }
+        }
+    }
+
     private static StoredSettings ReadStoredOrDefault()
     {
         if (!File.Exists(AppPaths.ParentSettingsPath))
@@ -103,8 +130,9 @@ internal sealed class JsonParentSettingsStore : IParentPinStore, IParentLearning
     private sealed record StoredSettings(
         [property: JsonPropertyName("parentPassword")] string? ParentPassword,
         [property: JsonPropertyName("questionCount")] int? QuestionCount,
-        [property: JsonPropertyName("passLine")] int? PassLine)
+        [property: JsonPropertyName("passLine")] int? PassLine,
+        [property: JsonPropertyName("pendingLearningReset")] string? PendingLearningReset)
     {
-        public static StoredSettings Default { get; } = new(ParentPin.Default.Value, null, null);
+        public static StoredSettings Default { get; } = new(ParentPin.Default.Value, null, null, null);
     }
 }
