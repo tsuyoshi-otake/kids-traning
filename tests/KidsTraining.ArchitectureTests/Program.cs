@@ -334,6 +334,17 @@ internal static class Program
             html.Contains("e.key==='Process'", StringComparison.Ordinal),
             "typing input does not guard repeat or IME key events");
         Assert(
+            html.Contains("fingerColors={little:{background:'#36c8ae'", StringComparison.Ordinal) &&
+            html.Contains("fingerFor=key=>'qazp'.includes(key)?'little'", StringComparison.Ordinal) &&
+            html.Contains("'wsxol'.includes(key)?'ring'", StringComparison.Ordinal) &&
+            html.Contains("'edcik'.includes(key)?'middle':'index'", StringComparison.Ordinal),
+            "the typing guide does not map QWERTY keys to the physical keyboard finger colors");
+        Assert(
+            html.Contains("outline:4px solid #fff", StringComparison.Ordinal) &&
+            html.Contains("transform:translateY(-4px)", StringComparison.Ordinal) &&
+            html.Contains("role=\"img\" aria-label=", StringComparison.Ordinal),
+            "the next typing key lacks a non-color cue or an accessible board description");
+        Assert(
             html.Contains("['neko','ねこ']", StringComparison.Ordinal) &&
             html.Contains("['tokei','とけい']", StringComparison.Ordinal),
             "representative four- and five-letter romaji words are missing");
@@ -470,6 +481,22 @@ internal static class Program
         Assert(subGeneratorStart > 0 && hissanGeneratorStart > subGeneratorStart, "arithmetic generator source boundaries are missing");
         var addGeneratorSource = arithmeticSource[..subGeneratorStart];
         var subGeneratorSource = arithmeticSource[subGeneratorStart..hissanGeneratorStart];
+        var gradeOneBucketsStart = subGeneratorSource.IndexOf("const gradeOneBuckets=[", StringComparison.Ordinal);
+        var upperGradeBucketsStart = subGeneratorSource.IndexOf("const upperGradeBuckets=[", StringComparison.Ordinal);
+        Assert(
+            gradeOneBucketsStart > 0 && upperGradeBucketsStart > gradeOneBucketsStart,
+            "grade-specific subtraction source boundaries are missing");
+        var gradeOneSubGeneratorSource = subGeneratorSource[gradeOneBucketsStart..upperGradeBucketsStart];
+        Assert(
+            gradeOneSubGeneratorSource.Contains("Math.random()<.08?zeroReview():basic()", StringComparison.Ordinal) &&
+            gradeOneSubGeneratorSource.Contains("[threeTerm,missingBorrow,mixed]", StringComparison.Ordinal),
+            "subtract-zero review is not rare and isolated from grade 1 difficulty 5");
+        Assert(
+            subGeneratorSource.Contains("const threeTerm=()=>{const x=this.rand(11,20),y=this.rand(x%10+1,9)", StringComparison.Ordinal) &&
+            !gradeOneSubGeneratorSource.Contains("this.rand(15,30)", StringComparison.Ordinal) &&
+            !gradeOneSubGeneratorSource.Contains("this.rand(30,99)", StringComparison.Ordinal) &&
+            !gradeOneSubGeneratorSource.Contains("makeHissan", StringComparison.Ordinal),
+            "grade 1 subtraction can exceed 20 or route to general two-digit written subtraction");
         Assert(
             !addGeneratorSource.Contains("16 - 6 + 7", StringComparison.Ordinal) &&
             subGeneratorSource.Contains("prompt:'16 - 6 + 7'", StringComparison.Ordinal) &&

@@ -18,13 +18,28 @@ genAdd(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'add'),make=(a,
     private static string BuildGenSubScript()
     {
         return """
-genSub(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'sub'),make=(a,b,extra)=>{const ans=a-b;return{topic:'sub',mode:'num',a:a,b:b,prompt:extra?extra.prompt:a+' - '+b,answer:''+(extra?extra.answer:ans),explanation:extra?extra.explanation:a+' - '+b+' = '+ans};},mixed=()=>({topic:'sub',mode:'num',prompt:'16 - 6 + 7',answer:'17',explanation:'まえから じゅんに。16−6=10、10+7=17。'}),makeHissan=()=>{let a,b;do{a=this.rand(22,99);b=this.rand(11,Math.min(88,a-1));}while(a%10>=b%10||Math.floor(a/10)<=Math.floor(b/10));const q=this.hissanSub(a,b);q.topic='sub';q.difficulty=5;return q;};const buckets=[
-    [()=>{const a=this.rand(2,10),b=this.rand(1,a-1);return make(a,b);}],
+genSub(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'sub'),make=(a,b,extra)=>{const ans=a-b;return{topic:'sub',mode:'num',a:a,b:b,prompt:extra?extra.prompt:a+' - '+b,answer:''+(extra?extra.answer:ans),explanation:extra?extra.explanation:a+' - '+b+' = '+ans};},mixed=()=>({topic:'sub',mode:'num',prompt:'16 - 6 + 7',answer:'17',explanation:'まえから じゅんに。16−6=10、10+7=17。'}),makeHissan=()=>{let a,b;do{a=this.rand(22,99);b=this.rand(11,Math.min(88,a-1));}while(a%10>=b%10||Math.floor(a/10)<=Math.floor(b/10));const q=this.hissanSub(a,b);q.topic='sub';q.difficulty=5;return q;};
+  const basic=()=>{const a=this.rand(2,10),b=this.rand(1,a-1);return make(a,b);};
+  const zeroReview=()=>{const a=this.rand(1,10);return make(a,0,{prompt:a+' - 0',answer:a,explanation:'0を ひいても 数は '+a+'の まま。'});};
+  const noBorrowWithinTwenty=()=>{const a=this.rand(11,18),b=this.rand(1,a%10);return make(a,b);};
+  const borrowWithinTwenty=()=>{const a=this.rand(11,18),b=this.rand(a%10+1,9);return make(a,b);};
+  const missingBorrow=()=>{const a=this.rand(11,18),b=this.rand(a%10+1,9),answer=a-b;return{topic:'sub',mode:'num',subtype:'missing-sub',prompt:a+' - □ = '+answer,answer:''+b,explanation:a+' から '+answer+' になるには '+b+' を ひく。'};};
+  const threeTerm=()=>{const x=this.rand(11,20),y=this.rand(x%10+1,9),z=this.rand(1,Math.min(9,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});};
+  const gradeOneBuckets=[
+    [()=>Math.random()<.08?zeroReview():basic()],
+    [noBorrowWithinTwenty],
+    [borrowWithinTwenty],
+    [borrowWithinTwenty,missingBorrow,()=>({topic:'sub',mode:'num',prompt:'9 - 3 - 2',answer:'4',explanation:'まえから じゅんに。9−3=6、6−2=4。'})],
+    [threeTerm,missingBorrow,mixed]
+  ];
+  const upperGradeBuckets=[
+    [basic],
     [()=>{const a=this.rand(11,18),b=this.rand(1,Math.max(1,a%10));return make(a,b);},()=>{const a=this.rand(5,18),b=this.rand(1,a-1),answer=a-b;return{topic:'sub',mode:'num',subtype:'missing-sub',prompt:a+' - □ = '+answer,answer:''+b,explanation:a+' から '+answer+' になるには '+b+' を ひく。'};}],
     [()=>{let a=this.rand(21,89);if(a%10===0)a++;const b=this.rand(1,a%10);return make(a,b);},()=>{const a=this.rand(2,9)*10,b=this.rand(1,a/10-1)*10;return make(a,b);},()=>{const b=this.rand(2,9),answer=this.rand(10,40),a=answer+b;return{topic:'sub',mode:'num',subtype:'missing-sub',prompt:'□ - '+b+' = '+answer,answer:''+a,explanation:answer+' に '+b+' を たすと '+a+'。'};}],
     [()=>{const a=this.rand(30,99),b=this.rand(a%10+1,Math.min(19,a-1));return make(a,b);},()=>{const x=this.rand(12,28),y=this.rand(1,8),z=this.rand(1,Math.max(1,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});},()=>({topic:'sub',mode:'num',prompt:'9 - 3 - 2',answer:'4',explanation:'まえから じゅんに。9−3=6、6−2=4。'})],
-    g<=1?[()=>{const x=this.rand(15,30),y=this.rand(2,8),z=this.rand(2,Math.max(2,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});},()=>{const a=this.rand(0,20);return make(a,0,{prompt:a+' - 0',answer:a,explanation:'0を ひいても 数は '+a+'の まま。'});},mixed]:[makeHissan]
-  ];return this.pickStage(stage,buckets,0);}
+    [makeHissan]
+  ];
+  return this.pickStage(stage,g<=1?gradeOneBuckets:upperGradeBuckets,0);}
 """;
     }
 
