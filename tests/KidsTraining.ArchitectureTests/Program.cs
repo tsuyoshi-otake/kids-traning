@@ -6,6 +6,8 @@ using KidsTraining.App.Domain.Learning;
 using KidsTraining.App.Domain.Updates;
 using KidsTraining.App.Infrastructure.Lifecycle;
 using KidsTraining.App.Infrastructure.ParentControl;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Text;
 
 namespace KidsTraining.ArchitectureTests;
@@ -29,6 +31,7 @@ internal static class Program
         Run("Learning evidence separates outcomes and readiness", TestLearningEvidence);
         Run("Review schedule uses bounded spaced intervals", TestReviewSchedule);
         Run("Learning markup contains evidence-based progression", () => TestEducationalProgressionMarkup(repositoryRoot));
+        Run("Generated questions satisfy curriculum invariants", () => TestGeneratedQuestionAudit(repositoryRoot));
         Run("Learning page builder rejects missing placeholder", () => TestMissingPlaceholder(repositoryRoot));
         Run("Learning page builder rejects duplicate placeholder", () => TestDuplicatePlaceholder(repositoryRoot));
         Run("Learning markup reports a missing required anchor", () => TestMissingRequiredAnchor(repositoryRoot));
@@ -43,7 +46,7 @@ internal static class Program
 
         if (Failures.Count == 0)
         {
-            Console.WriteLine("Architecture tests passed: 17");
+            Console.WriteLine("Architecture tests passed: 18");
             return 0;
         }
 
@@ -318,7 +321,8 @@ internal static class Program
         Assert(html.Contains("const kanjiGrade1='" + grade1Kanji + "';", StringComparison.Ordinal), "grade 1 canonical kanji allocation differs from the official set");
         Assert(html.Contains("const kanjiGrade2='" + grade2Kanji + "';", StringComparison.Ordinal), "grade 2 canonical kanji allocation differs from the official set");
         Assert(html.Contains("const kanjiGrade3='" + grade3Kanji + "';", StringComparison.Ordinal), "grade 3 canonical kanji allocation differs from the official set");
-        Assert(html.Contains("return kanji.map((k,index)=>({g:g,k:k,r:readings[index]", StringComparison.Ordinal), "canonical kanji are not converted into independently selectable question targets");
+        Assert(html.Contains("return kanji.map((k,index)=>{const r=readings[index],tail=okuri.get(k)||''", StringComparison.Ordinal), "canonical kanji are not converted into independently selectable question targets");
+        Assert(html.Contains("word:k+tail", StringComparison.Ordinal), "kanji targets are not written with their okurigana");
         Assert(html.Contains("const L=this.kanjiCurriculumEntries().concat([", StringComparison.Ordinal), "canonical kanji are not included in the Japanese question pool");
         Assert(html.Split("{g:1,t:'", StringSplitOptions.None).Length - 1 + html.Split("{g:2,t:'", StringSplitOptions.None).Length - 1 + html.Split("{g:3,t:'", StringSplitOptions.None).Length - 1 >= 32, "reading passages were not doubled");
         Assert(html.Contains("pickOrder(p)", StringComparison.Ordinal) && html.Contains("（ ）の なかを さきに", StringComparison.Ordinal), "parentheses or inequalities are missing");
@@ -349,7 +353,13 @@ internal static class Program
             html.Contains("['tokei','とけい']", StringComparison.Ordinal),
             "representative four- and five-letter romaji words are missing");
         Assert(html.Contains("isTape:true", StringComparison.Ordinal) && html.Contains("isTable:true", StringComparison.Ordinal), "tape-diagram or table questions are missing");
-        Assert(html.Contains("pickDiv(p)", StringComparison.Ordinal) && html.Contains("等分除", StringComparison.Ordinal) && html.Contains("包含除", StringComparison.Ordinal), "division concepts are incomplete");
+        // Both division meanings are still taught, but in the words a third grader uses:
+        // 等分除 and 包含除 are teacher-facing jargon and were removed from the questions.
+        Assert(
+            html.Contains("pickDiv(p)", StringComparison.Ordinal) &&
+            html.Contains("1人ぶんの こすう", StringComparison.Ordinal) &&
+            html.Contains("わけられる 人数", StringComparison.Ordinal),
+            "division concepts are incomplete");
         Assert(html.Contains("difficulty:5", StringComparison.Ordinal) && html.Contains("コンパス", StringComparison.Ordinal), "staged grade 3 written arithmetic or circle work is missing");
         Assert(html.Contains("q.isMoney", StringComparison.Ordinal) && html.Contains("q.isGroups", StringComparison.Ordinal) && html.Contains("q.isTape", StringComparison.Ordinal), "new visual scaffolding is missing");
         Assert(html.Contains("requestLearningReset('history')", StringComparison.Ordinal) && html.Contains("this.state.resetPin!==this.parentPin()", StringComparison.Ordinal), "learning reset bypasses PIN confirmation");
@@ -492,7 +502,9 @@ internal static class Program
             gradeOneSubGeneratorSource.Contains("[threeTerm,missingBorrow,mixed]", StringComparison.Ordinal),
             "subtract-zero review is not rare and isolated from grade 1 difficulty 5");
         Assert(
-            subGeneratorSource.Contains("const threeTerm=()=>{const x=this.rand(11,20),y=this.rand(x%10+1,9)", StringComparison.Ordinal) &&
+            // x stops at 18 so that rand(x%10+1,9) always has a single-digit range: at
+            // x=19 it collapses to rand(10,9) and hands the child a two-digit middle term.
+            subGeneratorSource.Contains("const threeTerm=()=>{const x=this.rand(11,18),y=this.rand(x%10+1,9)", StringComparison.Ordinal) &&
             !gradeOneSubGeneratorSource.Contains("this.rand(15,30)", StringComparison.Ordinal) &&
             !gradeOneSubGeneratorSource.Contains("this.rand(30,99)", StringComparison.Ordinal) &&
             !gradeOneSubGeneratorSource.Contains("makeHissan", StringComparison.Ordinal),
@@ -511,12 +523,15 @@ internal static class Program
             "JapaneseQuestionPatch.cs",
             "KanjiCurriculumPatch.cs"
         };
+        // Only the kanji a child can read on screen need furigana, so the commentary that
+        // explains why a generator is written the way it is does not count.
         var generatorCharacters = CjkCharacters(string.Concat(
-            generatorFiles.Select(file => File.ReadAllText(Path.Combine(markupRoot, file)))));
+            generatorFiles.Select(file => WithoutCommentary(File.ReadAllText(Path.Combine(markupRoot, file))))));
         var furiganaSource = File.ReadAllText(Path.Combine(markupRoot, "QuestionFuriganaPatch.cs"));
         var curriculumSource = File.ReadAllText(Path.Combine(markupRoot, "KanjiCurriculumPatch.cs"));
         Assert(
-            furiganaSource.Contains("this.kanjiCurriculumEntries().map(entry=>[entry.k,entry.r])", StringComparison.Ordinal),
+            // The stem, not the whole reading: 見 is read み when 見る already shows る.
+            furiganaSource.Contains("this.kanjiCurriculumEntries().map(entry=>[entry.k,entry.stem||entry.r])", StringComparison.Ordinal),
             "canonical kanji readings are not included in the furigana dictionary");
         var furiganaCharacters = CjkCharacters(furiganaSource)
             .Union(CjkCharacters(curriculumSource))
@@ -529,11 +544,89 @@ internal static class Program
             missingCharacters.Length == 0,
             "question generator CJK characters missing from furigana source: " + new string(missingCharacters));
 
+        static string WithoutCommentary(string source) =>
+            string.Join(
+                '\n',
+                source
+                    .Split('\n')
+                    .Where(static line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal)));
+
         static HashSet<char> CjkCharacters(string source) =>
             source
                 .Where(static character =>
                     (character >= '\u4E00' && character <= '\u9FFF') || character == '々')
                 .ToHashSet();
+    }
+
+    // Marker checks cannot tell whether a generated question teaches the truth, so the
+    // question bank is audited by generating from it. The generators only exist as
+    // JavaScript inside the produced page, so the audit runs them on Node rather than
+    // re-implementing them here, where a copy would drift away from what ships.
+    private static void TestGeneratedQuestionAudit(string repositoryRoot)
+    {
+        var auditScript = Path.Combine(
+            repositoryRoot,
+            "tests",
+            "KidsTraining.ArchitectureTests",
+            "GeneratedQuestionAudit.mjs");
+        Assert(File.Exists(auditScript), $"the generated-question audit is missing: {auditScript}");
+
+        var (template, appDefinition) = ReadLearningSource(repositoryRoot);
+        var html = new LearningPageBuilder().Build(
+            template,
+            appDefinition,
+            "Architecture Test",
+            ParentPin.FromOrDefault("4456"));
+
+        var auditedPage = Path.Combine(
+            Path.GetTempPath(),
+            "kids-training-generated-question-audit.html");
+        File.WriteAllText(auditedPage, html, new UTF8Encoding(false));
+
+        var (exitCode, output) = RunNodeAudit(auditScript, auditedPage);
+        Assert(
+            exitCode == 0,
+            $"the generated question bank violates curriculum invariants (node exit {exitCode}):" +
+            Environment.NewLine + output);
+    }
+
+    private static (int ExitCode, string Output) RunNodeAudit(string scriptPath, string pagePath)
+    {
+        var startInfo = new ProcessStartInfo("node")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
+            UseShellExecute = false,
+        };
+        startInfo.ArgumentList.Add(scriptPath);
+        startInfo.ArgumentList.Add(pagePath);
+
+        Process? process;
+        try
+        {
+            process = Process.Start(startInfo);
+        }
+        catch (Win32Exception exception)
+        {
+            throw new InvalidOperationException(
+                "Node.js is required to audit the generated question bank because the " +
+                "generators ship as JavaScript. Install Node and retry. " + exception.Message);
+        }
+
+        if (process is null)
+        {
+            throw new InvalidOperationException("the generated-question audit process did not start");
+        }
+
+        using (process)
+        {
+            var standardOutput = process.StandardOutput.ReadToEnd();
+            var standardError = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            return (process.ExitCode, (standardOutput + standardError).Trim());
+        }
     }
 
     private static void TestMissingPlaceholder(string repositoryRoot)
