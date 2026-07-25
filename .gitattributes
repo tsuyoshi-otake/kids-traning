@@ -1,0 +1,10 @@
+# The markup patcher locates its edit points with anchors that embed \n, so the
+# learning templates must be LF in the working tree no matter what core.autocrlf
+# a contributor has configured.
+* text=auto eol=lf
+
+*.woff2 -text
+*.ico -text
+*.png -text
+*.jpg -text
+*.msi -text
