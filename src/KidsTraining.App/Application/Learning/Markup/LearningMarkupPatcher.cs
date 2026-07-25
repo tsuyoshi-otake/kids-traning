@@ -132,7 +132,7 @@ internal static partial class LearningMarkupPatcher
             markup,
             "next(){",
             "\n  retry(){",
-            "next(){this.sfx('select');const s=this.state.session;if(s.idx>=s.rolePlan.length-1){const globalPass=s.correct>=this.passLine(),targetPass=s.targetAsked>=4&&s.targetIndependent/s.targetAsked>=.7,pass=globalPass&&targetPass;if(pass)setTimeout(()=>this.sfx('clear'),280);this.setState({screen:pass?'clear':'retry'});}else{const nextIndex=s.idx+1,p=this.curP(),q=this.generateSessionQuestion(p,s,s.rolePlan[nextIndex]);s.questions[nextIndex]=q;s.idx=nextIndex;this.setState({screen:'quiz',...this.freshQ()});}}");
+            "next(){this.sfx('select');const s=this.state.session;if(s.idx>=s.rolePlan.length-1){const pass=this.sessionPassOutcome(this.curP(),s).pass;if(pass)setTimeout(()=>this.sfx('clear'),280);this.setState({screen:pass?'clear':'retry'});}else{const nextIndex=s.idx+1,p=this.curP(),q=this.generateSessionQuestion(p,s,s.rolePlan[nextIndex]);s.questions[nextIndex]=q;s.idx=nextIndex;this.setState({screen:'quiz',...this.freshQ()});}}");
 
         markup = ReplaceBlock(
             markup,
@@ -194,6 +194,7 @@ internal static partial class LearningMarkupPatcher
         markup = PatchQuestionMetadata(markup);
         markup = PatchKeyboardQuestion(markup);
         markup = PatchFractionalScoring(markup);
+        markup = PatchSessionPassGate(markup);
         markup = PatchLearningCheckpoint(markup);
 
         return markup;

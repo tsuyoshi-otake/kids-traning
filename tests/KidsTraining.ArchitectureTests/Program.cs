@@ -301,7 +301,22 @@ internal static class Program
             html.Contains("mixedCount=n-reviewCount-targetCount-1", StringComparison.Ordinal),
             "adaptive sessions do not reserve diverse mixed work while keeping target evidence");
         Assert(!html.Contains("for(let i=0;i<n;i++)qs.push", StringComparison.Ordinal), "all session questions are still generated before the first answer");
-        Assert(html.Contains("globalPass&&targetPass", StringComparison.Ordinal), "session completion ignores target-skill evidence");
+        // Clearing still needs target-skill evidence, but that second goal has to be visible on the
+        // mission and retry screens, and a session that only ever fails it must not trap the child.
+        Assert(
+            html.Contains("const pass=this.sessionPassOutcome(this.curP(),s).pass;", StringComparison.Ordinal) &&
+            html.Contains("targetPass=this.targetGoalMet(s)", StringComparison.Ordinal),
+            "session completion ignores target-skill evidence");
+        Assert(
+            html.Contains("grace=globalPass&&!targetPass&&blocked+1>=this.passGraceLimit()", StringComparison.Ordinal) &&
+            html.Contains("passGraceLimit(){return 2;}", StringComparison.Ordinal),
+            "a session blocked only by the target goal can never be cleared without a parent PIN");
+        Assert(
+            html.Contains("{{ missionTargetText }}", StringComparison.Ordinal) &&
+            html.Contains("{{ retryGoalText }}", StringComparison.Ordinal) &&
+            html.Contains("{{ retryAdvice }}", StringComparison.Ordinal) &&
+            !html.Contains("ごうかくまで あと <b>{{ retryRemaining }}", StringComparison.Ordinal),
+            "the retry screen still shows the score gap only, hiding the real unmet condition");
         Assert(html.Contains("const gradeOpts=[1,2,3].map", StringComparison.Ordinal), "UI still claims unsupported grades");
         Assert(!html.Contains("if(done('add'))staged.push", StringComparison.Ordinal), "cross-subject prerequisite chain remains");
         Assert(html.Contains("1000万を 10こ", StringComparison.Ordinal) && html.Contains("const scale=(g>=3&&stage>=4)?5", StringComparison.Ordinal), "key grade 3 number/chart content is missing");
