@@ -78,10 +78,10 @@ rtk dotnet run --project tests\KidsTraining.ArchitectureTests\KidsTraining.Archi
 Build new releases with a version that matches the release tag:
 
 ```powershell
-rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.19.0
+rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.20.0
 ```
 
-Publish a GitHub Release such as `v1.19.0` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
+Publish a GitHub Release such as `v1.20.0` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
 
 Tracking issues:
 - Initial app and installer: https://github.com/tsuyoshi-otake/kids-traning/issues/1
@@ -113,3 +113,6 @@ Tracking issues:
 - Three-attempt fractional scoring: https://github.com/tsuyoshi-otake/kids-traning/issues/37
 - Pause and resume an in-progress session: https://github.com/tsuyoshi-otake/kids-traning/issues/38
 - Grade-appropriate subtraction and finger-colored keyboard guidance: https://github.com/tsuyoshi-otake/kids-traning/issues/39
+- Answer feedback within a 768px viewport: https://github.com/tsuyoshi-otake/kids-traning/issues/40
+- Centered feedback layout and drawn hanamaru/batsu marks: https://github.com/tsuyoshi-otake/kids-traning/issues/44
+- Visible session pass conditions and a way out of the retry loop: https://github.com/tsuyoshi-otake/kids-traning/issues/43
