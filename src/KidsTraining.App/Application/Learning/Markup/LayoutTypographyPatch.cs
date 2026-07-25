@@ -79,7 +79,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "<div style=\"font-size:26px; color:#5b5040; margin-top:10px;\">{{ fbPrompt }} = <b>{{ fbAnswer }}</b></div>",
-            "<div class=\"kt-feedback-answer\"><div class=\"kt-feedback-row\"><span class=\"kt-feedback-label\">もんだい</span><span>{{ fbPrompt }}</span></div><div class=\"kt-feedback-row\"><span class=\"kt-feedback-label kt-answer-label\">こたえ</span><b>{{ fbAnswer }}</b></div></div>",
+            "<div class=\"kt-feedback-answer\"><div class=\"kt-feedback-row\"><span class=\"kt-feedback-label\">もんだい</span><span class=\"kt-feedback-prompt\">{{ fbPrompt }}</span></div><div class=\"kt-feedback-row\"><span class=\"kt-feedback-label kt-answer-label\">こたえ</span><b class=\"kt-feedback-answer-text\">{{ fbAnswer }}</b></div></div>",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -208,6 +208,49 @@ internal static partial class LearningMarkupPatcher
     line-height: 1.65;
   }
 
+  .kt-feedback-screen {
+    width: 100%;
+    min-height: 100dvh !important;
+    padding: clamp(20px, 3vh, 32px) clamp(20px, 4vw, 48px) !important;
+  }
+
+  .kt-feedback-hero {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--kt-space-6);
+    animation: rise .4s ease-out both;
+  }
+
+  .kt-feedback-mark {
+    display: flex;
+    flex: none;
+    width: 152px;
+    height: 152px;
+    align-items: center;
+    justify-content: center;
+    border: 10px solid currentColor;
+    border-radius: 50%;
+    font-size: 84px;
+    font-weight: 900;
+    line-height: 1;
+    animation: popIn .45s ease-out;
+  }
+
+  .kt-feedback-title {
+    font-size: clamp(44px, 4vw, 58px);
+    font-weight: 900;
+    line-height: 1.15;
+  }
+
+  .kt-feedback-hero-correct {
+    color: #2f7d44;
+  }
+
+  .kt-feedback-hero-wrong {
+    color: #c0453d;
+  }
+
   .kt-feedback-row {
     display: grid;
     grid-template-columns: 6em minmax(0, 1fr);
@@ -232,6 +275,166 @@ internal static partial class LearningMarkupPatcher
   .kt-answer-label {
     background: #eafaef;
     color: #2f7d44;
+  }
+
+  .kt-feedback-prompt,
+  .kt-feedback-answer-text,
+  .kt-feedback-explanation-body {
+    overflow-wrap: break-word;
+    word-break: normal;
+    line-break: strict;
+    text-wrap: pretty;
+  }
+
+  .kt-feedback-note {
+    margin-top: var(--kt-space-3);
+    padding: var(--kt-space-2) var(--kt-space-4);
+    border: 2px solid;
+    border-radius: 18px;
+    background: #fff;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .kt-feedback-note-success {
+    border-color: #cfe9d4;
+    color: #2f7d44;
+  }
+
+  .kt-feedback-note-helped {
+    border-color: #ffe0a8;
+    color: #8a5b0b;
+  }
+
+  .kt-feedback-xp {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--kt-space-2);
+    margin-top: var(--kt-space-3);
+    padding: var(--kt-space-2) var(--kt-space-4);
+    border: 3px solid #d5def5;
+    border-radius: 18px;
+    background: #fff;
+    color: #4f7edb;
+  }
+
+  .kt-feedback-xp-label {
+    font-size: 15px;
+    font-weight: 900;
+  }
+
+  .kt-feedback-xp-amount {
+    font-size: 26px;
+    line-height: 1.2;
+  }
+
+  .kt-feedback-level-up {
+    color: #a96808;
+    font-size: 18px;
+    font-weight: 900;
+    animation: popIn .45s ease-out;
+  }
+
+  .kt-feedback-score {
+    margin-top: var(--kt-space-3);
+    padding: var(--kt-space-2) var(--kt-space-4);
+    border: 3px solid #e8d8b9;
+    border-radius: 18px;
+    background: #fff;
+    color: #5b5040;
+    font-size: 20px;
+    font-weight: 900;
+  }
+
+  .kt-feedback-auto-advance {
+    margin-top: var(--kt-space-2);
+    color: #835a21;
+    font-size: 17px;
+    font-weight: 800;
+  }
+
+  .kt-feedback-rewards {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--kt-space-3);
+    margin-top: var(--kt-space-4);
+    animation: pop .4s ease-out .2s both;
+  }
+
+  .kt-feedback-reward {
+    padding: var(--kt-space-2) var(--kt-space-6);
+    border: 3px solid var(--kt-ink);
+    border-radius: 24px;
+    font-size: 24px;
+    font-weight: 900;
+    line-height: 1.4;
+  }
+
+  .kt-feedback-points {
+    background: #ffcb45;
+  }
+
+  .kt-feedback-combo {
+    background: #ff6b3d;
+    color: #fff;
+  }
+
+  .kt-feedback-explanation {
+    width: min(900px, 92vw);
+    margin-top: var(--kt-space-4);
+    padding: var(--kt-space-4) var(--kt-space-6);
+    border: 3px solid #f0d8c0;
+    border-radius: 20px;
+    background: #fff;
+    color: var(--kt-ink);
+    animation: rise .4s ease-out .2s both;
+  }
+
+  .kt-feedback-explanation-label {
+    margin-bottom: var(--kt-space-2);
+    color: var(--kt-muted);
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .kt-feedback-explanation-body {
+    font-size: clamp(20px, 2vw, 24px);
+    line-height: 1.5;
+  }
+
+  .kt-feedback-topic-row {
+    margin-top: var(--kt-space-3);
+  }
+
+  .kt-feedback-topic {
+    display: inline-block;
+    padding: var(--kt-space-1) var(--kt-space-3);
+    border: 2px solid #ff8a8a;
+    border-radius: 18px;
+    background: #ffe6e0;
+    color: #b83f31;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .kt-feedback-next {
+    min-width: 220px;
+    min-height: 64px;
+    margin-top: var(--kt-space-6);
+    padding: var(--kt-space-3) var(--kt-space-8);
+    border: 4px solid #e07d2a;
+    border-radius: 24px;
+    background: #ff8a3d;
+    box-shadow: 0 7px 0 #d96a26;
+    color: #fff;
+    cursor: pointer;
+    font-size: 30px;
+    font-weight: 900;
+    line-height: 1.2;
+    text-align: center;
   }
 
   [role="button"],
@@ -275,6 +478,116 @@ internal static partial class LearningMarkupPatcher
     .kt-feedback-answer {
       gap: var(--kt-space-2);
       padding: var(--kt-space-3) var(--kt-space-4);
+    }
+  }
+
+  @media (max-height: 900px) {
+    .kt-feedback-screen {
+      justify-content: flex-start !important;
+      padding: var(--kt-space-4) var(--kt-space-6) !important;
+    }
+
+    .kt-feedback-hero {
+      gap: var(--kt-space-4);
+    }
+
+    .kt-feedback-mark {
+      width: 104px;
+      height: 104px;
+      border-width: 8px;
+      font-size: 60px;
+    }
+
+    .kt-feedback-title {
+      font-size: 40px;
+    }
+
+    .kt-feedback-answer {
+      gap: var(--kt-space-2);
+      margin-top: var(--kt-space-3);
+      padding: var(--kt-space-2) var(--kt-space-4);
+      font-size: 19px;
+      line-height: 1.4;
+    }
+
+    .kt-feedback-label {
+      min-height: 30px;
+      padding: var(--kt-space-1) var(--kt-space-2);
+    }
+
+    .kt-feedback-note {
+      margin-top: var(--kt-space-2);
+      padding: var(--kt-space-1) var(--kt-space-3);
+      font-size: 16px;
+    }
+
+    .kt-feedback-xp {
+      margin-top: var(--kt-space-2);
+      padding: var(--kt-space-1) var(--kt-space-3);
+    }
+
+    .kt-feedback-xp-label {
+      font-size: 14px;
+    }
+
+    .kt-feedback-xp-amount {
+      font-size: 22px;
+    }
+
+    .kt-feedback-level-up {
+      font-size: 16px;
+    }
+
+    .kt-feedback-score {
+      margin-top: var(--kt-space-2);
+      padding: var(--kt-space-1) var(--kt-space-3);
+      font-size: 17px;
+    }
+
+    .kt-feedback-auto-advance {
+      margin-top: var(--kt-space-1);
+      font-size: 15px;
+    }
+
+    .kt-feedback-rewards {
+      gap: var(--kt-space-2);
+      margin-top: var(--kt-space-3);
+    }
+
+    .kt-feedback-reward {
+      padding: var(--kt-space-1) var(--kt-space-4);
+      font-size: 20px;
+    }
+
+    .kt-feedback-explanation {
+      margin-top: var(--kt-space-3);
+      padding: var(--kt-space-3) var(--kt-space-4);
+    }
+
+    .kt-feedback-explanation-label {
+      margin-bottom: var(--kt-space-1);
+      font-size: 14px;
+    }
+
+    .kt-feedback-explanation-body {
+      font-size: 19px;
+      line-height: 1.4;
+    }
+
+    .kt-feedback-topic-row {
+      margin-top: var(--kt-space-2);
+    }
+
+    .kt-feedback-topic {
+      padding: 2px var(--kt-space-2);
+      font-size: 14px;
+    }
+
+    .kt-feedback-next {
+      min-height: 56px;
+      margin-top: var(--kt-space-4);
+      padding: var(--kt-space-2) var(--kt-space-8);
+      font-size: 26px;
     }
   }
 

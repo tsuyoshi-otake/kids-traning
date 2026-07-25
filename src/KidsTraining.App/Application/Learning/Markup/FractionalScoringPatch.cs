@@ -59,16 +59,16 @@ internal static partial class LearningMarkupPatcher
             markup,
             """
       <sc-if value="{{ fbCorrect }}" hint-placeholder-val="{{ false }}">
-        <div style="display:flex; gap:14px; margin-top:18px; animation:pop .4s ease-out .2s both;">
+        <div class="kt-feedback-rewards">
 """,
             """
-      <div style="margin-top:14px; background:#fff; border:3px solid #e8d8b9; border-radius:18px; padding:8px 20px; font-size:22px; font-weight:900; color:#5b5040;">この もんだい：<b>{{ fbScore }}てん</b></div>
+      <div class="kt-feedback-score">この もんだい：<b>{{ fbScore }}てん</b></div>
       <sc-if value="{{ fbAutoAdvance }}" hint-placeholder-val="{{ false }}">
-        <div role="status" style="margin-top:10px; color:#9a6a2e; font-size:18px; font-weight:800;">こたえを かくにんして、つぎへ すすみます</div>
+        <div class="kt-feedback-auto-advance" role="status">こたえを かくにんして、つぎへ すすみます</div>
       </sc-if>
 
       <sc-if value="{{ fbCorrect }}" hint-placeholder-val="{{ false }}">
-        <div style="display:flex; gap:14px; margin-top:18px; animation:pop .4s ease-out .2s both;">
+        <div class="kt-feedback-rewards">
 """,
             StringComparison.Ordinal);
 

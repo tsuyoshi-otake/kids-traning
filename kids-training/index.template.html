@@ -304,42 +304,46 @@
 
   <!-- ============ FEEDBACK ============ -->
   <sc-if value="{{ isFeedback }}" hint-placeholder-val="{{ false }}">
-    <div data-screen-label="フィードバック" style="{{ feedbackBgStyle }}">
+    <div class="kt-feedback-screen" data-screen-label="フィードバック" style="{{ feedbackBgStyle }}">
       <sc-if value="{{ fbCorrect }}" hint-placeholder-val="{{ false }}">
-        <div style="width:200px; height:200px; border:14px solid #3aa655; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:110px; color:#3aa655; animation:popIn .45s ease-out; font-weight:900;">○</div>
-        <div style="font-size:54px; font-weight:900; color:#2f7d44; margin-top:14px; animation:rise .4s ease-out .1s both;">せいかい！</div>
+        <div class="kt-feedback-hero kt-feedback-hero-correct">
+          <div class="kt-feedback-mark" aria-hidden="true">○</div>
+          <div class="kt-feedback-title">せいかい！</div>
+        </div>
       </sc-if>
       <sc-if value="{{ fbWrong }}" hint-placeholder-val="{{ false }}">
-        <div style="width:200px; height:200px; border:14px solid #e0552f; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:104px; color:#e0552f; animation:popIn .45s ease-out; font-weight:900;">×</div>
-        <div style="font-size:50px; font-weight:900; color:#c0453d; margin-top:14px; animation:rise .4s ease-out .1s both;">おしい！</div>
+        <div class="kt-feedback-hero kt-feedback-hero-wrong">
+          <div class="kt-feedback-mark" aria-hidden="true">×</div>
+          <div class="kt-feedback-title">おしい！</div>
+        </div>
       </sc-if>
 
       <div style="font-size:26px; color:#5b5040; margin-top:10px;">{{ fbPrompt }} = <b>{{ fbAnswer }}</b></div>
       <sc-if value="{{ fbViaSteps }}" hint-placeholder-val="{{ false }}">
-        <div style="margin-top:10px; background:#fff; border:2px solid #cfe9d4; border-radius:18px; padding:6px 18px; font-size:18px; color:#2f7d44; font-weight:700;">✓ ステップで かいけつ できたね！</div>
+        <div class="kt-feedback-note kt-feedback-note-success">✓ ステップで かいけつ できたね！</div>
       </sc-if>
       <sc-if value="{{ fbHelped }}" hint-placeholder-val="{{ false }}">
-        <div style="margin-top:10px; background:#fff; border:2px solid #ffe0a8; border-radius:18px; padding:6px 18px; font-size:18px; color:#b07a1a; font-weight:700;">💡 ヒントを つかって せいかい！</div>
+        <div class="kt-feedback-note kt-feedback-note-helped">💡 ヒントを つかって せいかい！</div>
       </sc-if>
 
       <sc-if value="{{ fbCorrect }}" hint-placeholder-val="{{ false }}">
-        <div style="display:flex; gap:14px; margin-top:18px; animation:pop .4s ease-out .2s both;">
-          <span style="background:#ffcb45; border:3px solid #3a3326; border-radius:24px; padding:10px 22px; font-size:24px; font-weight:900;">★ {{ fbStarText }} ポイント</span>
+        <div class="kt-feedback-rewards">
+          <span class="kt-feedback-reward kt-feedback-points">★ {{ fbStarText }} ポイント</span>
           <sc-if value="{{ fbCombo }}" hint-placeholder-val="{{ false }}">
-            <span style="background:#ff6b3d; color:#fff; border:3px solid #3a3326; border-radius:24px; padding:10px 22px; font-size:24px; font-weight:900;">🔥 れんぞく ボーナス！</span>
+            <span class="kt-feedback-reward kt-feedback-combo">🔥 れんぞく ボーナス！</span>
           </sc-if>
         </div>
       </sc-if>
 
       <sc-if value="{{ fbWrong }}" hint-placeholder-val="{{ false }}">
-        <div style="width:620px; max-width:90%; background:#fff; border:4px solid #f0e2c8; border-radius:22px; padding:18px 22px; margin-top:20px; animation:rise .4s ease-out .2s both;">
-          <div style="font-size:16px; color:#9a8662; margin-bottom:6px;">どうして？（かいせつ）</div>
-          <div style="font-size:24px; line-height:1.6;">{{ fbExplanation }}</div>
-          <div style="margin-top:12px;"><span style="background:#ffe6e0; color:#d2503f; border:2px solid #ff8a8a; border-radius:18px; padding:5px 14px; font-size:16px; font-weight:700;">「{{ fbTopicLabel }}」を にがてに きろく</span></div>
+        <div class="kt-feedback-explanation">
+          <div class="kt-feedback-explanation-label">どうして？（かいせつ）</div>
+          <div class="kt-feedback-explanation-body">{{ fbExplanation }}</div>
+          <div class="kt-feedback-topic-row"><span class="kt-feedback-topic">「{{ fbTopicLabel }}」を にがてに きろく</span></div>
         </div>
       </sc-if>
 
-      <div onclick="{{ next }}" style="margin-top:26px; background:#ff8a3d; color:#fff; border:4px solid #e07d2a; border-radius:24px; padding:15px 56px; font-size:30px; font-weight:900; cursor:pointer; box-shadow:0 7px 0 #d96a26;">つぎへ ▶</div>
+      <div class="kt-feedback-next" onclick="{{ next }}">つぎへ ▶</div>
     </div>
   </sc-if>
 

@@ -472,6 +472,13 @@ internal static class Program
             html.Contains("""class="kt-question-prompt""", StringComparison.Ordinal) &&
             html.Contains("""class="kt-choice-grid""", StringComparison.Ordinal) &&
             html.Contains("""class="kt-feedback-answer""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-feedback-screen""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-feedback-hero kt-feedback-hero-correct""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-feedback-explanation""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-feedback-xp""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-feedback-next""", StringComparison.Ordinal) &&
+            html.Contains("min-height: 100dvh !important", StringComparison.Ordinal) &&
+            html.Contains("@media (max-height: 900px)", StringComparison.Ordinal) &&
             html.Contains("@media (max-width: 720px)", StringComparison.Ordinal) &&
             html.Contains("button:focus-visible", StringComparison.Ordinal) &&
             html.Contains("select:focus-visible", StringComparison.Ordinal) &&

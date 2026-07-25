@@ -34,7 +34,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "      <div style=\"font-size:26px; color:#5b5040; margin-top:10px;\">{{ fbPrompt }} = <b>{{ fbAnswer }}</b></div>",
-            "      <div style=\"margin-top:12px; background:#fff; border:4px solid #f0e2c8; border-radius:22px; padding:10px 22px; min-width:280px; text-align:center;\">\n        <div style=\"font-size:15px; color:#4f7edb; font-weight:900;\">けいけんち</div>\n        <div style=\"font-size:34px; color:#4f7edb; font-weight:900;\">+{{ fbXp }} XP</div>\n        <sc-if value=\"{{ fbLevelUp }}\" hint-placeholder-val=\"{{ false }}\"><div style=\"font-size:22px; color:#e09020; font-weight:900; animation:popIn .45s ease-out;\">レベルアップ！ {{ level }}</div></sc-if>\n      </div>\n      <div style=\"font-size:26px; color:#5b5040; margin-top:10px;\">{{ fbPrompt }} = <b>{{ fbAnswer }}</b></div>",
+            "      <div style=\"font-size:26px; color:#5b5040; margin-top:10px;\">{{ fbPrompt }} = <b>{{ fbAnswer }}</b></div>\n      <div class=\"kt-feedback-xp\">\n        <span class=\"kt-feedback-xp-label\">けいけんち</span>\n        <strong class=\"kt-feedback-xp-amount\">+{{ fbXp }} XP</strong>\n        <sc-if value=\"{{ fbLevelUp }}\" hint-placeholder-val=\"{{ false }}\"><span class=\"kt-feedback-level-up\">レベルアップ！ {{ level }}</span></sc-if>\n      </div>",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
