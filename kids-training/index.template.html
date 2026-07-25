@@ -307,13 +307,19 @@
     <div class="kt-feedback-screen" data-screen-label="フィードバック" style="{{ feedbackBgStyle }}">
       <sc-if value="{{ fbCorrect }}" hint-placeholder-val="{{ false }}">
         <div class="kt-feedback-hero kt-feedback-hero-correct">
-          <div class="kt-feedback-mark" aria-hidden="true">○</div>
+          <svg class="kt-feedback-mark kt-mark-hanamaru" sc-camel-view-box="0 0 120 120" aria-hidden="true">
+            <path class="kt-mark-petals" sc-camel-path-length="100" d="M101.3 42.9 A18 18 0 0 1 101.3 77.1 A18 18 0 0 1 77.1 101.3 A18 18 0 0 1 42.9 101.3 A18 18 0 0 1 18.7 77.1 A18 18 0 0 1 18.7 42.9 A18 18 0 0 1 42.9 18.7 A18 18 0 0 1 77.1 18.7 A18 18 0 0 1 101.3 42.9 Z"/>
+            <path class="kt-mark-swirl" sc-camel-path-length="100" d="M60.0 60.0 L60.5 60.1 L60.9 60.4 L61.2 60.9 L61.3 61.4 L61.2 62.1 L60.9 62.8 L60.4 63.4 L59.6 63.9 L58.6 64.2 L57.6 64.2 L56.4 64.0 L55.3 63.4 L54.2 62.6 L53.3 61.4 L52.7 60.0 L52.4 58.4 L52.4 56.6 L52.9 54.9 L53.8 53.1 L55.1 51.6 L56.8 50.3 L58.9 49.4 L61.2 48.9 L63.6 48.9 L66.1 49.5 L68.5 50.6 L70.6 52.3 L72.4 54.5 L73.8 57.1 L74.6 60.0 L74.7 63.1 L74.2 66.3 L73.0 69.4 L71.1 72.3 L68.5 74.7 L65.4 76.6 L61.9 77.9 L58.1 78.4 L54.1 78.0 L50.3 76.8 L46.7 74.8 L43.5 72.0 L40.9 68.5 L39.1 64.4 L38.1 60.0 L38.1 55.3 L39.1 50.7 L41.1 46.3 L44.1 42.3 L47.8 38.9 L52.3 36.4 L57.4 34.9 L62.7 34.4 L68.1 35.0 L73.4 36.8 L78.2 39.8 L82.4 43.7 L85.8 48.5 L88.1 54.0 L89.2 60.0 L89.0 66.2 L87.5 72.3 L84.8 78.0 L81.9 81.9"/>
+          </svg>
           <div class="kt-feedback-title">せいかい！</div>
         </div>
       </sc-if>
       <sc-if value="{{ fbWrong }}" hint-placeholder-val="{{ false }}">
         <div class="kt-feedback-hero kt-feedback-hero-wrong">
-          <div class="kt-feedback-mark" aria-hidden="true">×</div>
+          <svg class="kt-feedback-mark kt-mark-batsu" sc-camel-view-box="0 0 120 120" aria-hidden="true">
+            <path class="kt-mark-stroke kt-mark-stroke-a" sc-camel-path-length="100" d="M28 28 Q57.2 62.8 92 92"/>
+            <path class="kt-mark-stroke kt-mark-stroke-b" sc-camel-path-length="100" d="M92 28 Q62.8 62.8 28 92"/>
+          </svg>
           <div class="kt-feedback-title">おしい！</div>
         </div>
       </sc-if>

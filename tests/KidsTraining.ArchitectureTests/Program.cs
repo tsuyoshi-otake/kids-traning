@@ -478,12 +478,27 @@ internal static class Program
             html.Contains("""class="kt-feedback-xp""", StringComparison.Ordinal) &&
             html.Contains("""class="kt-feedback-next""", StringComparison.Ordinal) &&
             html.Contains("min-height: 100dvh !important", StringComparison.Ordinal) &&
+            html.Contains("justify-content: safe center !important", StringComparison.Ordinal) &&
+            !html.Contains("justify-content: flex-start !important", StringComparison.Ordinal) &&
             html.Contains("@media (max-height: 900px)", StringComparison.Ordinal) &&
+            html.Contains("@media (max-height: 760px)", StringComparison.Ordinal) &&
             html.Contains("@media (max-width: 720px)", StringComparison.Ordinal) &&
             html.Contains("button:focus-visible", StringComparison.Ordinal) &&
             html.Contains("select:focus-visible", StringComparison.Ordinal) &&
             html.Contains("@media (prefers-reduced-motion: reduce)", StringComparison.Ordinal),
             "responsive typography, focus, or reduced-motion markup is missing");
+
+        // The runtime lowercases every HTML attribute, so viewBox / pathLength only survive
+        // through the sc-camel- escape hatch. Losing it silently breaks scaling and the draw animation.
+        Assert(
+            html.Contains("""class="kt-feedback-mark kt-mark-hanamaru" sc-camel-view-box="0 0 120 120""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-feedback-mark kt-mark-batsu" sc-camel-view-box="0 0 120 120""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-mark-petals" sc-camel-path-length="100""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-mark-swirl" sc-camel-path-length="100""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-mark-stroke kt-mark-stroke-a" sc-camel-path-length="100""", StringComparison.Ordinal) &&
+            html.Contains("""class="kt-mark-stroke kt-mark-stroke-b" sc-camel-path-length="100""", StringComparison.Ordinal) &&
+            html.Contains("@keyframes kt-draw-mark", StringComparison.Ordinal),
+            "feedback hanamaru/batsu SVG marks or their draw animation are missing");
 
         var markupRoot = Path.Combine(
             repositoryRoot,

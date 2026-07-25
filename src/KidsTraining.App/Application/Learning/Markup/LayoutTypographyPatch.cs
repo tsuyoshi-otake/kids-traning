@@ -130,6 +130,7 @@ internal static partial class LearningMarkupPatcher
     --kt-muted: #765f3d;
     --kt-paper: #fffdf8;
     --kt-border: #e7d6b6;
+    --kt-feedback-measure: min(760px, 92vw);
   }
 
   body {
@@ -197,7 +198,9 @@ internal static partial class LearningMarkupPatcher
   .kt-feedback-answer {
     display: grid;
     gap: var(--kt-space-3);
-    width: min(900px, 92vw);
+    width: fit-content;
+    min-width: min(460px, 92vw);
+    max-width: var(--kt-feedback-measure);
     margin-top: var(--kt-space-4);
     padding: var(--kt-space-4) var(--kt-space-6);
     border: 3px solid var(--kt-border);
@@ -212,6 +215,7 @@ internal static partial class LearningMarkupPatcher
     width: 100%;
     min-height: 100dvh !important;
     padding: clamp(20px, 3vh, 32px) clamp(20px, 4vw, 48px) !important;
+    justify-content: safe center !important;
   }
 
   .kt-feedback-hero {
@@ -223,18 +227,46 @@ internal static partial class LearningMarkupPatcher
   }
 
   .kt-feedback-mark {
-    display: flex;
+    display: block;
     flex: none;
     width: 152px;
     height: 152px;
-    align-items: center;
-    justify-content: center;
-    border: 10px solid currentColor;
-    border-radius: 50%;
-    font-size: 84px;
-    font-weight: 900;
-    line-height: 1;
-    animation: popIn .45s ease-out;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .kt-mark-hanamaru {
+    stroke-width: 6;
+  }
+
+  .kt-mark-batsu {
+    stroke-width: 10;
+  }
+
+  /* Every mark path declares pathLength="100", so one dash length draws them all. */
+  .kt-mark-petals,
+  .kt-mark-swirl,
+  .kt-mark-stroke {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: kt-draw-mark .42s ease-out both;
+  }
+
+  .kt-mark-swirl {
+    animation-duration: .62s;
+    animation-delay: .3s;
+  }
+
+  .kt-mark-stroke-b {
+    animation-delay: .16s;
+  }
+
+  @keyframes kt-draw-mark {
+    to {
+      stroke-dashoffset: 0;
+    }
   }
 
   .kt-feedback-title {
@@ -383,7 +415,9 @@ internal static partial class LearningMarkupPatcher
   }
 
   .kt-feedback-explanation {
-    width: min(900px, 92vw);
+    width: fit-content;
+    min-width: min(460px, 92vw);
+    max-width: var(--kt-feedback-measure);
     margin-top: var(--kt-space-4);
     padding: var(--kt-space-4) var(--kt-space-6);
     border: 3px solid #f0d8c0;
@@ -483,7 +517,6 @@ internal static partial class LearningMarkupPatcher
 
   @media (max-height: 900px) {
     .kt-feedback-screen {
-      justify-content: flex-start !important;
       padding: var(--kt-space-4) var(--kt-space-6) !important;
     }
 
@@ -492,22 +525,20 @@ internal static partial class LearningMarkupPatcher
     }
 
     .kt-feedback-mark {
-      width: 104px;
-      height: 104px;
-      border-width: 8px;
-      font-size: 60px;
+      width: 120px;
+      height: 120px;
     }
 
     .kt-feedback-title {
-      font-size: 40px;
+      font-size: 44px;
     }
 
     .kt-feedback-answer {
       gap: var(--kt-space-2);
       margin-top: var(--kt-space-3);
-      padding: var(--kt-space-2) var(--kt-space-4);
-      font-size: 19px;
-      line-height: 1.4;
+      padding: var(--kt-space-3) var(--kt-space-4);
+      font-size: 21px;
+      line-height: 1.45;
     }
 
     .kt-feedback-label {
@@ -570,8 +601,8 @@ internal static partial class LearningMarkupPatcher
     }
 
     .kt-feedback-explanation-body {
-      font-size: 19px;
-      line-height: 1.4;
+      font-size: 21px;
+      line-height: 1.45;
     }
 
     .kt-feedback-topic-row {
@@ -588,6 +619,27 @@ internal static partial class LearningMarkupPatcher
       margin-top: var(--kt-space-4);
       padding: var(--kt-space-2) var(--kt-space-8);
       font-size: 26px;
+    }
+  }
+
+  @media (max-height: 760px) {
+    .kt-feedback-mark {
+      width: 104px;
+      height: 104px;
+    }
+
+    .kt-feedback-title {
+      font-size: 40px;
+    }
+
+    .kt-feedback-answer,
+    .kt-feedback-explanation-body {
+      font-size: 19px;
+      line-height: 1.4;
+    }
+
+    .kt-feedback-answer {
+      padding: var(--kt-space-2) var(--kt-space-4);
     }
   }
 
