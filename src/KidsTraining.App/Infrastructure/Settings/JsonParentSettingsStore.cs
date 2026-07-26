@@ -28,7 +28,11 @@ internal sealed class JsonParentSettingsStore : IParentPinStore, IParentLearning
         lock (gate)
         {
             var stored = ReadStoredOrDefault();
-            return LearningSessionSettings.Normalize(stored.QuestionCount, stored.PassLine);
+            return LearningSessionSettings.Normalize(
+                stored.QuestionCount,
+                stored.PassLine,
+                stored.SchoolGrade,
+                stored.PreferSchoolGrade);
         }
     }
 
@@ -69,7 +73,9 @@ internal sealed class JsonParentSettingsStore : IParentPinStore, IParentLearning
                 WriteStored(current with
                 {
                     QuestionCount = settings.QuestionCount,
-                    PassLine = settings.PassLine
+                    PassLine = settings.PassLine,
+                    SchoolGrade = settings.SchoolGrade,
+                    PreferSchoolGrade = settings.PreferSchoolGrade
                 });
             }
             catch (Exception exception)
@@ -131,8 +137,10 @@ internal sealed class JsonParentSettingsStore : IParentPinStore, IParentLearning
         [property: JsonPropertyName("parentPassword")] string? ParentPassword,
         [property: JsonPropertyName("questionCount")] int? QuestionCount,
         [property: JsonPropertyName("passLine")] int? PassLine,
+        [property: JsonPropertyName("schoolGrade")] int? SchoolGrade,
+        [property: JsonPropertyName("preferSchoolGrade")] bool? PreferSchoolGrade,
         [property: JsonPropertyName("pendingLearningReset")] string? PendingLearningReset)
     {
-        public static StoredSettings Default { get; } = new(ParentPin.Default.Value, null, null, null);
+        public static StoredSettings Default { get; } = new(ParentPin.Default.Value, null, null, null, null, null);
     }
 }

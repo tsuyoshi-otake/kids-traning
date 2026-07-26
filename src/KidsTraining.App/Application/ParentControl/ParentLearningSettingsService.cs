@@ -13,7 +13,11 @@ internal sealed class ParentLearningSettingsService : IParentLearningSettingsPro
 
     public LearningSessionSettings GetCurrentSettings() => store.ReadLearningSettings();
 
-    public LearningSessionSettingsUpdateResult Update(int? questionCount, int? passLine)
+    public LearningSessionSettingsUpdateResult Update(
+        int? questionCount,
+        int? passLine,
+        int? schoolGrade,
+        bool? preferSchoolGrade)
     {
         var current = GetCurrentSettings();
         if (questionCount is null or < LearningSessionSettings.MinimumQuestionCount or > LearningSessionSettings.MaximumQuestionCount)
@@ -32,7 +36,27 @@ internal sealed class ParentLearningSettingsService : IParentLearningSettingsPro
                 current);
         }
 
-        var settings = new LearningSessionSettings(questionCount.Value, passLine.Value);
+        if (schoolGrade is null or < LearningSessionSettings.MinimumSchoolGrade or > LearningSessionSettings.MaximumSchoolGrade)
+        {
+            return new LearningSessionSettingsUpdateResult(
+                false,
+                "学校学年は1〜6の整数にしてください。",
+                current);
+        }
+
+        if (preferSchoolGrade is null)
+        {
+            return new LearningSessionSettingsUpdateResult(
+                false,
+                "登録学年優先はONまたはOFFで指定してください。",
+                current);
+        }
+
+        var settings = new LearningSessionSettings(
+            questionCount.Value,
+            passLine.Value,
+            schoolGrade.Value,
+            preferSchoolGrade.Value);
         try
         {
             store.WriteLearningSettings(settings);

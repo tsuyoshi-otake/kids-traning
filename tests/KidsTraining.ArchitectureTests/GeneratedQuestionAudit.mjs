@@ -60,6 +60,7 @@ let app;
 try {
   const Component = new Function('DCLogic', `${appSource}\nreturn Component;`)(DCLogic);
   app = new Component();
+  app.props = app.props || {};
 } catch (error) {
   console.error(`the app class could not be instantiated: ${error && error.stack}`);
   process.exit(2);
@@ -86,10 +87,9 @@ const observe = (check, amount = 1) => observed.set(check, (observed.get(check) 
 const TOPICS = [
   'add', 'sub', 'hissan', 'mul', 'clock', 'kokugo', 'moji', 'measure', 'kazu', 'shape',
   'div', 'frac', 'chart', 'story', 'bun', 'goi', 'dokkai', 'eigo', 'money', 'groups',
-  'order', 'soroban', 'seikatsu', 'shakai', 'rika', 'doutoku', 'jouhou', 'sougou',
+  'order', 'soroban', 'seikatsu', 'shakai', 'rika', 'kateika', 'doutoku', 'jouhou', 'sougou',
   'tokubetsu', 'keyboard',
 ];
-const GRADES = [1, 2, 3];
 const STAGES = [1, 2, 3, 4, 5];
 const SAMPLES_PER_COMBINATION = Math.max(1, Number(process.argv[3]) || 300);
 
@@ -113,6 +113,11 @@ const profileFor = (grade) => ({
 // --- reference data taken from the app itself, never re-typed ----------------------------
 
 const curriculum = app.kanjiCurriculumEntries();
+const kanjiCounts = [1, 2, 3, 4, 5, 6].map((grade) => curriculum.filter((entry) => entry.g === grade).length);
+observe('kanji allocation is complete', curriculum.length);
+if (kanjiCounts.join(',') !== '80,160,200,202,193,191' || curriculum.length !== 1026 || new Set(curriculum.map((entry) => entry.k)).size !== 1026) {
+  violated('kanji allocation is complete', `counts were ${kanjiCounts.join(',')} with ${curriculum.length} total entries`, 'MEXT grade allocation');
+}
 const readingsByWord = new Map();
 for (const entry of curriculum) {
   const word = entry.word || entry.k;
@@ -175,15 +180,132 @@ const TWO_TERM_ADDITION = /^\s*(\d+)\s*[+＋]\s*(\d+)\s*$/;
 // --- generate and audit -----------------------------------------------------------------
 
 let generated = 0;
-for (const topic of TOPICS) {
-  for (const grade of GRADES) {
+const UNITS = app.curriculumCatalog();
+observe('common IME romaji spellings are equivalent', 10);
+for (const [standard, ime] of [['shi', 'si'], ['chi', 'ti'], ['tsu', 'tu'], ['fu', 'hu'], ['sha', 'sya'], ['cha', 'tya'], ['ja', 'zya']]) {
+  if (!app.romajiInputEquivalent(standard, ime)) {
+    violated('common IME romaji spellings are equivalent', `${standard} and ${ime} were treated differently`, `${standard}/${ime}`);
+  }
+}
+
+// Exercise the real schema-v5 migration and lane selection code before auditing generators.
+// These checks protect the early-learning contract independently of the registered grade.
+app.state = {
+  settings: { topics: Object.fromEntries(TOPICS.map((topic) => [topic, true])) },
+  session: null,
+};
+const legacyProfiles = [
+  { name: 'complete', grade: 2, stars: 42, xp: 91, mastery: { add: 0.95 }, skillStats: { add: { attempts: 8, independent: 7, retentionStartedAt: 100, masteredAt: 200 } }, cleared: { add: true } },
+  { name: 'partial', grade: 2, stars: 7, xp: 13, mastery: { add: 0.6 }, skillStats: { add: { attempts: 5, independent: 3, confidence: 0.6, lastAttemptAt: 300 } }, cleared: {} },
+  { name: 'untouched', grade: 1, stars: 0, xp: 0, mastery: {}, skillStats: {}, cleared: {} },
+];
+const migratedOnce = app.migrateProfiles(legacyProfiles);
+const migratedTwice = app.migrateProfiles(migratedOnce);
+observe('schema-v5 migration is idempotent', legacyProfiles.length);
+if (JSON.stringify(migratedOnce) !== JSON.stringify(migratedTwice)) {
+  violated('schema-v5 migration is idempotent', 'a second migration changed profile data', 'v4 -> v5 -> v5');
+}
+for (let index = 0; index < legacyProfiles.length; index += 1) {
+  const before = legacyProfiles[index];
+  const after = migratedOnce[index];
+  if (after.learningSchema !== 5 || Object.keys(after.unitStats || {}).length !== UNITS.length) {
+    violated('schema-v5 migration is idempotent', `${before.name} did not receive one stat per unit`, before.name);
+  }
+  if (after.stars !== before.stars || after.xp !== before.xp || !after.legacyTopicStats) {
+    violated('schema-v5 migration preserves evidence', `${before.name} lost stars, XP, or legacy evidence`, before.name);
+  }
+}
+observe('schema-v5 migration preserves evidence', legacyProfiles.length);
+
+const beginnerAtGrade = (grade) => app.ensureLearningProfile({
+  name: `grade-${grade}`,
+  grade,
+  stars: 0,
+  xp: 0,
+  mastery: {},
+  skillStats: {},
+  cleared: {},
+});
+const gradeOneBeginner = beginnerAtGrade(1);
+const gradeSixBeginner = beginnerAtGrade(6);
+const gradeOneFrontier = app.frontierTopics(gradeOneBeginner);
+const gradeSixFrontier = app.frontierTopics(gradeSixBeginner);
+observe('school grade never caps curriculum', 2);
+if (JSON.stringify(gradeOneFrontier) !== JSON.stringify(gradeSixFrontier)) {
+  violated('school grade never caps curriculum', 'registered grades 1 and 6 start with different lane frontiers', `${gradeOneFrontier} vs ${gradeSixFrontier}`);
+}
+
+const originalSettings = app.state.settings;
+const preferenceProfile = beginnerAtGrade(4);
+app.state.settings = { ...app.defaultSettings(), preferSchoolGrade: false };
+const preferenceOffFrontier = app.frontierTopics(preferenceProfile);
+const preferenceStatsBefore = JSON.stringify(preferenceProfile.unitStats);
+app.state.settings = { ...app.defaultSettings(), preferSchoolGrade: true };
+const preferenceOnFrontier = app.frontierTopics(preferenceProfile);
+observe('school-grade preference is optional and reversible', 4);
+const belowPreferredGrade = preferenceOnFrontier.filter((id) => app.curriculumUnit(id).grade < 4);
+if (belowPreferredGrade.length) {
+  violated('school-grade preference is optional and reversible', 'enabled preference still selected units below grade 4', belowPreferredGrade.join(','));
+}
+const preferredMath = preferenceOnFrontier.find((id) => id.startsWith('math.'));
+if (!preferredMath || app.curriculumUnit(preferredMath).grade !== 4) {
+  violated('school-grade preference is optional and reversible', 'grade 4 did not begin at the first grade-4 mathematics unit', String(preferredMath));
+}
+if (JSON.stringify(preferenceProfile.unitStats) !== preferenceStatsBefore) {
+  violated('school-grade preference is optional and reversible', 'enabling the preference changed unit progress', preferenceProfile.name);
+}
+app.state.settings = { ...app.defaultSettings(), preferSchoolGrade: false };
+const preferenceRestoredFrontier = app.frontierTopics(preferenceProfile);
+if (JSON.stringify(preferenceRestoredFrontier) !== JSON.stringify(preferenceOffFrontier)) {
+  violated('school-grade preference is optional and reversible', 'turning the preference off did not restore the original frontier', `${preferenceRestoredFrontier} vs ${preferenceOffFrontier}`);
+}
+app.state.settings = originalSettings;
+
+const mathLane = app.curriculumLaneIds().find((lane) => lane.some((id) => id.startsWith('math.')));
+const japaneseLane = app.curriculumLaneIds().find((lane) => lane.some((id) => id.startsWith('japanese.')));
+observe('subject lanes unlock independently', 2);
+observe('question generation uses unit grade, not school grade', 2);
+if (mathLane) {
+  const firstMathGrade = app.curriculumUnit(mathLane[0]).grade;
+  const lastMathGrade = app.curriculumUnit(mathLane[mathLane.length - 1]).grade;
+  if (app.profileAtStage(gradeSixBeginner, mathLane[0], 1).grade !== firstMathGrade) {
+    violated('question generation uses unit grade, not school grade', 'a grade-6 registration changed the first mathematics unit generator grade', mathLane[0]);
+  }
+  if (app.profileAtStage(gradeOneBeginner, mathLane[mathLane.length - 1], 1).grade !== lastMathGrade) {
+    violated('question generation uses unit grade, not school grade', 'a grade-1 registration changed the last mathematics unit generator grade', mathLane[mathLane.length - 1]);
+  }
+}
+if (!mathLane || app.frontierTopics(gradeOneBeginner).find((id) => id.startsWith('math.')) !== mathLane[0]) {
+  violated('subject lanes unlock independently', 'a beginner does not start at the first mathematics unit', String(mathLane && mathLane[0]));
+} else {
+  gradeOneBeginner.unitStats[mathLane[0]].retentionStartedAt = 1;
+  const nextMath = app.frontierTopics(gradeOneBeginner).find((id) => id.startsWith('math.'));
+  if (nextMath !== mathLane[1]) {
+    violated('subject lanes unlock independently', 'starting retention did not unlock the next mathematics unit', `${nextMath} vs ${mathLane[1]}`);
+  }
+  if (japaneseLane && app.frontierTopics(gradeOneBeginner).find((id) => id.startsWith('japanese.')) !== japaneseLane[0]) {
+    violated('subject lanes unlock independently', 'advancing mathematics also advanced Japanese', japaneseLane[0]);
+  }
+  for (const id of mathLane) {
+    if ((app.curriculumUnit(id)?.grade || 0) >= 6) break;
+    gradeOneBeginner.unitStats[id].retentionStartedAt = 1;
+  }
+  const earlyLearningUnit = app.frontierTopics(gradeOneBeginner).find((id) => id.startsWith('math.'));
+  if ((app.curriculumUnit(earlyLearningUnit)?.grade || 0) !== 6) {
+    violated('school grade never caps curriculum', 'a registered grade-1 profile could not reach grade-6 mathematics', String(earlyLearningUnit));
+  }
+}
+
+for (const unit of UNITS) {
+  const topic = unit.topicId;
+  const grade = unit.grade;
     for (const stage of STAGES) {
       const profile = profileFor(grade);
       for (let i = 0; i < SAMPLES_PER_COMBINATION; i += 1) {
-        const where = `${topic} grade${grade} stage${stage}`;
+        const where = `${unit.id} (${topic}) grade${grade} stage${stage}`;
         let question;
         try {
-          question = app.genFor(topic, profile, stage);
+          question = app.genFor(unit.id, profile, stage);
         } catch (error) {
           violated('generators complete', `${topic} threw ${error && error.message}`, where);
           continue;
@@ -197,6 +319,9 @@ for (const topic of TOPICS) {
         observe('questions are complete');
         if (question.topic !== topic) {
           violated('questions are complete', `the question is labelled ${question.topic} but was asked for ${topic}`, context);
+        }
+        if (question.unitId !== unit.id || question.grade !== unit.grade) {
+          violated('questions are complete', `unit metadata is ${question.unitId}/grade${question.grade}, expected ${unit.id}/grade${unit.grade}`, context);
         }
         if (answer === '' || answer === 'undefined' || answer === 'null') {
           violated('questions are complete', 'the question has no answer', context);
@@ -354,7 +479,6 @@ for (const topic of TOPICS) {
         }
       }
     }
-  }
 }
 
 // --- aggregate checks -------------------------------------------------------------------
@@ -388,7 +512,7 @@ const summary = [...observed.entries()]
   .join('\n');
 
 if (violations.size === 0 && emptyChecks.length === 0) {
-  console.log(`generated-question audit passed: ${generated} questions across ${TOPICS.length} topics x ${GRADES.length} grades x ${STAGES.length} stages`);
+  console.log(`generated-question audit passed: ${generated} questions across ${UNITS.length} units x ${STAGES.length} stages`);
   console.log(summary);
   process.exit(0);
 }

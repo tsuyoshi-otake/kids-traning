@@ -12,4 +12,12 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\KidsTraining.App\KidsTraining.App.csproj" />
   </ItemGroup>
+
+  <!-- ProjectReference evaluation re-imports WebView2's unused WPF assembly into this
+       WinForms architecture harness, so mirror the application-side exclusion. -->
+  <Target Name="RemoveUnusedWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="$(NuGetPackageRoot)microsoft.web.webview2\1.0.4022.49\buildTransitive\..\\lib_manual\net5.0-windows10.0.17763.0\Microsoft.Web.WebView2.Wpf.dll" />
+    </ItemGroup>
+  </Target>
 </Project>

@@ -60,6 +60,8 @@ internal static class ParentControlPageRenderer
     h2 { margin: 0 0 var(--space-2); font-size: 20px; line-height: 1.4; }
     .settings-copy { margin: 0 0 var(--space-4); color: var(--muted); line-height: 1.65; text-wrap: pretty; }
     .learning-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+    .check-field > span { display: flex; gap: 10px; align-items: center; color: #20242c; font-size: 16px; }
+    .check-field input { width: 22px; height: 22px; padding: 0; accent-color: var(--primary); }
     .field-help { color: #667085; font-size: 13px; font-weight: 600; line-height: 1.5; }
     .field-error { min-height: 22px; margin-top: var(--space-2); color: var(--danger); font-weight: 800; }
     .message:empty, .field-error:empty { display: none; }
@@ -130,6 +132,21 @@ internal static class ParentControlPageRenderer
       <h2 id="learningSettingsHeading">1回の学習設定</h2>
       <p class="settings-copy">次に始める学習から使う出題数と合格点を設定します。</p>
       <div class="learning-fields">
+        <label for="schoolGrade">登録している学校学年
+          <select id="schoolGrade" required aria-describedby="schoolGradeHelp settingsError">
+            <option value="1"{{(settings.SchoolGrade == 1 ? " selected" : string.Empty)}}>小学1年</option>
+            <option value="2"{{(settings.SchoolGrade == 2 ? " selected" : string.Empty)}}>小学2年</option>
+            <option value="3"{{(settings.SchoolGrade == 3 ? " selected" : string.Empty)}}>小学3年</option>
+            <option value="4"{{(settings.SchoolGrade == 4 ? " selected" : string.Empty)}}>小学4年</option>
+            <option value="5"{{(settings.SchoolGrade == 5 ? " selected" : string.Empty)}}>小学5年</option>
+            <option value="6"{{(settings.SchoolGrade == 6 ? " selected" : string.Empty)}}>小学6年</option>
+          </select>
+          <small class="field-help" id="schoolGradeHelp">表示・記録用です。出題の上限にはなりません。</small>
+        </label>
+        <label class="check-field" for="preferSchoolGrade">
+          <span><input id="preferSchoolGrade" type="checkbox"{{(settings.PreferSchoolGrade ? " checked" : string.Empty)}}>登録学年の単元を優先する</span>
+          <small class="field-help" id="preferSchoolGradeHelp">ONでは登録学年以上から始めます。学年上限にはならず、OFFで低学年単元へ戻せます。</small>
+        </label>
         <label for="questionCount">1回の出題数
           <input id="questionCount" type="number" inputmode="numeric" min="10" max="30" step="1" required aria-describedby="questionCountHelp settingsError" value="{{settings.QuestionCount}}">
           <small class="field-help" id="questionCountHelp">10〜30問</small>
@@ -171,6 +188,8 @@ internal static class ParentControlPageRenderer
     const confirmPassword = document.getElementById('confirmPassword');
     const questionCount = document.getElementById('questionCount');
     const passLine = document.getElementById('passLine');
+    const schoolGrade = document.getElementById('schoolGrade');
+    const preferSchoolGrade = document.getElementById('preferSchoolGrade');
     const settingsError = document.getElementById('settingsError');
     const settingsMessage = document.getElementById('settingsMessage');
     const saveLearningSettingsButton = document.getElementById('saveLearningSettings');
@@ -195,6 +214,8 @@ internal static class ParentControlPageRenderer
       pauseButton.disabled = !data.trainingActive;
       questionCount.value = data.questionCount;
       passLine.value = data.passLine;
+      schoolGrade.value = data.schoolGrade;
+      preferSchoolGrade.checked = data.preferSchoolGrade === true;
       passLine.max = data.questionCount;
     }
 
@@ -231,6 +252,7 @@ internal static class ParentControlPageRenderer
       const invalid = Boolean(text);
       questionCount.setAttribute('aria-invalid', String(invalid && fieldId === 'questionCount'));
       passLine.setAttribute('aria-invalid', String(invalid && fieldId === 'passLine'));
+      schoolGrade.setAttribute('aria-invalid', String(invalid && fieldId === 'schoolGrade'));
       if (invalid && fieldId) {
         document.getElementById(fieldId)?.focus();
       }
@@ -239,6 +261,7 @@ internal static class ParentControlPageRenderer
     function cleanLearningSettings() {
       const count = Number(questionCount.value);
       const pass = Number(passLine.value);
+      const grade = Number(schoolGrade.value);
       passLine.max = Number.isInteger(count) ? String(count) : '30';
       if (!Number.isInteger(count) || count < 10 || count > 30) {
         return { error: '1回の出題数は10〜30問にしてください。', fieldId: 'questionCount' };
@@ -246,7 +269,10 @@ internal static class ParentControlPageRenderer
       if (!Number.isInteger(pass) || pass < 1 || pass > count) {
         return { error: '合格点は1点以上、出題数以下にしてください。', fieldId: 'passLine' };
       }
-      return { questionCount: count, passLine: pass };
+      if (!Number.isInteger(grade) || grade < 1 || grade > 6) {
+        return { error: '学校学年は1〜6の整数にしてください。', fieldId: 'schoolGrade' };
+      }
+      return { questionCount: count, passLine: pass, schoolGrade: grade, preferSchoolGrade: preferSchoolGrade.checked };
     }
 
     async function saveLearningSettings() {
@@ -267,6 +293,8 @@ internal static class ParentControlPageRenderer
         });
         questionCount.value = data.questionCount;
         passLine.value = data.passLine;
+        schoolGrade.value = data.schoolGrade;
+        preferSchoolGrade.checked = data.preferSchoolGrade === true;
         passLine.max = data.questionCount;
         settingsMessage.textContent = data.message;
       } catch (error) {
@@ -364,6 +392,8 @@ internal static class ParentControlPageRenderer
     resetFullButton.addEventListener('click', () => resetLearning('full'));
     questionCount.addEventListener('input', () => { showSettingsError(''); cleanLearningSettings(); });
     passLine.addEventListener('input', () => showSettingsError(''));
+    schoolGrade.addEventListener('change', () => showSettingsError(''));
+    preferSchoolGrade.addEventListener('change', () => showSettingsError(''));
     refresh().catch(error => { message.textContent = error.message; });
   </script>
 </body>

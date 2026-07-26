@@ -43,7 +43,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true},count:this.props.questionCount??10,pass:this.props.passLine??8};}",
-            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true,eigo:true,money:true,groups:true,order:true,soroban:true,seikatsu:true,shakai:true,rika:true,doutoku:true,jouhou:true,sougou:true,tokubetsu:true,keyboard:true},count:this.props.questionCount??20,pass:this.props.passLine??15,attentionEnabled:true};}",
+            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true,eigo:true,money:true,groups:true,order:true,soroban:true,seikatsu:true,shakai:true,rika:true,kateika:true,doutoku:true,jouhou:true,sougou:true,tokubetsu:true,keyboard:true},count:this.props.questionCount??20,pass:this.props.passLine??15,attentionEnabled:true,preferSchoolGrade:false};}",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
@@ -54,6 +54,11 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(markup,
             "    kokugo:{label:'こくご',color:'#d2691e'},\n  };",
             "    kokugo:{label:'こくご',color:'#d2691e'},\n    moji:{label:'もじ',color:'#4f7edb'},\n    measure:{label:'たんい',color:'#3aa655'},\n    kazu:{label:'かず',color:'#c2891f'},\n    shape:{label:'かたち',color:'#9a4fd6'},\n    div:{label:'わりざん',color:'#0f8fbf'},\n    frac:{label:'ぶんすう',color:'#d64f8e'},\n    chart:{label:'グラフ',color:'#5a8f29'},\n    story:{label:'ぶんしょうだい',color:'#8a6d3b'},\n    bun:{label:'ぶん',color:'#7a5cd6'},\n    goi:{label:'ことば',color:'#2f9e8f'},\n    dokkai:{label:'よみとり',color:'#c2503f'},\n    eigo:{label:'えいご',color:'#2563eb'},\n    money:{label:'おかね',color:'#b7791f'},\n    groups:{label:'おなじかず',color:'#0f8f78'},\n    order:{label:'しきのじゅんじょ',color:'#8b5cf6'},\n    soroban:{label:'そろばん',color:'#8b6f47'},\n    seikatsu:{label:'せいかつ',color:'#2f855a'},\n    shakai:{label:'しゃかい',color:'#9c6b30'},\n    rika:{label:'りか',color:'#16846b'},\n    doutoku:{label:'どうとく',color:'#b05279'},\n    jouhou:{label:'じょうほう',color:'#3366a8'},\n    sougou:{label:'そうごう',color:'#6b5bb5'},\n    tokubetsu:{label:'学校かつどう',color:'#b45f45'},\n    keyboard:{label:'キーボード',color:'#0d9488'},\n  };",
+            StringComparison.Ordinal);
+        markup = ReplaceRequired(
+            markup,
+            "    rika:{label:'りか',color:'#16846b'},",
+            "    rika:{label:'りか',color:'#16846b'},\n    kateika:{label:'家庭科',color:'#d97706'},",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
@@ -115,7 +120,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "genFor(k){return k==='add'?this.genAdd():k==='sub'?this.genSub():k==='hissan'?this.genHissan():k==='mul'?this.pickMul():k==='clock'?this.pickClock():this.pickKokugo();}",
-            "genFor(k,p,stageOverride){const requested=Number(stageOverride),stage=Number.isFinite(requested)?this.clamp(requested,1,5):this.reviewStage(p,k),sp=this.profileAtStage(p,k,stage),q=k==='add'?this.genAdd(sp):k==='sub'?this.genSub(sp):k==='hissan'?this.genHissan(sp):k==='mul'?this.pickMul(sp):k==='clock'?this.pickClock(sp):k==='measure'?this.pickMeasure(sp):k==='kazu'?this.pickKazu(sp):k==='shape'?this.pickShape(sp):k==='div'?this.pickDiv(sp):k==='frac'?this.pickFrac(sp):k==='chart'?this.pickChart(sp):k==='story'?this.pickStory(sp):k==='money'?this.pickMoney(sp):k==='groups'?this.pickGroups(sp):k==='order'?this.pickOrder(sp):k==='soroban'?this.pickSoroban(sp):k==='seikatsu'?this.pickSeikatsu(sp):k==='shakai'?this.pickShakai(sp):k==='rika'?this.pickRika(sp):k==='doutoku'?this.pickDoutoku(sp):k==='jouhou'?this.pickJouhou(sp):k==='sougou'?this.pickSougou(sp):k==='tokubetsu'?this.pickTokubetsu(sp):k==='kokugo'?this.pickKokugo(sp):k==='bun'?this.pickBun(sp):k==='goi'?this.pickGoi(sp):k==='dokkai'?this.pickDokkai(sp):k==='eigo'?this.pickEigo(sp):k==='keyboard'?this.pickKeyboard(sp):this.pickMoji(sp);q.difficulty=this.clamp(Number(q.difficulty)||stage,1,5);q.grade=this.effectiveGrade(sp);return q;}",
+            "pickCurriculumBank(unit,stage){const questions=unit.questions||[],eligible=questions.filter(item=>Number(item.stage)<=stage),pool=eligible.length?eligible:questions;if(!pool.length)throw new Error('No curriculum questions for '+unit.id);const highest=Math.max(...pool.map(item=>Number(item.stage)||1)),atStage=pool.filter(item=>(Number(item.stage)||1)===highest),item=atStage[this.rand(0,atStage.length-1)];return this.activityChoice(unit.topicId,item.prompt,item.answer,item.distractors,item.explanation,item.activityPrompt);}\n  genFor(k,p,stageOverride){const id=this.resolveUnitId(p,k),unit=this.curriculumUnit(id);if(!unit)throw new Error('Unknown curriculum unit '+k);const requested=Number(stageOverride),stage=Number.isFinite(requested)?this.clamp(requested,1,5):this.reviewStage(p,id),sp=this.profileAtStage(p,id,stage),g=unit.generatorKey;const q=g==='curriculum-bank'?this.pickCurriculumBank(unit,stage):g==='add'?this.genAdd(sp):g==='sub'?this.genSub(sp):g==='hissan'?this.genHissan(sp):g==='mul'?this.pickMul(sp):g==='clock'?this.pickClock(sp):g==='measure'?this.pickMeasure(sp):g==='kazu'?this.pickKazu(sp):g==='shape'?this.pickShape(sp):g==='div'?this.pickDiv(sp):g==='frac'?this.pickFrac(sp):g==='chart'?this.pickChart(sp):g==='story'?this.pickStory(sp):g==='money'?this.pickMoney(sp):g==='groups'?this.pickGroups(sp):g==='order'?this.pickOrder(sp):g==='soroban'?this.pickSoroban(sp):g==='seikatsu'?this.pickSeikatsu(sp):g==='shakai'?this.pickShakai(sp):g==='rika'?this.pickRika(sp):g==='doutoku'?this.pickDoutoku(sp):g==='jouhou'?this.pickJouhou(sp):g==='sougou'?this.pickSougou(sp):g==='tokubetsu'?this.pickTokubetsu(sp):g==='kokugo'?this.pickKokugo(sp):g==='bun'?this.pickBun(sp):g==='goi'?this.pickGoi(sp):g==='dokkai'?this.pickDokkai(sp):g==='eigo'?this.pickEigo(sp):g==='keyboard'?this.pickKeyboard(sp):this.pickMoji(sp);q.difficulty=stage;q.grade=unit.grade;q.unitGrade=unit.grade;q.unitId=unit.id;q.topic=unit.topicId;q.unitLabel=unit.label;q.assessmentMode=unit.assessmentMode;return q;}",
             StringComparison.Ordinal);
         markup = ReplaceBlock(
             markup,
@@ -142,7 +147,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "const weakKeys=Object.keys(T).filter(k=>p.mastery[k]<0.5);",
-            "const weakKeys=this.allowedTopics(p).filter(k=>(Number(p.mastery[k])||0.05)<0.5);",
+            "const weakKeys=Object.keys(T).filter(k=>this.curriculumUnitsForTopic(k).some(unit=>this.allowedTopics(p).includes(unit.id)&&(Number(p.mastery[unit.id])||0.05)<0.5));",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
@@ -152,7 +157,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "const available=this.allowedTopics(p).includes(k);",
-            "const available=this.gradeTopics(p).includes(k),introduced=this.allowedTopics(p).includes(k);",
+            "const available=this.gradeTopics(p).some(id=>this.curriculumUnit(id)&&this.curriculumUnit(id).topicId===k),introduced=this.allowedTopics(p).some(id=>this.curriculumUnit(id)&&this.curriculumUnit(id).topicId===k);",
             StringComparison.Ordinal);
         markup = ReplaceRequired(markup,
             "const status=(!available?'対象外':ready?",
@@ -182,7 +187,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "const gradeOpts=[1,2,3,4,5,6].map(g=>",
-            "const gradeOpts=[1,2,3].map(g=>",
+            "const gradeOpts=[1,2,3,4,5,6].map(g=>",
             StringComparison.Ordinal);
 
         markup = PatchEducationalPersistence(markup);
@@ -250,7 +255,37 @@ questionIdentity(q){const omit=new Set(['choices','explanation','sessionRole','d
     private static string BuildEducationalPersistenceScript()
     {
         return $$$"""
-componentDidMount(){let profiles=this.state.profiles;const host=window.__kidsTrainingHost&&typeof window.__kidsTrainingHost==='object'?window.__kidsTrainingHost:{};const bundled=Array.isArray(profiles)&&profiles.length?profiles[0]:{};const profileName=typeof host.profileName==='string'&&host.profileName.length?host.profileName:String(bundled.name||'');const parentPin=typeof host.parentPin==='string'&&/^\d{4}$/.test(host.parentPin)?host.parentPin:this.parentPin();const beginnerMastery={{{BeginnerMasteryObjectMarkup}}},masteryKeys=Object.keys(beginnerMastery),numberOrDefault=(value,fallback)=>{const number=Number(value);return Number.isFinite(number)?number:fallback;},isDefaultishMastery=mastery=>masteryKeys.every(key=>{const value=Number(mastery&&mastery[key]);return !Number.isFinite(value)||Math.abs(value-.5)<.001||Math.abs(value-beginnerMastery[key])<.001;}),hasMeaningfulProgress=profile=>numberOrDefault(profile.stars,0)>0||numberOrDefault(profile.streak,0)>0||numberOrDefault(profile.xp,0)>0||!isDefaultishMastery(profile.mastery),defaultProfile={...bundled,name:profileName,grade:1,color:bundled.color||'#4ad991',streak:0,stars:0,xp:0,mastery:{...beginnerMastery}},normalizeProfile=source=>{const profile=source&&typeof source==='object'?source:{},mastery=profile.mastery&&typeof profile.mastery==='object'?profile.mastery:{},resetToBeginner=!hasMeaningfulProgress(profile)&&!profile.progressResetAt;return{...defaultProfile,...profile,name:profileName,grade:resetToBeginner?1:numberOrDefault(profile.grade,defaultProfile.grade),streak:numberOrDefault(profile.streak,defaultProfile.streak),stars:numberOrDefault(profile.stars,defaultProfile.stars),xp:numberOrDefault(profile.xp,defaultProfile.xp),color:profile.color||defaultProfile.color,mastery:resetToBeginner?{...beginnerMastery}:{...defaultProfile.mastery,...mastery}};};let savedProfile=bundled;try{const raw=localStorage.getItem('kt_profiles_v1');if(raw){const parsed=JSON.parse(raw);savedProfile=Array.isArray(parsed)?(parsed[0]||bundled):(parsed&&typeof parsed==='object'?parsed:bundled);}}catch(e){}profiles=[normalizeProfile(savedProfile)];profiles=this.migrateProfiles(profiles);const migrated=JSON.stringify(profiles);this._lastSaved=migrated;try{localStorage.setItem('kt_profiles_v1',migrated);}catch(e){}try{localStorage.setItem('kt_parent_pin_v1',parentPin);}catch(e){}let storedSettings=null;try{const raw=localStorage.getItem('kt_settings_v1');if(raw)storedSettings=JSON.parse(raw);}catch(e){}const def=this.defaultSettings(),sourceSettings=storedSettings&&typeof storedSettings==='object'?storedSettings:{},storedTopics=sourceSettings.topics&&typeof sourceSettings.topics==='object'?sourceSettings.topics:{},count=this.clamp(numberOrDefault(host.questionCount,numberOrDefault(sourceSettings.count,def.count)),10,30),pass=this.clamp(numberOrDefault(host.passLine,numberOrDefault(sourceSettings.pass,def.pass)),1,count),settings={...def,...sourceSettings,topics:{...def.topics,...storedTopics},count:count,pass:pass};try{localStorage.setItem('kt_settings_v1',JSON.stringify(settings));}catch(e){}let muted=this.state.muted;try{const value=localStorage.getItem('kt_muted_v1');if(value!=null)muted=value==='1';}catch(e){}this.setState({profiles:profiles,settings:settings,muted:muted});}
+componentDidMount(){
+    let profiles=this.state.profiles;
+    const host=window.__kidsTrainingHost&&typeof window.__kidsTrainingHost==='object'?window.__kidsTrainingHost:{};
+    const bundled=Array.isArray(profiles)&&profiles.length?profiles[0]:{};
+    const profileName=typeof host.profileName==='string'&&host.profileName.length?host.profileName:String(bundled.name||'');
+    const parentPin=typeof host.parentPin==='string'&&/^\d{4}$/.test(host.parentPin)?host.parentPin:this.parentPin();
+    const beginnerMastery={{{BeginnerMasteryObjectMarkup}}},masteryKeys=Object.keys(beginnerMastery);
+    const numberOrDefault=(value,fallback)=>{const number=Number(value);return Number.isFinite(number)?number:fallback;};
+    let storedSettings=null;
+    try{const raw=localStorage.getItem('kt_settings_v1');if(raw)storedSettings=JSON.parse(raw);}catch(e){}
+    const def=this.defaultSettings(),sourceSettings=storedSettings&&typeof storedSettings==='object'?storedSettings:{};
+    const schoolGrade=this.clamp(numberOrDefault(host.schoolGrade,numberOrDefault(sourceSettings.schoolGrade,1)),1,6);
+    const preferSchoolGrade=typeof host.preferSchoolGrade==='boolean'?host.preferSchoolGrade:sourceSettings.preferSchoolGrade===true;
+    const isDefaultishMastery=mastery=>masteryKeys.every(key=>{const value=Number(mastery&&mastery[key]);return !Number.isFinite(value)||Math.abs(value-.5)<.001||Math.abs(value-beginnerMastery[key])<.001;});
+    const hasMeaningfulProgress=profile=>numberOrDefault(profile.stars,0)>0||numberOrDefault(profile.streak,0)>0||numberOrDefault(profile.xp,0)>0||!isDefaultishMastery(profile.mastery);
+    const defaultProfile={...bundled,name:profileName,grade:schoolGrade,color:bundled.color||'#4ad991',streak:0,stars:0,xp:0,mastery:{...beginnerMastery}};
+    const normalizeProfile=source=>{const profile=source&&typeof source==='object'?source:{},mastery=profile.mastery&&typeof profile.mastery==='object'?profile.mastery:{},resetToBeginner=!hasMeaningfulProgress(profile)&&!profile.progressResetAt;return{...defaultProfile,...profile,name:profileName,grade:schoolGrade,streak:numberOrDefault(profile.streak,defaultProfile.streak),stars:numberOrDefault(profile.stars,defaultProfile.stars),xp:numberOrDefault(profile.xp,defaultProfile.xp),color:profile.color||defaultProfile.color,mastery:resetToBeginner?{...beginnerMastery}:{...defaultProfile.mastery,...mastery}};};
+    let savedProfile=bundled;
+    try{const raw=localStorage.getItem('kt_profiles_v1');if(raw){const parsed=JSON.parse(raw);savedProfile=Array.isArray(parsed)?(parsed[0]||bundled):(parsed&&typeof parsed==='object'?parsed:bundled);}}catch(e){}
+    profiles=this.migrateProfiles([normalizeProfile(savedProfile)]);
+    const migrated=JSON.stringify(profiles);this._lastSaved=migrated;
+    try{localStorage.setItem('kt_profiles_v1',migrated);localStorage.setItem('kt_parent_pin_v1',parentPin);}catch(e){}
+    const storedTopics=sourceSettings.topics&&typeof sourceSettings.topics==='object'?sourceSettings.topics:{};
+    const count=this.clamp(numberOrDefault(host.questionCount,numberOrDefault(sourceSettings.count,def.count)),10,30);
+    const pass=this.clamp(numberOrDefault(host.passLine,numberOrDefault(sourceSettings.pass,def.pass)),1,count);
+    const settings={...def,...sourceSettings,topics:{...def.topics,...storedTopics},count:count,pass:pass,schoolGrade:schoolGrade,preferSchoolGrade:preferSchoolGrade};
+    try{localStorage.setItem('kt_settings_v1',JSON.stringify(settings));}catch(e){}
+    window.__kidsTrainingApplySchoolGrade=value=>{const grade=Number(value);if(!Number.isInteger(grade)||grade<1||grade>6)return false;const nextProfiles=this.state.profiles.map((profile,index)=>index===0?{...profile,grade:grade}:profile),nextSettings={...this.state.settings,schoolGrade:grade};try{localStorage.setItem('kt_profiles_v1',JSON.stringify(nextProfiles));localStorage.setItem('kt_settings_v1',JSON.stringify(nextSettings));}catch(e){}this.setState({profiles:nextProfiles,settings:nextSettings});return true;};
+    let muted=this.state.muted;try{const value=localStorage.getItem('kt_muted_v1');if(value!=null)muted=value==='1';}catch(e){}
+    this.setState({profiles:profiles,settings:settings,muted:muted});
+}
 """;
     }
 

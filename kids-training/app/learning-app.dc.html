@@ -40,10 +40,12 @@ class Component extends DCLogic {
 
   defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true},count:this.props.questionCount??10,pass:this.props.passLine??8};}
   componentDidMount(){try{const raw=localStorage.getItem('kt_profiles_v1');if(raw){const p=JSON.parse(raw);if(Array.isArray(p)&&p.length){this._lastSaved=raw;this.setState({profiles:p});}}const m=localStorage.getItem('kt_muted_v1');if(m!=null)this.setState({muted:m==='1'});}catch(e){}let st=null;try{const r=localStorage.getItem('kt_settings_v1');if(r)st=JSON.parse(r);}catch(e){}const def=this.defaultSettings();this.setState({settings:st&&st.topics?{topics:{...def.topics,...st.topics},count:st.count||def.count,pass:st.pass||def.pass}:def});}
-  setSettings(patch){const ns={...this.state.settings,...patch};this.setState({settings:ns});try{localStorage.setItem('kt_settings_v1',JSON.stringify(ns));}catch(e){}}
+  setSettings(patch){const ns={...this.state.settings,...patch};this.setState({settings:ns});try{localStorage.setItem('kt_settings_v1',JSON.stringify(ns));}catch(e){}if(window.chrome&&window.chrome.webview&&typeof window.chrome.webview.postMessage==='function')window.chrome.webview.postMessage('kidsTraining.settings:'+JSON.stringify({questionCount:ns.count,passLine:ns.pass,schoolGrade:ns.schoolGrade||1,preferSchoolGrade:ns.preferSchoolGrade===true}));}
   toggleTopic(k){this.sfx('tap');const s=this.state.settings;const topics={...s.topics,[k]:!s.topics[k]};if(Object.values(topics).filter(Boolean).length===0)return;this.setSettings({topics:topics});}
   countDelta(d){this.sfx('tap');const s=this.state.settings;const count=this.clamp(s.count+d,4,15);this.setSettings({count:count,pass:Math.min(s.pass,count)});}
   passDelta(d){this.sfx('tap');const s=this.state.settings;this.setSettings({pass:this.clamp(s.pass+d,1,s.count)});}
+  schoolGradeDelta(d){this.sfx('tap');const grade=this.clamp((Number(this.curP().grade)||1)+d,1,6);if(typeof window.__kidsTrainingApplySchoolGrade==='function')window.__kidsTrainingApplySchoolGrade(grade);this.setSettings({schoolGrade:grade});}
+  togglePreferSchoolGrade(){this.sfx('tap');const enabled=!(this.state.settings&&this.state.settings.preferSchoolGrade===true);this.setSettings({preferSchoolGrade:enabled});}
   componentDidUpdate(){try{const s=JSON.stringify(this.state.profiles);if(s!==this._lastSaved){localStorage.setItem('kt_profiles_v1',s);this._lastSaved=s;}}catch(e){}}
   toggleMute(){const m=!this.state.muted;this.setState({muted:m});try{localStorage.setItem('kt_muted_v1',m?'1':'0');}catch(e){}if(!m)setTimeout(()=>this.sfx('select'),0);}
   quitQuiz(){this.sfx('select');this.setState({screen:'start',session:null,combo:0});}
@@ -170,6 +172,9 @@ class Component extends DCLogic {
 
     const stepBtn='display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:14px;font-size:26px;font-weight:900;cursor:pointer;background:#fff;color:#7a6db5;border:3px solid #ecd9b9;box-shadow:0 4px 0 #ecd9b9;user-select:none;';
     const topicToggles=Object.keys(T).map(k=>{const on=S.settings?!!S.settings.topics[k]:true;return{label:T[k].label,onClick:()=>this.toggleTopic(k),style:'display:flex;align-items:center;justify-content:center;padding:8px 16px;border-radius:20px;font-size:16px;font-weight:900;cursor:pointer;user-select:none;'+(on?'background:'+T[k].color+';color:#fff;border:3px solid rgba(0,0,0,.10);':'background:#f3e8d4;color:#9a8662;border:3px solid #ecd9b9;')};});
+    const parentSchoolGrade=this.effectiveGrade(p);
+    const currentLearningUnit=this.curriculumUnit(this.nextCurriculumTopic(p));
+    const currentLearningGrade=currentLearningUnit?'小学'+currentLearningUnit.grade+'年相当':'未開始';
 
     const total=this.total();
     const prog=S.session?Math.round(S.session.idx/total*100):0;
@@ -187,7 +192,7 @@ class Component extends DCLogic {
       isSetup:sc==='setup', setupName:S.setupName, onSetupName:(e)=>this.onSetupName(e), gradeOpts:gradeOpts, setupNextStyle:setupNextStyle, startCalib:()=>this.startCalib(), backProfile:()=>this.backProfile(),
       calibIdx:calibIdx, calibTotal:calibTotal, calibProgStyle:calibProgStyle, calibTopicLabel:calibTopicLabel, calibTopicChipStyle:calibTopicChipStyle, calibChoices:calibChoices, calibIsKokugo:calibIsKokugo, calibIsPlain:calibIsPlain, calibPrompt:calibPrompt, calibEq:' ＝ ？', calibKokuPre:calibKokuPre, calibKokuWord:calibKokuWord, calibKokuPost:calibKokuPost,
       muted:S.muted, muteIcon:S.muted?'🔇':'🔊', toggleMute:()=>this.toggleMute(), quitQuiz:()=>this.quitQuiz(),
-      topicToggles:topicToggles, stepBtn:stepBtn, setCount:total, setPass:this.passLine(), countInc:()=>this.countDelta(1), countDec:()=>this.countDelta(-1), passInc:()=>this.passDelta(1), passDec:()=>this.passDelta(-1),
+      topicToggles:topicToggles, stepBtn:stepBtn, setCount:total, setPass:this.passLine(), countInc:()=>this.countDelta(1), countDec:()=>this.countDelta(-1), passInc:()=>this.passDelta(1), passDec:()=>this.passDelta(-1), parentSchoolGrade:parentSchoolGrade, currentLearningGrade:currentLearningGrade, schoolGradeInc:()=>this.schoolGradeDelta(1), schoolGradeDec:()=>this.schoolGradeDelta(-1), preferSchoolGrade:S.settings&&S.settings.preferSchoolGrade===true, preferSchoolGradeLabel:S.settings&&S.settings.preferSchoolGrade===true?'ON':'OFF', togglePreferSchoolGrade:()=>this.togglePreferSchoolGrade(),
       profileName:p.name, profileInitial:p.name.charAt(0), avatarStyle:avatar(p.color,56,26), profileGrade:p.grade+'年生', stars:p.stars, streak:p.streak, level:this.lvl(p),
       weakLabels:weakLabels, hasWeak:weakKeys.length>0,
       goStart:()=>this.goStart(), goParent:()=>this.goParent(), goEmergency:()=>this.goEmergency(), backStart:()=>this.backStart(),

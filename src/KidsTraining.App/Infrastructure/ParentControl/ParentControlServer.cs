@@ -28,7 +28,7 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
     private readonly Func<bool> isTrainingActive;
     private readonly Func<string?, string?, CancellationToken, Task<PasswordChangeResult>> changeParentPassword;
     private readonly Func<LearningSessionSettings> getLearningSettings;
-    private readonly Func<int?, int?, CancellationToken, Task<LearningSessionSettingsUpdateResult>> changeLearningSettings;
+    private readonly Func<int?, int?, int?, bool?, CancellationToken, Task<LearningSessionSettingsUpdateResult>> changeLearningSettings;
     private readonly Func<string?, string?, CancellationToken, Task<LearningResetResult>> requestLearningReset;
     private readonly object lifecycleGate = new();
     private readonly object clientTasksGate = new();
@@ -47,7 +47,7 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
         Func<bool> isTrainingActive,
         Func<string?, string?, CancellationToken, Task<PasswordChangeResult>> changeParentPassword,
         Func<LearningSessionSettings> getLearningSettings,
-        Func<int?, int?, CancellationToken, Task<LearningSessionSettingsUpdateResult>> changeLearningSettings,
+        Func<int?, int?, int?, bool?, CancellationToken, Task<LearningSessionSettingsUpdateResult>> changeLearningSettings,
         Func<string?, string?, CancellationToken, Task<LearningResetResult>> requestLearningReset)
     {
         ArgumentNullException.ThrowIfNull(startTraining);
@@ -414,7 +414,14 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
                 await WriteJsonAsync(
                     stream,
                     HttpStatusCode.OK,
-                    new ApiResult(true, "OK", isTrainingActive(), statusSettings.QuestionCount, statusSettings.PassLine),
+                    new ApiResult(
+                        true,
+                        "OK",
+                        isTrainingActive(),
+                        statusSettings.QuestionCount,
+                        statusSettings.PassLine,
+                        statusSettings.SchoolGrade,
+                        statusSettings.PreferSchoolGrade),
                     cancellationToken).ConfigureAwait(false);
                 break;
             case { Method: "POST", Path: "/api/start" }:
@@ -456,7 +463,14 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
                     await WriteJsonAsync(
                         stream,
                         HttpStatusCode.BadRequest,
-                        new ApiResult(false, "入力を読み取れませんでした。", isTrainingActive(), current.QuestionCount, current.PassLine),
+                        new ApiResult(
+                            false,
+                            "入力を読み取れませんでした。",
+                            isTrainingActive(),
+                            current.QuestionCount,
+                            current.PassLine,
+                            current.SchoolGrade,
+                            current.PreferSchoolGrade),
                         cancellationToken).ConfigureAwait(false);
                     break;
                 }
@@ -466,6 +480,8 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
                     token => changeLearningSettings(
                         settingsPayload?.QuestionCount,
                         settingsPayload?.PassLine,
+                        settingsPayload?.SchoolGrade,
+                        settingsPayload?.PreferSchoolGrade,
                         token),
                     "学習設定を保存できませんでした。",
                     cancellationToken,
@@ -483,7 +499,9 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
                         settingsResult.Message,
                         isTrainingActive(),
                         settingsResult.Settings.QuestionCount,
-                        settingsResult.Settings.PassLine),
+                        settingsResult.Settings.PassLine,
+                        settingsResult.Settings.SchoolGrade,
+                        settingsResult.Settings.PreferSchoolGrade),
                     cancellationToken).ConfigureAwait(false);
                 break;
             case { Method: "POST", Path: "/api/password" }:
@@ -739,7 +757,11 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
 
     private sealed record PasswordChangeRequest(string? CurrentPassword, string? NewPassword);
 
-    private sealed record LearningSettingsRequest(int? QuestionCount, int? PassLine);
+    private sealed record LearningSettingsRequest(
+        int? QuestionCount,
+        int? PassLine,
+        int? SchoolGrade,
+        bool? PreferSchoolGrade);
 
     private sealed record LearningResetRequest(string? CurrentPassword, string? Mode);
 
@@ -749,5 +771,7 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
         bool TrainingActive,
         int? QuestionCount = null,
         int? PassLine = null,
+        int? SchoolGrade = null,
+        bool? PreferSchoolGrade = null,
         bool? Pending = null);
 }

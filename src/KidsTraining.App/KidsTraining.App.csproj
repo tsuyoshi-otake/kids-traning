@@ -16,12 +16,20 @@
     <DebugType>embedded</DebugType>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.21.0</Version>
+    <Version>1.22.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4022.49" />
   </ItemGroup>
+
+  <!-- The WebView2 package references its WPF control even in WinForms-only apps. Removing
+       that unused assembly avoids a WindowsBase 4/5 conflict on current .NET SDKs. -->
+  <Target Name="RemoveUnusedWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="$(NuGetPackageRoot)microsoft.web.webview2\1.0.4022.49\buildTransitive\..\\lib_manual\net5.0-windows10.0.17763.0\Microsoft.Web.WebView2.Wpf.dll" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <Content Include="..\..\kids-training\**\*" Exclude="..\..\kids-training\CLAUDE.md;..\..\kids-training\**\CLAUDE.md" Link="assets\kids-training\%(RecursiveDir)%(Filename)%(Extension)">

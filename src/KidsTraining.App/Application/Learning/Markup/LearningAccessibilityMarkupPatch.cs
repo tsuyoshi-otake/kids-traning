@@ -24,7 +24,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "q=this.cur();const t=T[q.topic];topicLabel=t.label;",
-            "q=this.cur();const t=T[q.topic];practicePrompt=q.activityPrompt||(q.topic==='eigo'?'補助活動：音声を聞き、声に出してまねしてから答えよう。':(q.topic==='kokugo'&&q.subtype==='kanji-choice'?'ノートに漢字を書いてから答えよう。':''));topicLabel=t.label;",
+            "q=this.cur();const t=T[q.topic];practicePrompt=q.activityPrompt?('活動カード＋振り返り：'+q.activityPrompt):(q.topic==='eigo'?'補助活動：音声を聞き、声に出してまねしてから答えよう。':(q.topic==='kokugo'&&q.subtype==='kanji-choice'?'ノートに漢字を書いてから答えよう。':''));topicLabel=t.label;",
             StringComparison.Ordinal);
         markup = ReplaceRequired(
             markup,
@@ -49,8 +49,8 @@ internal static partial class LearningMarkupPatcher
             StringComparison.Ordinal);
         markup = ReplaceRequired(
             markup,
-            "componentDidMount(){let profiles=this.state.profiles;",
-            "componentDidMount(){this._keyActivate=e=>{if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button'){e.preventDefault();e.target.click();}};document.addEventListener('keydown',this._keyActivate);let profiles=this.state.profiles;",
+            "componentDidMount(){\n    let profiles=this.state.profiles;",
+            "componentDidMount(){this._keyActivate=e=>{if((e.key==='Enter'||e.key===' ')&&e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button'){e.preventDefault();e.target.click();}};document.addEventListener('keydown',this._keyActivate);\n    let profiles=this.state.profiles;",
             StringComparison.Ordinal);
         markup = ReplaceRequired(
             markup,

@@ -12,8 +12,8 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(
             markup,
-            "this.setState({profiles:profiles,settings:settings,muted:muted});}",
-            "window.__kidsTrainingPause=notifyHost=>this.pauseLearning(notifyHost!==false);window.__kidsTrainingDiscard=()=>{this.clearLearningCheckpoint();return true;};window.__kidsTrainingReset=mode=>this.applyLearningReset(mode,{screen:'start'});this.setState({profiles:profiles,settings:settings,muted:muted},()=>{const pending=host.pendingLearningReset;if((pending==='history'||pending==='full')&&this.applyLearningReset(pending,{screen:'start',notifyHost:true}))return;this.restoreLearningCheckpoint();});}",
+            "this.setState({profiles:profiles,settings:settings,muted:muted});\n}",
+            "window.__kidsTrainingPause=notifyHost=>this.pauseLearning(notifyHost!==false);window.__kidsTrainingDiscard=()=>{this.clearLearningCheckpoint();return true;};window.__kidsTrainingReset=mode=>this.applyLearningReset(mode,{screen:'start'});this.setState({profiles:profiles,settings:settings,muted:muted},()=>{const pending=host.pendingLearningReset;if((pending==='history'||pending==='full')&&this.applyLearningReset(pending,{screen:'start',notifyHost:true}))return;this.restoreLearningCheckpoint();});\n}",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(

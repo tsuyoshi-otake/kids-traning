@@ -163,7 +163,7 @@ internal static class Program
             var parentPage = ParentControlServer.BuildParentPage(
                 ["http://127.0.0.1:44567/"],
                 trainingActive: false,
-                new LearningSessionSettings(28, 21));
+                new LearningSessionSettings(28, 21, 6, true));
             if (!parentPage.Contains("Kids Training 保護者画面", StringComparison.Ordinal) ||
                 !parentPage.Contains("/api/start", StringComparison.Ordinal) ||
                 !parentPage.Contains("/api/return", StringComparison.Ordinal) ||
@@ -172,6 +172,7 @@ internal static class Program
                 !parentPage.Contains("/api/password", StringComparison.Ordinal) ||
                 !parentPage.Contains("/api/settings", StringComparison.Ordinal) ||
                 !parentPage.Contains("id=\"questionCount\"", StringComparison.Ordinal) ||
+                !parentPage.Contains("id=\"preferSchoolGrade\"", StringComparison.Ordinal) ||
                 !parentPage.Contains("value=\"28\"", StringComparison.Ordinal) ||
                 !parentPage.Contains("id=\"passLine\"", StringComparison.Ordinal) ||
                 !parentPage.Contains("value=\"21\"", StringComparison.Ordinal) ||

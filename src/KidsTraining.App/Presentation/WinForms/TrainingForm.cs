@@ -11,6 +11,7 @@ internal sealed class TrainingForm : Form
     private const string UnlockMessage = "kidsTraining.unlock";
     private const string PauseMessage = "kidsTraining.pause";
     private const string ResetAppliedMessagePrefix = "kidsTraining.resetApplied:";
+    private const string LearningSettingsMessagePrefix = "kidsTraining.settings:";
     private const string LearningVirtualHostName = "learning.kidstraining.local";
     private const string ExperimentalWebPlatformFeaturesArgument = "--enable-experimental-web-platform-features";
 
@@ -19,7 +20,7 @@ internal sealed class TrainingForm : Form
     private readonly ILearningPagePreparer learningPagePreparer;
     private readonly IParentPinProvider parentPinProvider;
     private readonly IUserProfileNameProvider profileNameProvider;
-    private readonly IParentLearningSettingsProvider parentLearningSettingsProvider;
+    private readonly ParentLearningSettingsService parentLearningSettingsService;
     private readonly ParentLearningResetService parentLearningResetService;
     private bool canExit;
     private bool webViewInitialized;
@@ -28,13 +29,13 @@ internal sealed class TrainingForm : Form
         ILearningPagePreparer learningPagePreparer,
         IParentPinProvider parentPinProvider,
         IUserProfileNameProvider profileNameProvider,
-        IParentLearningSettingsProvider parentLearningSettingsProvider,
+        ParentLearningSettingsService parentLearningSettingsService,
         ParentLearningResetService parentLearningResetService)
     {
         this.learningPagePreparer = learningPagePreparer;
         this.parentPinProvider = parentPinProvider;
         this.profileNameProvider = profileNameProvider;
-        this.parentLearningSettingsProvider = parentLearningSettingsProvider;
+        this.parentLearningSettingsService = parentLearningSettingsService;
         this.parentLearningResetService = parentLearningResetService;
         Text = "Kids Training";
         ApplyWindowIcon();
@@ -192,11 +193,16 @@ internal sealed class TrainingForm : Form
               const key = 'kt_settings_v1';
               const raw = localStorage.getItem(key);
               const current = raw ? JSON.parse(raw) : {};
-              const next = { ...current, count: __QUESTION_COUNT__, pass: __PASS_LINE__ };
+              const next = { ...current, count: __QUESTION_COUNT__, pass: __PASS_LINE__, schoolGrade: __SCHOOL_GRADE__, preferSchoolGrade: __PREFER_SCHOOL_GRADE__ };
               localStorage.setItem(key, JSON.stringify(next));
               if (window.__kidsTrainingHost) {
                 window.__kidsTrainingHost.questionCount = __QUESTION_COUNT__;
                 window.__kidsTrainingHost.passLine = __PASS_LINE__;
+                window.__kidsTrainingHost.schoolGrade = __SCHOOL_GRADE__;
+                window.__kidsTrainingHost.preferSchoolGrade = __PREFER_SCHOOL_GRADE__;
+              }
+              if (typeof window.__kidsTrainingApplySchoolGrade === 'function') {
+                window.__kidsTrainingApplySchoolGrade(__SCHOOL_GRADE__);
               }
               return true;
             } catch {
@@ -204,7 +210,12 @@ internal sealed class TrainingForm : Form
             }
             """
                 .Replace("__QUESTION_COUNT__", settings.QuestionCount.ToString(), StringComparison.Ordinal)
-                .Replace("__PASS_LINE__", settings.PassLine.ToString(), StringComparison.Ordinal);
+                .Replace("__PASS_LINE__", settings.PassLine.ToString(), StringComparison.Ordinal)
+                .Replace("__SCHOOL_GRADE__", settings.SchoolGrade.ToString(), StringComparison.Ordinal)
+                .Replace(
+                    "__PREFER_SCHOOL_GRADE__",
+                    settings.PreferSchoolGrade ? "true" : "false",
+                    StringComparison.Ordinal);
         try
         {
             var result = await webView.CoreWebView2.ExecuteScriptAsync($"(() => {{ {script} }})()");
@@ -310,7 +321,7 @@ internal sealed class TrainingForm : Form
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.IsZoomControlEnabled = false;
 
-        core.WebMessageReceived += (_, args) =>
+        core.WebMessageReceived += async (_, args) =>
         {
             var message = args.TryGetWebMessageAsString();
             if (string.Equals(message, UnlockMessage, StringComparison.Ordinal) ||
@@ -325,6 +336,29 @@ internal sealed class TrainingForm : Form
                 !parentLearningResetService.CompleteAppliedReset(appliedMode))
             {
                 UpdateLogger.Info("A pending learning reset was applied, but its completion marker could not be cleared.");
+            }
+
+            if (message.StartsWith(LearningSettingsMessagePrefix, StringComparison.Ordinal))
+            {
+                try
+                {
+                    var payload = System.Text.Json.JsonSerializer.Deserialize<LearningSettingsMessage>(
+                        message[LearningSettingsMessagePrefix.Length..],
+                        new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+                    var result = parentLearningSettingsService.Update(
+                        payload?.QuestionCount,
+                        payload?.PassLine,
+                        payload?.SchoolGrade,
+                        payload?.PreferSchoolGrade);
+                    if (!result.Success)
+                    {
+                        await SetLearningSessionSettingsAsync(result.Settings).ConfigureAwait(true);
+                    }
+                }
+                catch (System.Text.Json.JsonException exception)
+                {
+                    UpdateLogger.Error("Could not parse learning settings from the protected parent screen", exception);
+                }
             }
         };
 
@@ -472,7 +506,7 @@ internal sealed class TrainingForm : Form
     {
         var profileName = System.Text.Json.JsonSerializer.Serialize(profileNameProvider.GetProfileName());
         var parentPin = System.Text.Json.JsonSerializer.Serialize(parentPinProvider.GetCurrentPin().Value);
-        var learningSettings = parentLearningSettingsProvider.GetCurrentSettings();
+        var learningSettings = parentLearningSettingsService.GetCurrentSettings();
         var pendingLearningReset = System.Text.Json.JsonSerializer.Serialize(
             parentLearningResetService.GetPendingReset().ToWireValue());
         return
@@ -483,6 +517,8 @@ internal sealed class TrainingForm : Form
             parentPin: __PARENT_PIN__,
             questionCount: __QUESTION_COUNT__,
             passLine: __PASS_LINE__,
+            schoolGrade: __SCHOOL_GRADE__,
+            preferSchoolGrade: __PREFER_SCHOOL_GRADE__,
             pendingLearningReset: __PENDING_LEARNING_RESET__
           };
         })();
@@ -497,6 +533,20 @@ internal sealed class TrainingForm : Form
                 "__PASS_LINE__",
                 learningSettings.PassLine.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 StringComparison.Ordinal)
+            .Replace(
+                "__SCHOOL_GRADE__",
+                learningSettings.SchoolGrade.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                StringComparison.Ordinal)
+            .Replace(
+                "__PREFER_SCHOOL_GRADE__",
+                learningSettings.PreferSchoolGrade ? "true" : "false",
+                StringComparison.Ordinal)
             .Replace("__PENDING_LEARNING_RESET__", pendingLearningReset, StringComparison.Ordinal);
     }
+
+    private sealed record LearningSettingsMessage(
+        int? QuestionCount,
+        int? PassLine,
+        int? SchoolGrade,
+        bool? PreferSchoolGrade);
 }

@@ -408,7 +408,7 @@
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
           <div style="font-size:34px; font-weight:900;">保護者ダッシュボード</div>
-          <div style="font-size:18px; color:#9a8662;">{{ profileName }} ・ {{ profileGrade }} ・ {{ level }}</div>
+          <div style="font-size:18px; color:#9a8662;">{{ profileName }} ・ 登録学年：{{ profileGrade }} ・ 学習中：{{ currentLearningGrade }} ・ {{ level }}</div>
         </div>
         <div style="display:flex; gap:10px;">
           <span style="font-size:15px; color:#9a8662; border:2px dashed #d8c4a0; border-radius:10px; padding:6px 12px; display:flex; align-items:center;">🔑 PINで保護</span>
@@ -441,6 +441,19 @@
               </sc-for>
             </div>
             <div style="display:flex; gap:18px; margin-top:20px;">
+              <div style="flex:1;">
+                <div style="font-size:15px; color:#9a8662; margin-bottom:6px;">登録している学校学年</div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div onclick="{{ schoolGradeDec }}" style="{{ stepBtn }}">−</div>
+                  <div style="font-size:24px; font-weight:900; min-width:72px; text-align:center;">小学{{ parentSchoolGrade }}年</div>
+                  <div onclick="{{ schoolGradeInc }}" style="{{ stepBtn }}">＋</div>
+                </div>
+                <div style="font-size:13px; color:#9a8662; margin-top:6px;">表示・記録用。出題上限にはなりません。</div>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px;">
+                  <div style="font-size:14px; font-weight:800; line-height:1.45;">登録学年の単元を優先<br><span style="font-size:12px; color:#9a8662; font-weight:600;">上限にはしません</span></div>
+                  <button type="button" onclick="{{ togglePreferSchoolGrade }}" aria-pressed="{{ preferSchoolGrade }}" style="min-width:72px; background:#fff; color:#294d8f; border:3px solid #6f94d4; border-radius:16px; padding:8px 14px; font-size:17px; font-weight:900; cursor:pointer;">{{ preferSchoolGradeLabel }}</button>
+                </div>
+              </div>
               <div style="flex:1;">
                 <div style="font-size:15px; color:#9a8662; margin-bottom:6px;">問題数</div>
                 <div style="display:flex; align-items:center; gap:10px;">

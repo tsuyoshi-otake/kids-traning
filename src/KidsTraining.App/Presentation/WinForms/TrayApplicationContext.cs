@@ -305,10 +305,16 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private async Task<LearningSessionSettingsUpdateResult> ChangeLearningSettingsFromParentControl(
         int? questionCount,
         int? passLine,
+        int? schoolGrade,
+        bool? preferSchoolGrade,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var result = parentLearningSettingsService.Update(questionCount, passLine);
+        var result = parentLearningSettingsService.Update(
+            questionCount,
+            passLine,
+            schoolGrade,
+            preferSchoolGrade);
         if (result.Success)
         {
             var synchronized = await SynchronizeActiveTrainingAsync(
