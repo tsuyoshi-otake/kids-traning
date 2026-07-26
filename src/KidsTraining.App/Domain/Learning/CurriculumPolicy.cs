@@ -30,12 +30,19 @@ internal static partial class CurriculumPolicy
     private const string EnglishSource = "https://www.mext.go.jp/content/20220614-mxt_kyoiku02-100002607_11.pdf";
     private const string HomeEconomicsSource = "https://www.mext.go.jp/content/20240918-mxt_kyoiku01-100002607_02.pdf";
     private const string GeneralSource = "https://www.mext.go.jp/a_menu/shotou/new-cs/1384661.htm";
+    private const string MiddleJapaneseSource = "https://www.mext.go.jp/component/a_menu/education/micro_detail/__icsFiles/afieldfile/2019/03/18/1387018_002.pdf";
+    private const string MiddleMathematicsSource = "https://www.mext.go.jp/component/a_menu/education/micro_detail/__icsFiles/afieldfile/2019/03/18/1387018_004.pdf";
+    private const string MiddleSocialSource = "https://www.mext.go.jp/component/a_menu/education/micro_detail/__icsFiles/afieldfile/2019/03/18/1387018_003.pdf";
+    private const string MiddleScienceSource = "https://www.mext.go.jp/content/20210830-mxt_kyoiku01-100002608_05.pdf";
+    private const string MiddleEnglishSource = "https://www.mext.go.jp/content/20210531-mxt_kyoiku01-100002608_010.pdf";
+    private const string MiddleTechnologyHomeSource = "https://www.mext.go.jp/component/a_menu/education/micro_detail/__icsFiles/afieldfile/2019/03/18/1387018_009.pdf";
+    private const string MiddleGeneralSource = "https://www.mext.go.jp/a_menu/shotou/new-cs/1387016.htm";
 
     private static readonly string[] TopicKeys =
     [
         "add", "sub", "mul", "clock", "kokugo", "hissan", "moji", "measure", "kazu", "shape", "div",
         "frac", "chart", "story", "bun", "goi", "dokkai", "eigo", "money", "groups", "order", "keyboard",
-        "soroban", "seikatsu", "shakai", "rika", "kateika", "doutoku", "sougou", "jouhou", "tokubetsu"
+        "soroban", "seikatsu", "shakai", "rika", "kateika", "gijutsu", "doutoku", "sougou", "jouhou", "tokubetsu"
     ];
 
     private static readonly IReadOnlyList<CurriculumUnit> Units = BuildUnits();
@@ -46,7 +53,7 @@ internal static partial class CurriculumPolicy
             .Select(static group => (IReadOnlyList<string>)group.OrderBy(static unit => unit.Order).Select(static unit => unit.Id).ToArray())
             .ToArray();
 
-    public static int NormalizeGrade(int grade) => Math.Clamp(grade, 1, 6);
+    public static int NormalizeGrade(int grade) => Math.Clamp(grade, 1, 9);
 
     public static IReadOnlyList<IReadOnlyList<string>> CurriculumLanes => SubjectLanes;
 
@@ -162,6 +169,8 @@ internal static partial class CurriculumPolicy
         AddLegacyLane("keyboard", 3, GeneralSource, "keyboard");
 
         AddUpperGradeUnits(AddBank, Add);
+        AddMiddleCore(AddBank);
+        AddMiddleActivities(AddBank);
         return units;
     }
 
@@ -294,6 +303,7 @@ internal static partial class CurriculumPolicy
         "shakai" => "社会",
         "rika" => "理科",
         "kateika" => "家庭科",
+        "gijutsu" => "技術",
         "doutoku" => "道徳",
         "sougou" => "総合",
         "jouhou" => "情報",
@@ -314,4 +324,8 @@ internal static partial class CurriculumPolicy
     private static partial void AddHomeEconomics(Action<string, string, int, string, string, string, CurriculumQuestion[]> add);
 
     private static partial void AddUpperActivities(Action<string, string, int, string, string, string, CurriculumQuestion[]> add);
+
+    private static partial void AddMiddleCore(Action<string, string, int, string, string, string, CurriculumQuestion[]> add);
+
+    private static partial void AddMiddleActivities(Action<string, string, int, string, string, string, CurriculumQuestion[]> add);
 }

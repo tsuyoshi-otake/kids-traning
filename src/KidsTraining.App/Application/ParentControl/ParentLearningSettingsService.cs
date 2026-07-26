@@ -40,7 +40,7 @@ internal sealed class ParentLearningSettingsService : IParentLearningSettingsPro
         {
             return new LearningSessionSettingsUpdateResult(
                 false,
-                "学校学年は1〜6の整数にしてください。",
+                "学校学年は小学1年〜中学3年の範囲で指定してください。",
                 current);
         }
 

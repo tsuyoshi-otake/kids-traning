@@ -13,7 +13,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "calibTopicLabel=T[cq.topic].label;calibTopicChipStyle=",
-            "calibGradeLabel='小学'+(Number(cq.grade)||this.state.setupGrade)+'年相当';calibTopicLabel=T[cq.topic].label;calibDifficultyLabel=this.clamp(Number(cq.difficulty)||1,1,5)+' / 5';calibTopicChipStyle=",
+            "calibGradeLabel=this.schoolGradeName(Number(cq.grade)||this.state.setupGrade)+'相当';calibTopicLabel=T[cq.topic].label;calibDifficultyLabel=this.clamp(Number(cq.difficulty)||1,1,5)+' / 5';calibTopicChipStyle=",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -25,7 +25,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "topicLabel:topicLabel, hasPracticePrompt:!!practicePrompt, practicePrompt:this.withFurigana(practicePrompt), topicChipStyle:",
-            "questionGradeLabel:q?('小学'+(Number(q.grade)||this.effectiveGrade(p))+'年相当'):'', questionCategoryLabel:topicLabel, questionDifficultyLabel:q?(this.clamp(Number(q.difficulty)||1,1,5)+' / 5'):'',\n      topicLabel:topicLabel, hasPracticePrompt:!!practicePrompt, practicePrompt:this.withFurigana(practicePrompt), topicChipStyle:",
+            "questionGradeLabel:q?(this.schoolGradeName(Number(q.grade)||this.effectiveGrade(p))+'相当'):'', questionCategoryLabel:topicLabel, questionDifficultyLabel:q?(this.clamp(Number(q.difficulty)||1,1,5)+' / 5'):'',\n      topicLabel:topicLabel, hasPracticePrompt:!!practicePrompt, practicePrompt:this.withFurigana(practicePrompt), topicChipStyle:",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(

@@ -140,6 +140,9 @@ internal static class ParentControlPageRenderer
             <option value="4"{{(settings.SchoolGrade == 4 ? " selected" : string.Empty)}}>小学4年</option>
             <option value="5"{{(settings.SchoolGrade == 5 ? " selected" : string.Empty)}}>小学5年</option>
             <option value="6"{{(settings.SchoolGrade == 6 ? " selected" : string.Empty)}}>小学6年</option>
+            <option value="7"{{(settings.SchoolGrade == 7 ? " selected" : string.Empty)}}>中学1年</option>
+            <option value="8"{{(settings.SchoolGrade == 8 ? " selected" : string.Empty)}}>中学2年</option>
+            <option value="9"{{(settings.SchoolGrade == 9 ? " selected" : string.Empty)}}>中学3年</option>
           </select>
           <small class="field-help" id="schoolGradeHelp">表示・記録用です。出題の上限にはなりません。</small>
         </label>
@@ -269,8 +272,8 @@ internal static class ParentControlPageRenderer
       if (!Number.isInteger(pass) || pass < 1 || pass > count) {
         return { error: '合格点は1点以上、出題数以下にしてください。', fieldId: 'passLine' };
       }
-      if (!Number.isInteger(grade) || grade < 1 || grade > 6) {
-        return { error: '学校学年は1〜6の整数にしてください。', fieldId: 'schoolGrade' };
+      if (!Number.isInteger(grade) || grade < 1 || grade > 9) {
+        return { error: '学校学年は小学1年〜中学3年の範囲で選んでください。', fieldId: 'schoolGrade' };
       }
       return { questionCount: count, passLine: pass, schoolGrade: grade, preferSchoolGrade: preferSchoolGrade.checked };
     }

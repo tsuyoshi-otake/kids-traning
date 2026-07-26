@@ -43,7 +43,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true},count:this.props.questionCount??10,pass:this.props.passLine??8};}",
-            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true,eigo:true,money:true,groups:true,order:true,soroban:true,seikatsu:true,shakai:true,rika:true,kateika:true,doutoku:true,jouhou:true,sougou:true,tokubetsu:true,keyboard:true},count:this.props.questionCount??20,pass:this.props.passLine??15,attentionEnabled:true,preferSchoolGrade:false};}",
+            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true,eigo:true,money:true,groups:true,order:true,soroban:true,seikatsu:true,shakai:true,rika:true,kateika:true,gijutsu:true,doutoku:true,jouhou:true,sougou:true,tokubetsu:true,keyboard:true},count:this.props.questionCount??20,pass:this.props.passLine??15,attentionEnabled:true,preferSchoolGrade:false};}",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
@@ -58,7 +58,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "    rika:{label:'りか',color:'#16846b'},",
-            "    rika:{label:'りか',color:'#16846b'},\n    kateika:{label:'家庭科',color:'#d97706'},",
+            "    rika:{label:'りか',color:'#16846b'},\n    kateika:{label:'家庭科',color:'#d97706'},\n    gijutsu:{label:'技術',color:'#4b6b45'},",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
@@ -187,7 +187,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "const gradeOpts=[1,2,3,4,5,6].map(g=>",
-            "const gradeOpts=[1,2,3,4,5,6].map(g=>",
+            "const gradeOpts=[1,2,3,4,5,6,7,8,9].map(g=>",
             StringComparison.Ordinal);
 
         markup = PatchEducationalPersistence(markup);
@@ -266,7 +266,7 @@ componentDidMount(){
     let storedSettings=null;
     try{const raw=localStorage.getItem('kt_settings_v1');if(raw)storedSettings=JSON.parse(raw);}catch(e){}
     const def=this.defaultSettings(),sourceSettings=storedSettings&&typeof storedSettings==='object'?storedSettings:{};
-    const schoolGrade=this.clamp(numberOrDefault(host.schoolGrade,numberOrDefault(sourceSettings.schoolGrade,1)),1,6);
+    const schoolGrade=this.clamp(numberOrDefault(host.schoolGrade,numberOrDefault(sourceSettings.schoolGrade,1)),1,9);
     const preferSchoolGrade=typeof host.preferSchoolGrade==='boolean'?host.preferSchoolGrade:sourceSettings.preferSchoolGrade===true;
     const isDefaultishMastery=mastery=>masteryKeys.every(key=>{const value=Number(mastery&&mastery[key]);return !Number.isFinite(value)||Math.abs(value-.5)<.001||Math.abs(value-beginnerMastery[key])<.001;});
     const hasMeaningfulProgress=profile=>numberOrDefault(profile.stars,0)>0||numberOrDefault(profile.streak,0)>0||numberOrDefault(profile.xp,0)>0||!isDefaultishMastery(profile.mastery);
@@ -282,7 +282,7 @@ componentDidMount(){
     const pass=this.clamp(numberOrDefault(host.passLine,numberOrDefault(sourceSettings.pass,def.pass)),1,count);
     const settings={...def,...sourceSettings,topics:{...def.topics,...storedTopics},count:count,pass:pass,schoolGrade:schoolGrade,preferSchoolGrade:preferSchoolGrade};
     try{localStorage.setItem('kt_settings_v1',JSON.stringify(settings));}catch(e){}
-    window.__kidsTrainingApplySchoolGrade=value=>{const grade=Number(value);if(!Number.isInteger(grade)||grade<1||grade>6)return false;const nextProfiles=this.state.profiles.map((profile,index)=>index===0?{...profile,grade:grade}:profile),nextSettings={...this.state.settings,schoolGrade:grade};try{localStorage.setItem('kt_profiles_v1',JSON.stringify(nextProfiles));localStorage.setItem('kt_settings_v1',JSON.stringify(nextSettings));}catch(e){}this.setState({profiles:nextProfiles,settings:nextSettings});return true;};
+    window.__kidsTrainingApplySchoolGrade=value=>{const grade=Number(value);if(!Number.isInteger(grade)||grade<1||grade>9)return false;const nextProfiles=this.state.profiles.map((profile,index)=>index===0?{...profile,grade:grade}:profile),nextSettings={...this.state.settings,schoolGrade:grade};try{localStorage.setItem('kt_profiles_v1',JSON.stringify(nextProfiles));localStorage.setItem('kt_settings_v1',JSON.stringify(nextSettings));}catch(e){}this.setState({profiles:nextProfiles,settings:nextSettings});return true;};
     let muted=this.state.muted;try{const value=localStorage.getItem('kt_muted_v1');if(value!=null)muted=value==='1';}catch(e){}
     this.setState({profiles:profiles,settings:settings,muted:muted});
 }

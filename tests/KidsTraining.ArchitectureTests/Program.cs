@@ -75,6 +75,13 @@ internal static class Program
             "Architecture Test",
             ParentPin.FromOrDefault("4456"));
 
+        var runtimeOutput = Environment.GetEnvironmentVariable("KIDS_TRAINING_RUNTIME_OUTPUT");
+        if (!string.IsNullOrWhiteSpace(runtimeOutput))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(runtimeOutput))!);
+            File.WriteAllText(runtimeOutput, html, new UTF8Encoding(false));
+        }
+
         Assert(!html.Contains("<!--__KIDS_TRAINING_APP__-->", StringComparison.Ordinal), "placeholder remained");
         Assert(html.Contains("localStorage.getItem('kt_parent_pin_v1')||'4456'", StringComparison.Ordinal), "parent PIN patch is missing");
         Assert(html.Contains("kids-training/scripts/runtime.js", StringComparison.Ordinal), "external runtime reference is missing");
@@ -222,14 +229,14 @@ internal static class Program
             Math.Abs(LearningDefaults.BeginnerMastery - 0.05) < double.Epsilon,
             "beginner mastery is not represented as a structured domain value");
         Assert(CurriculumPolicy.NormalizeGrade(0) == 1, "grades below the implemented range were not clamped");
-        Assert(CurriculumPolicy.NormalizeGrade(7) == 6, "grades above the implemented range were not clamped");
+        Assert(CurriculumPolicy.NormalizeGrade(10) == 9, "grades above the implemented range were not clamped");
 
         var units = CurriculumPolicy.AllUnits;
         Assert(units.Count > 0, "the curriculum catalog is empty");
         Assert(units.Select(static unit => unit.Id).Distinct(StringComparer.Ordinal).Count() == units.Count, "curriculum unit IDs are not unique");
         Assert(
-            Enumerable.Range(1, 6).All(grade => units.Any(unit => unit.Grade == grade)),
-            "one or more grades from 1 through 6 have no curriculum units");
+            Enumerable.Range(1, 9).All(grade => units.Any(unit => unit.Grade == grade)),
+            "one or more grades from elementary 1 through junior-high 3 have no curriculum units");
         Assert(
             units.All(static unit =>
                 !string.IsNullOrWhiteSpace(unit.SubjectId) &&
@@ -242,7 +249,7 @@ internal static class Program
             units.Where(static unit => unit.GeneratorKey == "curriculum-bank").All(static unit => unit.Questions.Count > 0),
             "a curriculum-bank unit has no questions");
         Assert(
-            units.All(static unit => unit.Grade is >= 1 and <= 6 && unit.Order > 0),
+            units.All(static unit => unit.Grade is >= 1 and <= 9 && unit.Order > 0),
             "a curriculum unit has an invalid grade or order");
 
         var ids = units.Select(static unit => unit.Id).ToHashSet(StringComparer.Ordinal);
@@ -276,6 +283,10 @@ internal static class Program
             units.Any(static unit => unit.Grade == 6 && unit.SubjectId == "english") &&
             units.Any(static unit => unit.Grade == 6 && unit.SubjectId == "home-economics"),
             "the grade 4-6 core curriculum is incomplete");
+        Assert(
+            new[] { "math", "japanese", "science", "social", "english", "technology", "home-economics", "moral", "integrated", "information", "special-activities" }
+                .All(subject => Enumerable.Range(7, 3).All(grade => units.Any(unit => unit.Grade == grade && unit.SubjectId == subject))),
+            "the junior-high grade 1-3 curriculum is incomplete");
         Assert(
             !CurriculumPolicy.AllTopics.Contains("ongaku", StringComparer.Ordinal) &&
             !CurriculumPolicy.AllTopics.Contains("taiiku", StringComparer.Ordinal) &&
@@ -398,7 +409,7 @@ internal static class Program
         Assert(
             html.Contains("data-question-grade=\"{{ questionGradeLabel }}\"", StringComparison.Ordinal) &&
             html.Contains("単元：{{ questionGradeLabel }}", StringComparison.Ordinal) &&
-            html.Contains("'小学'+(Number(q.grade)||this.effectiveGrade(p))+'年相当'", StringComparison.Ordinal) &&
+            html.Contains("this.schoolGradeName(Number(q.grade)||this.effectiveGrade(p))+'相当'", StringComparison.Ordinal) &&
             html.Contains("カテゴリ：{{ questionCategoryLabel }}", StringComparison.Ordinal) &&
             html.Contains("難易度：{{ questionDifficultyLabel }}", StringComparison.Ordinal),
             "quiz questions do not display grade, category, and difficulty metadata");
@@ -412,6 +423,11 @@ internal static class Program
             html.Contains("登録学年：{{ profileGrade }}", StringComparison.Ordinal) &&
             html.Contains("学習中：{{ currentLearningGrade }}", StringComparison.Ordinal),
             "the parent report does not separate registered and current unit grades");
+        Assert(
+            html.Contains("parentSchoolGradeText:parentSchoolGradeText", StringComparison.Ordinal) &&
+            html.Contains("{{ parentSchoolGradeText }}", StringComparison.Ordinal) &&
+            !html.Contains("小学{{ parentSchoolGrade", StringComparison.Ordinal),
+            "the protected parent UI does not render the normalized elementary/middle-school grade label exactly once");
         Assert(
             html.Contains("refreshSessionTarget(p,s)", StringComparison.Ordinal) &&
             html.Contains("current&&!this.topicComplete(p,current)", StringComparison.Ordinal) &&
@@ -457,7 +473,7 @@ internal static class Program
             html.Contains("{{ retryAdvice }}", StringComparison.Ordinal) &&
             !html.Contains("ごうかくまで あと <b>{{ retryRemaining }}", StringComparison.Ordinal),
             "the retry screen still shows the score gap only, hiding the real unmet condition");
-        Assert(html.Contains("const gradeOpts=[1,2,3,4,5,6].map", StringComparison.Ordinal), "UI does not expose all supported school grades");
+        Assert(html.Contains("const gradeOpts=[1,2,3,4,5,6,7,8,9].map", StringComparison.Ordinal), "UI does not expose all supported school grades");
         Assert(!html.Contains("if(done('add'))staged.push", StringComparison.Ordinal), "cross-subject prerequisite chain remains");
         Assert(html.Contains("1000万を 10こ", StringComparison.Ordinal) && html.Contains("const scale=(g>=3&&stage>=4)?5", StringComparison.Ordinal), "key grade 3 number/chart content is missing");
         Assert(html.Contains("pickWeekday(stage)", StringComparison.Ordinal) && html.Contains("subtype:'weekday'", StringComparison.Ordinal) && html.Contains("月曜日", StringComparison.Ordinal) && html.Contains("日曜日", StringComparison.Ordinal), "weekday names, order, or calendar offsets are missing");
@@ -911,24 +927,26 @@ internal static class Program
         var store = new InMemoryParentLearningSettingsStore(LearningSessionSettings.Default);
         var service = new ParentLearningSettingsService(store);
         Assert(!LearningSessionSettings.Normalize(20, 15, 4).PreferSchoolGrade, "legacy settings did not default the school-grade preference to OFF");
+        Assert(LearningSessionSettings.FormatSchoolGrade(1) == "小学1年", "elementary school grade formatting is incorrect");
+        Assert(LearningSessionSettings.FormatSchoolGrade(9) == "中学3年", "middle school grade formatting is incorrect");
 
         Assert(!service.Update(9, 9, 1, false).Success, "question counts below 10 were accepted");
         Assert(!service.Update(31, 15, 1, false).Success, "question counts above 30 were accepted");
         Assert(!service.Update(30, 31, 1, false).Success, "a pass line above the question count was accepted");
-        Assert(!service.Update(20, 15, 0, false).Success && !service.Update(20, 15, 7, false).Success, "an out-of-range school grade was accepted");
+        Assert(!service.Update(20, 15, 0, false).Success && !service.Update(20, 15, 10, false).Success, "an out-of-range school grade was accepted");
         Assert(!service.Update(20, 15, 1, null).Success, "a missing school-grade preference was accepted");
         Assert(service.GetCurrentSettings() == LearningSessionSettings.Default, "invalid input changed saved learning settings");
 
         var minimum = service.Update(10, 8, 1, false);
         Assert(minimum.Success && minimum.Settings == new LearningSessionSettings(10, 8, 1, false), "minimum learning settings were rejected");
 
-        var saved = service.Update(30, 24, 6, true);
-        Assert(saved.Success && saved.Settings == new LearningSessionSettings(30, 24, 6, true), "maximum learning settings were rejected");
+        var saved = service.Update(30, 24, 9, true);
+        Assert(saved.Success && saved.Settings == new LearningSessionSettings(30, 24, 9, true), "maximum learning settings were rejected");
         Assert(store.ReadLearningSettings() == saved.Settings, "valid learning settings were not persisted");
 
         var page = ParentControlPageRenderer.Build([], false, saved.Settings);
         Assert(page.Contains("min=\"10\" max=\"30\"", StringComparison.Ordinal) && page.Contains("10〜30問", StringComparison.Ordinal), "parent page does not expose the 10-to-30 fixed question range");
-        Assert(page.Contains("id=\"schoolGrade\"", StringComparison.Ordinal) && page.Contains("value=\"6\" selected", StringComparison.Ordinal), "parent page does not expose the persisted school grade");
+        Assert(page.Contains("id=\"schoolGrade\"", StringComparison.Ordinal) && page.Contains("value=\"9\" selected", StringComparison.Ordinal) && page.Contains("中学3年", StringComparison.Ordinal), "parent page does not expose the persisted school grade");
         Assert(page.Contains("id=\"preferSchoolGrade\"", StringComparison.Ordinal) && page.Contains("type=\"checkbox\" checked", StringComparison.Ordinal), "parent page does not expose the persisted school-grade preference");
 
         store.ThrowOnWrite = true;
@@ -1047,15 +1065,16 @@ internal static class Program
             () => false,
             (_, _, _) => Task.FromResult(PasswordChangeResult.Ok("ok")),
             () => LearningSessionSettings.Default,
-            (_, _, _, preferSchoolGrade, _) =>
+            (questionCount, passLine, schoolGrade, preferSchoolGrade, _) =>
             {
                 settingsCalls++;
                 capturedPreference = preferSchoolGrade;
+                var valid = schoolGrade is >= 1 and <= 9;
                 return Task.FromResult(
                     new LearningSessionSettingsUpdateResult(
-                        true,
-                        "ok",
-                        new LearningSessionSettings(20, 15, 4, preferSchoolGrade ?? false)));
+                        valid,
+                        valid ? "ok" : "invalid grade",
+                        LearningSessionSettings.Normalize(questionCount, passLine, schoolGrade, preferSchoolGrade)));
             },
             (currentPassword, mode, _) =>
             {
@@ -1106,7 +1125,7 @@ internal static class Program
                 .GetAwaiter()
                 .GetResult();
             using var settingsContent = new StringContent(
-                """{"questionCount":20,"passLine":15,"schoolGrade":4,"preferSchoolGrade":true}""",
+                """{"questionCount":20,"passLine":15,"schoolGrade":9,"preferSchoolGrade":true}""",
                 Encoding.UTF8,
                 "application/json");
             using var settingsResponse = client
@@ -1121,18 +1140,27 @@ internal static class Program
                 .PostAsync($"http://127.0.0.1:{port}/api/settings", invalidSettingsContent)
                 .GetAwaiter()
                 .GetResult();
+            using var outOfRangeSettingsContent = new StringContent(
+                """{"questionCount":20,"passLine":15,"schoolGrade":10,"preferSchoolGrade":true}""",
+                Encoding.UTF8,
+                "application/json");
+            using var outOfRangeSettingsResponse = client
+                .PostAsync($"http://127.0.0.1:{port}/api/settings", outOfRangeSettingsContent)
+                .GetAwaiter()
+                .GetResult();
             Assert(
                 startResponse.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable &&
                 returnResponse.StatusCode == System.Net.HttpStatusCode.OK &&
                 pauseResponse.StatusCode == System.Net.HttpStatusCode.OK &&
                 resetResponse.StatusCode == System.Net.HttpStatusCode.OK &&
                 settingsResponse.StatusCode == System.Net.HttpStatusCode.OK &&
-                invalidSettingsResponse.StatusCode == System.Net.HttpStatusCode.BadRequest,
+                invalidSettingsResponse.StatusCode == System.Net.HttpStatusCode.BadRequest &&
+                outOfRangeSettingsResponse.StatusCode == System.Net.HttpStatusCode.BadRequest,
                 "parent actions returned before their actual success results were known");
             Assert(
                 startCalls == 1 && returnCalls == 1 && pauseCalls == 1 && resetCalls == 1,
                 "parent actions were not invoked exactly once");
-            Assert(settingsCalls == 1 && capturedPreference == true, "the parent settings API did not preserve a strict boolean preference");
+            Assert(settingsCalls == 2 && capturedPreference == true, "the parent settings API did not preserve a strict boolean preference or terminal grade validation");
             Assert(
                 resetPassword == "1234" && resetMode == LearningResetModeValues.HistoryOnly,
                 "parent reset request did not preserve its PIN or reset mode");

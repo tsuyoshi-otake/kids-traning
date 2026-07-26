@@ -87,7 +87,7 @@ const observe = (check, amount = 1) => observed.set(check, (observed.get(check) 
 const TOPICS = [
   'add', 'sub', 'hissan', 'mul', 'clock', 'kokugo', 'moji', 'measure', 'kazu', 'shape',
   'div', 'frac', 'chart', 'story', 'bun', 'goi', 'dokkai', 'eigo', 'money', 'groups',
-  'order', 'soroban', 'seikatsu', 'shakai', 'rika', 'kateika', 'doutoku', 'jouhou', 'sougou',
+  'order', 'soroban', 'seikatsu', 'shakai', 'rika', 'kateika', 'gijutsu', 'doutoku', 'jouhou', 'sougou',
   'tokubetsu', 'keyboard',
 ];
 const STAGES = [1, 2, 3, 4, 5];

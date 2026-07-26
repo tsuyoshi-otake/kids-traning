@@ -45,8 +45,9 @@ skillAverage(p){const values=Object.values((p&&p.mastery)||{}).map(v=>Number(v))
   curriculumLaneIds(){return {{{lanesJson}}};}
   curriculumUnit(k){return this.curriculumCatalog().find(unit=>unit.id===k)||null;}
   curriculumUnitsForTopic(k){return this.curriculumCatalog().filter(unit=>unit.topicId===k);}
-  effectiveGrade(p){return Math.max(1,Math.min(6,Number(p&&p.grade)||1));}
-  gradeLabel(p){return this.effectiveGrade(p)+'年生';}
+  effectiveGrade(p){return Math.max(1,Math.min(9,Number(p&&p.grade)||1));}
+  schoolGradeName(value){const grade=Math.max(1,Math.min(9,Number(value)||1));return grade<=6?'小学'+grade+'年':'中学'+(grade-6)+'年';}
+  gradeLabel(p){return this.schoolGradeName(this.effectiveGrade(p))+'生';}
   learningStage(p){const level=this.skillLevel(p),stars=Number(p.stars)||0;if(stars<15&&level<=1)return 1;if(stars<45||level<=2)return 2;if(stars<90||level<=3)return 3;if(stars<150||level<=4)return 4;return 5;}
   blankUnitStat(){return{attempts:0,independent:0,assisted:0,revealed:0,errors:0,confidence:.05,reviewStep:0,retentionStep:0,lastAttemptAt:null,nextReviewAt:null,retentionStartedAt:null,masteredAt:null,level:1,stageAttempts:0,stageIndependent:0};}
   completedUnitStat(now=Date.now()){return{...this.blankUnitStat(),confidence:.99,retentionStep:{{{requiredRetentionConfirmations}}},retentionStartedAt:now,masteredAt:now,level:5};}
