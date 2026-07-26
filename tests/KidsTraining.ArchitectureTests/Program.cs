@@ -5,6 +5,7 @@ using KidsTraining.App.Domain.ParentControl;
 using KidsTraining.App.Domain.Learning;
 using KidsTraining.App.Domain.Updates;
 using KidsTraining.App.Infrastructure.Lifecycle;
+using KidsTraining.App.Infrastructure.Learning;
 using KidsTraining.App.Infrastructure.ParentControl;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -31,12 +32,15 @@ internal static class Program
         Run("Learning evidence separates outcomes and readiness", TestLearningEvidence);
         Run("Review schedule uses bounded spaced intervals", TestReviewSchedule);
         Run("Learning markup contains evidence-based progression", () => TestEducationalProgressionMarkup(repositoryRoot));
+        Run("Learning hot paths retain bounded-work performance contracts", () => TestPerformanceContracts(repositoryRoot));
         Run("Generated questions satisfy curriculum invariants", () => TestGeneratedQuestionAudit(repositoryRoot));
         Run("Learning page builder rejects missing placeholder", () => TestMissingPlaceholder(repositoryRoot));
         Run("Learning page builder rejects duplicate placeholder", () => TestDuplicatePlaceholder(repositoryRoot));
         Run("Learning markup reports a missing required anchor", () => TestMissingRequiredAnchor(repositoryRoot));
         Run("Learning markup rejects a duplicate required anchor", () => TestDuplicateRequiredAnchor(repositoryRoot));
         Run("Preparation result has explicit terminal states", TestPreparationTerminals);
+        Run("Learning runtime preparation reuses a validated cache", () => TestLearningRuntimeCache(repositoryRoot));
+        Run("Legacy storage migration retries are bounded across startups", TestLegacyStorageMigrationState);
         Run("Parent password changes reach explicit terminal states", TestPasswordServiceTerminals);
         Run("Parent learning settings reach explicit terminal states", TestLearningSettingsServiceTerminals);
         Run("Parent learning resets reach explicit terminal states", TestLearningResetServiceTerminals);
@@ -46,7 +50,7 @@ internal static class Program
 
         if (Failures.Count == 0)
         {
-            Console.WriteLine("Architecture tests passed: 18");
+            Console.WriteLine("Architecture tests passed: 21");
             return 0;
         }
 
@@ -802,6 +806,54 @@ internal static class Program
             Environment.NewLine + output);
     }
 
+    private static void TestPerformanceContracts(string repositoryRoot)
+    {
+        var (template, appDefinition) = ReadLearningSource(repositoryRoot);
+        var html = new LearningPageBuilder().Build(
+            template,
+            appDefinition,
+            "Performance Test",
+            ParentPin.FromOrDefault("4456"));
+
+        Assert(
+            html.Contains("curriculumData(){if(this._curriculumData)return this._curriculumData", StringComparison.Ordinal) &&
+            html.Contains("byId=new Map(),byTopic=new Map()", StringComparison.Ordinal) &&
+            html.Contains("normalizedProfiles:new WeakSet()", StringComparison.Ordinal) &&
+            html.Contains("if(data.normalizedProfiles.has(p))return p", StringComparison.Ordinal) &&
+            !html.Contains("curriculumCatalog(){return [", StringComparison.Ordinal),
+            "the curriculum hot path rebuilds or linearly searches the full catalog");
+        Assert(
+            html.Contains("progressionView(p)", StringComparison.Ordinal) &&
+            html.Contains("const progression=this.progressionView(p)", StringComparison.Ordinal) &&
+            html.Contains("progression.availableTopicIds.has(k)", StringComparison.Ordinal) &&
+            html.Contains("progression.introducedTopicIds.has(k)", StringComparison.Ordinal),
+            "derived progression data is recomputed inside the per-topic render loop");
+        Assert(
+            html.Contains("componentDidUpdate(prevProps,prevState)", StringComparison.Ordinal) &&
+            html.Contains("this.scheduleLearningCheckpoint(prevState)", StringComparison.Ordinal) &&
+            html.Contains("_checkpointSaveTimer=setTimeout", StringComparison.Ordinal) &&
+            !html.Contains("componentDidUpdate(){try{const s=JSON.stringify(this.state.profiles)", StringComparison.Ordinal),
+            "every UI update still serializes profiles or writes a checkpoint synchronously");
+
+        var runtimeSource = File.ReadAllText(
+            Path.Combine(repositoryRoot, "kids-training", "scripts", "runtime.js"),
+            Encoding.UTF8);
+        var staticMode = template.IndexOf("<meta name=\"dc-runtime-mode\" content=\"static\">", StringComparison.Ordinal);
+        var react = template.IndexOf("scripts/vendor/react-18.3.1.production.min.js", StringComparison.Ordinal);
+        var reactDom = template.IndexOf("scripts/vendor/react-dom-18.3.1.production.min.js", StringComparison.Ordinal);
+        var runtime = template.IndexOf("scripts/runtime.js", StringComparison.Ordinal);
+        Assert(
+            staticMode >= 0 && react >= 0 && react < reactDom && reactDom < runtime &&
+            runtimeSource.Contains("content !== \"static\"", StringComparison.Ordinal) &&
+            runtimeSource.Contains("fetch(location.href)", StringComparison.Ordinal),
+            "the static runtime does not suppress its duplicate self-fetch or preload local React correctly");
+        Assert(
+            !template.Contains("https://", StringComparison.OrdinalIgnoreCase) &&
+            !runtimeSource.Contains("unpkg.com", StringComparison.OrdinalIgnoreCase) &&
+            !runtimeSource.Contains("fonts.googleapis.com", StringComparison.OrdinalIgnoreCase),
+            "the learning startup path still depends on an external HTTP resource");
+    }
+
     private static (int ExitCode, string Output) RunNodeAudit(string scriptPath, string pagePath)
     {
         var startInfo = new ProcessStartInfo("node")
@@ -834,10 +886,17 @@ internal static class Program
 
         using (process)
         {
-            var standardOutput = process.StandardOutput.ReadToEnd();
-            var standardError = process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            return (process.ExitCode, (standardOutput + standardError).Trim());
+            var standardOutput = process.StandardOutput.ReadToEndAsync();
+            var standardError = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(TimeSpan.FromMinutes(2)))
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit();
+                throw new TimeoutException("the generated-question audit exceeded two minutes");
+            }
+
+            Task.WhenAll(standardOutput, standardError).GetAwaiter().GetResult();
+            return (process.ExitCode, (standardOutput.Result + standardError.Result).Trim());
         }
     }
 
@@ -890,9 +949,127 @@ internal static class Program
     private static void TestPreparationTerminals()
     {
         var prepared = LearningPagePreparationResult.Prepared("runtime.html");
+        var cached = LearningPagePreparationResult.PreparedFromCache("runtime.html");
         var failed = LearningPagePreparationResult.Failed("failure");
         Assert(prepared.IsSuccess && prepared.RuntimePagePath == "runtime.html" && prepared.ErrorMessage is null, "prepared state is incomplete");
+        Assert(cached.IsSuccess && cached.Status == LearningPagePreparationStatus.PreparedFromCache, "cache-hit state is incomplete");
         Assert(!failed.IsSuccess && failed.RuntimePagePath is null && failed.ErrorMessage == "failure", "failed state is incomplete");
+    }
+
+    private static void TestLearningRuntimeCache(string repositoryRoot)
+    {
+        var temporaryRoot = Path.Combine(
+            Path.GetTempPath(),
+            "KidsTrainingArchitectureTests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            var sourceRoot = Path.Combine(repositoryRoot, "kids-training");
+            var templatePath = Path.Combine(temporaryRoot, "index.template.html");
+            var definitionPath = Path.Combine(temporaryRoot, "learning-app.dc.html");
+            var runtimePath = Path.Combine(temporaryRoot, "runtime.html");
+            var manifestPath = Path.Combine(temporaryRoot, "runtime-cache.json");
+            File.Copy(Path.Combine(sourceRoot, "index.template.html"), templatePath);
+            File.Copy(Path.Combine(sourceRoot, "app", "learning-app.dc.html"), definitionPath);
+
+            var pinStore = new InMemoryParentPinStore(ParentPin.FromOrDefault("4456"));
+            var preparer = new FileLearningPagePreparer(
+                new LearningPageBuilder(),
+                new ParentPasswordService(pinStore),
+                new FixedProfileNameProvider("Cache Test"),
+                new LearningPagePreparationPaths(templatePath, definitionPath, runtimePath, manifestPath));
+
+            var first = preparer.Prepare();
+            var firstWrite = File.GetLastWriteTimeUtc(runtimePath);
+            var second = preparer.Prepare();
+            Assert(
+                first.Status == LearningPagePreparationStatus.PreparedFresh &&
+                second.Status == LearningPagePreparationStatus.PreparedFromCache &&
+                File.GetLastWriteTimeUtc(runtimePath) == firstWrite,
+                "an unchanged runtime was rebuilt or touched");
+
+            File.AppendAllText(runtimePath, "<!--tampered-->", Encoding.UTF8);
+            var repaired = preparer.Prepare();
+            Assert(
+                repaired.Status == LearningPagePreparationStatus.PreparedFresh &&
+                !File.ReadAllText(runtimePath).Contains("<!--tampered-->", StringComparison.Ordinal),
+                "a tampered runtime was accepted as a cache hit");
+
+            pinStore.Write(ParentPin.FromOrDefault("7788"));
+            var changedPin = preparer.Prepare();
+            var manifest = File.ReadAllText(manifestPath, Encoding.UTF8);
+            Assert(
+                changedPin.Status == LearningPagePreparationStatus.PreparedFresh &&
+                !manifest.Contains("4456", StringComparison.Ordinal) &&
+                !manifest.Contains("7788", StringComparison.Ordinal),
+                "a PIN change did not invalidate the runtime or a raw PIN leaked into the cache manifest");
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryRoot))
+            {
+                Directory.Delete(temporaryRoot, true);
+            }
+        }
+    }
+
+    private static void TestLegacyStorageMigrationState()
+    {
+        var temporaryRoot = Path.Combine(
+            Path.GetTempPath(),
+            "KidsTrainingArchitectureTests",
+            Guid.NewGuid().ToString("N"));
+        var statePath = Path.Combine(temporaryRoot, "legacy-migration.json");
+        Directory.CreateDirectory(temporaryRoot);
+        try
+        {
+            var store = new JsonLegacyLearningStorageMigrationStateStore(statePath);
+            var now = new DateTimeOffset(2026, 7, 26, 0, 0, 0, TimeSpan.Zero);
+            var pending = store.Read();
+            Assert(!pending.IsCompleted && pending.ShouldAttempt(now), "a new migration state did not start pending");
+
+            Assert(store.TryMarkDeferred(now), "the first deferred migration state was not saved");
+            var first = store.Read();
+            Assert(
+                first.FailedAttempts == 1 && first.RetryAfterUtc == now.AddHours(1) &&
+                !first.ShouldAttempt(now) && first.ShouldAttempt(now.AddHours(1)),
+                "the first failed migration did not apply a one-hour retry window");
+
+            var secondAttempt = now.AddHours(1);
+            Assert(store.TryMarkDeferred(secondAttempt), "the second deferred migration state was not saved");
+            var second = store.Read();
+            Assert(
+                second.FailedAttempts == 2 && second.RetryAfterUtc == secondAttempt.AddHours(6),
+                "the second failed migration did not apply a six-hour retry window");
+
+            var thirdAttempt = secondAttempt.AddHours(6);
+            Assert(store.TryMarkDeferred(thirdAttempt), "the third deferred migration state was not saved");
+            var third = store.Read();
+            Assert(
+                third.FailedAttempts == 3 && third.RetryAfterUtc == thirdAttempt.AddHours(24),
+                "later failed migrations were not capped at a 24-hour retry window");
+
+            Assert(store.TryMarkCompleted(), "a successful migration was not marked complete");
+            var completed = store.Read();
+            var completedJson = File.ReadAllText(statePath, Encoding.UTF8);
+            Assert(
+                completed.IsCompleted && completed.CompletedAtUtc is not null &&
+                completed.FailedAttempts == 0 && completed.RetryAfterUtc is null &&
+                !completed.ShouldAttempt(DateTimeOffset.MaxValue),
+                "completion did not clear retry state or permanently skip file navigation");
+            Assert(store.TryMarkCompleted(), "marking an already completed migration was not idempotent");
+            Assert(
+                File.ReadAllText(statePath, Encoding.UTF8) == completedJson,
+                "an idempotent completion rewrote the migration marker");
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryRoot))
+            {
+                Directory.Delete(temporaryRoot, true);
+            }
+        }
     }
 
     private static void TestPasswordServiceTerminals()
@@ -1235,6 +1412,11 @@ internal static class Program
 
             pin = nextPin;
         }
+    }
+
+    private sealed class FixedProfileNameProvider(string profileName) : IUserProfileNameProvider
+    {
+        public string GetProfileName() => profileName;
     }
 
     private sealed class InMemoryParentLearningSettingsStore(LearningSessionSettings initialSettings)

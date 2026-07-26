@@ -151,11 +151,13 @@
     const rootName = rootNameForDocument(doc, location);
     runtime.markFetched(rootName);
     runtime.adoptParsed(rootName, parsed);
-    fetch(location.href).then((res) => res.ok ? res.text() : "").then((t) => {
-      const raw = t ? parseDcText(t) : null;
-      if (raw?.template) runtime.updateHtml(rootName, raw.template);
-    }).catch(() => {
-    });
+    if (doc.querySelector('meta[name="dc-runtime-mode"]')?.content !== "static") {
+      fetch(location.href).then((res) => res.ok ? res.text() : "").then((t) => {
+        const raw = t ? parseDcText(t) : null;
+        if (raw?.template) runtime.updateHtml(rootName, raw.template);
+      }).catch(() => {
+      });
+    }
     const dc = doc.querySelector("x-dc");
     const hostEl = doc.createElement("div");
     hostEl.id = "dc-root";
@@ -986,7 +988,10 @@
     }
     return cur;
   }
-  var BABEL_URL = "https://unpkg.com/@babel/standalone@7.26.4/babel.min.js";
+  var RUNTIME_SCRIPT_URL = document.currentScript?.src || location.href;
+  var VENDOR_BASE_URL = new URL("./vendor/", RUNTIME_SCRIPT_URL);
+  var BABEL_URL = new URL("babel-standalone-7.26.4.min.js", VENDOR_BASE_URL).href;
+  var BABEL_SRI = "sha384-x/ilTFv/u/eu6YSmkFDZl5V5Mm/pkxxcVv2cVJOrr1J0rvILhMvRBCy6yA75wYBj";
   var GLOBAL_POLL_INTERVAL_MS = 50;
   var GLOBAL_POLL_TIMEOUT_MS = 3e4;
   function createExternalModules(onResolved) {
@@ -1000,7 +1005,7 @@
       babelLoading = new Promise((res, rej) => {
         const s = document.createElement("script");
         s.src = BABEL_URL;
-        s.crossOrigin = "anonymous";
+        s.integrity = BABEL_SRI;
         s.onload = () => res();
         s.onerror = rej;
         document.head.appendChild(s);
@@ -1421,9 +1426,9 @@
   }
 
   // src/index.ts
-  var REACT_URL = "https://unpkg.com/react@18.3.1/umd/react.production.min.js";
+  var REACT_URL = new URL("react-18.3.1.production.min.js", VENDOR_BASE_URL).href;
   var REACT_SRI = "sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z";
-  var REACT_DOM_URL = "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js";
+  var REACT_DOM_URL = new URL("react-dom-18.3.1.production.min.js", VENDOR_BASE_URL).href;
   var REACT_DOM_SRI = "sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1";
   function hideRawTemplate() {
     const s = document.createElement("style");
@@ -1436,7 +1441,6 @@
       const s = document.createElement("script");
       s.src = src;
       s.integrity = integrity;
-      s.crossOrigin = "anonymous";
       s.async = false;
       s.onload = () => resolve2();
       s.onerror = () => reject(new Error(`failed to load ${src}`));

@@ -14,10 +14,18 @@ internal sealed class TrainingForm : Form
     private const string LearningSettingsMessagePrefix = "kidsTraining.settings:";
     private const string LearningVirtualHostName = "learning.kidstraining.local";
     private const string ExperimentalWebPlatformFeaturesArgument = "--enable-experimental-web-platform-features";
+    private const int NavigationMaxAttempts = 2;
+    private static readonly TimeSpan LegacyMigrationBudget = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan LegacyNavigationAttemptTimeout = TimeSpan.FromMilliseconds(1250);
+    private static readonly TimeSpan MainNavigationAttemptTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan MigrationVerificationTimeout = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan NavigationRetryInitialDelay = TimeSpan.FromMilliseconds(125);
 
     private readonly WebView2 webView = new();
     private readonly System.Windows.Forms.Timer lockTimer = new();
+    private readonly CancellationTokenSource initializationCancellation = new();
     private readonly ILearningPagePreparer learningPagePreparer;
+    private readonly ILegacyLearningStorageMigrationStateStore legacyMigrationStateStore;
     private readonly IParentPinProvider parentPinProvider;
     private readonly IUserProfileNameProvider profileNameProvider;
     private readonly ParentLearningSettingsService parentLearningSettingsService;
@@ -27,12 +35,14 @@ internal sealed class TrainingForm : Form
 
     public TrainingForm(
         ILearningPagePreparer learningPagePreparer,
+        ILegacyLearningStorageMigrationStateStore legacyMigrationStateStore,
         IParentPinProvider parentPinProvider,
         IUserProfileNameProvider profileNameProvider,
         ParentLearningSettingsService parentLearningSettingsService,
         ParentLearningResetService parentLearningResetService)
     {
         this.learningPagePreparer = learningPagePreparer;
+        this.legacyMigrationStateStore = legacyMigrationStateStore;
         this.parentPinProvider = parentPinProvider;
         this.profileNameProvider = profileNameProvider;
         this.parentLearningSettingsService = parentLearningSettingsService;
@@ -49,7 +59,7 @@ internal sealed class TrainingForm : Form
         Controls.Add(webView);
         webView.Dock = DockStyle.Fill;
 
-        Load += async (_, _) => await InitializeWebViewAsync();
+        Load += async (_, _) => await InitializeWebViewAsync(initializationCancellation.Token);
         Deactivate += (_, _) => EnforceLock();
         FormClosing += OnTrainingFormClosing;
 
@@ -228,7 +238,7 @@ internal sealed class TrainingForm : Form
         }
     }
 
-    private async Task InitializeWebViewAsync()
+    private async Task InitializeWebViewAsync(CancellationToken cancellationToken)
     {
         if (webViewInitialized)
         {
@@ -239,6 +249,7 @@ internal sealed class TrainingForm : Form
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
             AppPaths.EnsureRuntimeDirectories();
 
             if (!File.Exists(AppPaths.HtmlTemplatePath) ||
@@ -279,16 +290,68 @@ internal sealed class TrainingForm : Form
                 learningAssetsFolder,
                 CoreWebView2HostResourceAccessKind.DenyCors);
             webView.Visible = false;
-            var legacyStorage = await ReadLegacyLearningStorageAsync(
-                webView.CoreWebView2,
-                new Uri(preparation.RuntimePagePath).AbsoluteUri);
-            await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
-                BuildLegacyStorageMigrationScript(legacyStorage));
             var runtimePageName = Uri.EscapeDataString(Path.GetFileName(preparation.RuntimePagePath));
-            await NavigateAsync(
-                webView.CoreWebView2,
-                $"https://{LearningVirtualHostName}/{runtimePageName}");
-            webView.Visible = true;
+            var secureRuntimeUri = $"https://{LearningVirtualHostName}/{runtimePageName}";
+            string? legacyMigrationScriptId = null;
+            var migrationPrepared = false;
+
+            if (IsLegacyStorageMigrationRequired())
+            {
+                var legacyRead = await ReadLegacyLearningStorageAsync(
+                    webView.CoreWebView2,
+                    new Uri(preparation.RuntimePagePath).AbsoluteUri,
+                    cancellationToken);
+                if (legacyRead.IsSuccess)
+                {
+                    try
+                    {
+                        legacyMigrationScriptId = await webView.CoreWebView2
+                            .AddScriptToExecuteOnDocumentCreatedAsync(
+                                BuildLegacyStorageMigrationScript(legacyRead.Storage));
+                        migrationPrepared = true;
+                    }
+                    catch (Exception exception)
+                    {
+                        UpdateLogger.Error(
+                            "Could not prepare legacy learning-storage migration; continuing with the secure learning page",
+                            exception);
+                        DeferLegacyStorageMigration();
+                    }
+                }
+                else
+                {
+                    DeferLegacyStorageMigration();
+                }
+            }
+
+            try
+            {
+                await NavigateWithRetryAsync(
+                    webView.CoreWebView2,
+                    secureRuntimeUri,
+                    MainNavigationAttemptTimeout,
+                    cancellationToken);
+                if (migrationPrepared)
+                {
+                    await CompleteLegacyStorageMigrationAsync(webView.CoreWebView2, cancellationToken);
+                }
+
+                webView.Visible = true;
+            }
+            finally
+            {
+                if (legacyMigrationScriptId is not null)
+                {
+                    try
+                    {
+                        webView.CoreWebView2.RemoveScriptToExecuteOnDocumentCreated(legacyMigrationScriptId);
+                    }
+                    catch (Exception exception)
+                    {
+                        UpdateLogger.Error("Could not remove the one-time legacy migration script", exception);
+                    }
+                }
+            }
         }
         catch (WebView2RuntimeNotFoundException)
         {
@@ -298,6 +361,10 @@ internal sealed class TrainingForm : Form
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
             ExitAfterUnlock();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Closing the training window owns the cancelled initialization terminal state.
         }
         catch (Exception ex)
         {
@@ -395,6 +462,7 @@ internal sealed class TrainingForm : Form
     private void ExitAfterUnlock()
     {
         canExit = true;
+        initializationCancellation.Cancel();
         lockTimer.Stop();
         TopMost = false;
         Close();
@@ -427,22 +495,58 @@ internal sealed class TrainingForm : Form
         }));
     }
 
-    private static async Task<IReadOnlyDictionary<string, string>> ReadLegacyLearningStorageAsync(
-        CoreWebView2 core,
-        string legacyRuntimeUri)
+    private bool IsLegacyStorageMigrationRequired()
     {
         try
         {
-            await NavigateAsync(core, legacyRuntimeUri);
-            var serialized = await core.ExecuteScriptAsync(
-                "(() => { const data = {}; for (const key of ['kt_profiles_v1','kt_settings_v1','kt_muted_v1','kt_session_checkpoint_v1']) { const value = localStorage.getItem(key); if (value !== null) data[key] = value; } return data; })()");
-            return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(serialized)
-                ?? new Dictionary<string, string>(StringComparer.Ordinal);
+            return legacyMigrationStateStore.Read().ShouldAttempt(DateTimeOffset.UtcNow);
         }
         catch (Exception exception)
         {
-            UpdateLogger.Error("Could not read legacy file-origin learning storage", exception);
-            return new Dictionary<string, string>(StringComparer.Ordinal);
+            UpdateLogger.Error(
+                "Could not determine whether legacy learning storage was migrated; a bounded migration attempt will be made",
+                exception);
+            return true;
+        }
+    }
+
+    private static async Task<LegacyLearningStorageReadResult> ReadLegacyLearningStorageAsync(
+        CoreWebView2 core,
+        string legacyRuntimeUri,
+        CancellationToken cancellationToken)
+    {
+        using var migrationCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        migrationCancellation.CancelAfter(LegacyMigrationBudget);
+        try
+        {
+            await NavigateWithRetryAsync(
+                core,
+                legacyRuntimeUri,
+                LegacyNavigationAttemptTimeout,
+                migrationCancellation.Token);
+            var serialized = await core.ExecuteScriptAsync(
+                    "(() => { const data = {}; for (const key of ['kt_profiles_v1','kt_settings_v1','kt_muted_v1','kt_session_checkpoint_v1']) { const value = localStorage.getItem(key); if (value !== null) data[key] = value; } return data; })()")
+                .WaitAsync(migrationCancellation.Token);
+            var storage = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(serialized)
+                ?? new Dictionary<string, string>(StringComparer.Ordinal);
+            return LegacyLearningStorageReadResult.Succeeded(storage);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            UpdateLogger.Info(
+                "Legacy file-origin learning-storage migration exceeded its startup budget; continuing with the secure learning page.");
+            return LegacyLearningStorageReadResult.Failed;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error(
+                "Could not read legacy file-origin learning storage; continuing with the secure learning page",
+                exception);
+            return LegacyLearningStorageReadResult.Failed;
         }
     }
 
@@ -450,39 +554,162 @@ internal sealed class TrainingForm : Form
     {
         var serialized = System.Text.Json.JsonSerializer.Serialize(legacyStorage);
         return
-            "(() => { try { const legacy = " + serialized +
-            "; for (const [key, value] of Object.entries(legacy)) { if (localStorage.getItem(key) === null && typeof value === 'string') localStorage.setItem(key, value); } } catch {} })();";
+            "(() => { const result = { success: false }; try { const legacy = " + serialized +
+            "; for (const [key, value] of Object.entries(legacy)) { if (typeof value !== 'string') continue; " +
+            "if (localStorage.getItem(key) === null) localStorage.setItem(key, value); " +
+            "if (localStorage.getItem(key) === null) throw new Error('Legacy storage could not be preserved: ' + key); } " +
+            "result.success = true; } catch (error) { result.error = String(error); } " +
+            "window.__kidsTrainingLegacyStorageMigration = result; })();";
     }
 
-    private static Task NavigateAsync(CoreWebView2 core, string uri)
+    private async Task CompleteLegacyStorageMigrationAsync(
+        CoreWebView2 core,
+        CancellationToken cancellationToken)
     {
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        EventHandler<CoreWebView2NavigationCompletedEventArgs>? handler = null;
-        handler = (_, args) =>
-        {
-            core.NavigationCompleted -= handler;
-            if (args.IsSuccess)
-            {
-                completion.TrySetResult();
-            }
-            else
-            {
-                completion.TrySetException(new InvalidOperationException(
-                    $"WebView navigation failed with status {args.WebErrorStatus}: {uri}"));
-            }
-        };
-        core.NavigationCompleted += handler;
         try
         {
-            core.Navigate(uri);
+            var verified = await core.ExecuteScriptAsync(
+                    "(() => window.__kidsTrainingLegacyStorageMigration?.success === true)()")
+                .WaitAsync(MigrationVerificationTimeout, cancellationToken);
+            if (!string.Equals(verified, "true", StringComparison.Ordinal))
+            {
+                UpdateLogger.Info(
+                    "Legacy learning-storage migration could not be verified; it will be retried on a later startup.");
+                DeferLegacyStorageMigration();
+                return;
+            }
+
+            if (legacyMigrationStateStore.TryMarkCompleted())
+            {
+                UpdateLogger.Info(
+                    "Legacy file-origin learning storage migration completed; later startups will skip file navigation.");
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception exception)
         {
-            core.NavigationCompleted -= handler;
-            completion.TrySetException(exception);
+            UpdateLogger.Error(
+                "Could not verify legacy learning-storage migration; continuing with the secure learning page",
+                exception);
+            DeferLegacyStorageMigration();
+        }
+    }
+
+    private void DeferLegacyStorageMigration()
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (!legacyMigrationStateStore.TryMarkDeferred(now))
+        {
+            UpdateLogger.Info("Legacy learning-storage migration retry state could not be saved.");
+            return;
         }
 
-        return completion.Task;
+        var retryAfter = legacyMigrationStateStore.Read().RetryAfterUtc;
+        UpdateLogger.Info(
+            $"Legacy learning-storage migration was deferred until {retryAfter?.ToString("O") ?? "a later startup"}.");
+    }
+
+    private static async Task NavigateWithRetryAsync(
+        CoreWebView2 core,
+        string uri,
+        TimeSpan attemptTimeout,
+        CancellationToken cancellationToken)
+    {
+        Exception? lastFailure = null;
+        for (var attempt = 1; attempt <= NavigationMaxAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await NavigateAsync(core, uri, attemptTimeout, cancellationToken);
+                return;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                lastFailure = exception;
+                if (attempt == NavigationMaxAttempts)
+                {
+                    break;
+                }
+
+                var backoff = TimeSpan.FromMilliseconds(
+                    NavigationRetryInitialDelay.TotalMilliseconds * Math.Pow(2, attempt - 1));
+                await Task.Delay(backoff, cancellationToken);
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"WebView navigation failed after {NavigationMaxAttempts} bounded attempts: {uri}",
+            lastFailure);
+    }
+
+    private static async Task NavigateAsync(
+        CoreWebView2 core,
+        string uri,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        var completion = new TaskCompletionSource<CoreWebView2NavigationCompletedEventArgs>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        ulong? navigationId = null;
+        EventHandler<CoreWebView2NavigationStartingEventArgs>? startingHandler = null;
+        EventHandler<CoreWebView2NavigationCompletedEventArgs>? completedHandler = null;
+        startingHandler = (_, args) => navigationId ??= args.NavigationId;
+        completedHandler = (_, args) =>
+        {
+            if (navigationId is not null && args.NavigationId == navigationId.Value)
+            {
+                completion.TrySetResult(args);
+            }
+        };
+
+        core.NavigationStarting += startingHandler;
+        core.NavigationCompleted += completedHandler;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            core.Navigate(uri);
+            var result = await completion.Task.WaitAsync(timeout, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                throw new InvalidOperationException(
+                    $"WebView navigation failed with status {result.WebErrorStatus}: {uri}");
+            }
+        }
+        catch (TimeoutException exception)
+        {
+            TryStopNavigation(core);
+            throw new TimeoutException($"WebView navigation timed out after {timeout}: {uri}", exception);
+        }
+        catch (OperationCanceledException)
+        {
+            TryStopNavigation(core);
+            throw;
+        }
+        finally
+        {
+            core.NavigationStarting -= startingHandler;
+            core.NavigationCompleted -= completedHandler;
+        }
+    }
+
+    private static void TryStopNavigation(CoreWebView2 core)
+    {
+        try
+        {
+            core.Stop();
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Could not stop a timed-out or cancelled WebView navigation", exception);
+        }
     }
 
     private string BuildProfileStorageScript()
@@ -532,4 +759,15 @@ internal sealed class TrainingForm : Form
         int? PassLine,
         int? SchoolGrade,
         bool? PreferSchoolGrade);
+
+    private sealed record LegacyLearningStorageReadResult(
+        bool IsSuccess,
+        IReadOnlyDictionary<string, string> Storage)
+    {
+        public static LegacyLearningStorageReadResult Failed { get; } =
+            new(false, new Dictionary<string, string>(StringComparer.Ordinal));
+
+        public static LegacyLearningStorageReadResult Succeeded(
+            IReadOnlyDictionary<string, string> storage) => new(true, storage);
+    }
 }

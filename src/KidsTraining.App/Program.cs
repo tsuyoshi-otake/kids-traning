@@ -68,6 +68,7 @@ internal static class Program
         {
             System.Windows.Forms.Application.Run(new TrainingForm(
                 services.LearningPagePreparer,
+                services.LegacyLearningStorageMigrationStateStore,
                 services.ParentPinProvider,
                 services.ProfileNameProvider,
                 services.ParentLearningSettingsService,
@@ -78,6 +79,7 @@ internal static class Program
             var context = new TrayApplicationContext(
                 autoTrainingRequested,
                 services.LearningPagePreparer,
+                services.LegacyLearningStorageMigrationStateStore,
                 services.ParentPinProvider,
                 services.ProfileNameProvider,
                 services.ParentPasswordService,
@@ -228,6 +230,8 @@ internal static class Program
             new LearningPageBuilder(),
             parentPinProvider,
             profileNameProvider);
+        var legacyLearningStorageMigrationStateStore =
+            new JsonLegacyLearningStorageMigrationStateStore();
         var currentVersion = ReleaseVersion.Normalize(
             Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0));
         var updateService = new UpdateService(
@@ -236,6 +240,7 @@ internal static class Program
             new MsiUpdateInstaller());
         return new ApplicationServices(
             learningPagePreparer,
+            legacyLearningStorageMigrationStateStore,
             parentPinProvider,
             profileNameProvider,
             parentPasswordService,
@@ -246,6 +251,7 @@ internal static class Program
 
     private sealed record ApplicationServices(
         ILearningPagePreparer LearningPagePreparer,
+        ILegacyLearningStorageMigrationStateStore LegacyLearningStorageMigrationStateStore,
         IParentPinProvider ParentPinProvider,
         IUserProfileNameProvider ProfileNameProvider,
         ParentPasswordService ParentPasswordService,

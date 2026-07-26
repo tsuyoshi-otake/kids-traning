@@ -147,7 +147,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "const weakKeys=Object.keys(T).filter(k=>p.mastery[k]<0.5);",
-            "const weakKeys=Object.keys(T).filter(k=>this.curriculumUnitsForTopic(k).some(unit=>this.allowedTopics(p).includes(unit.id)&&(Number(p.mastery[unit.id])||0.05)<0.5));",
+            "const progression=this.progressionView(p);\n    const weakKeys=Object.keys(T).filter(k=>progression.weakTopicIds.has(k));",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
@@ -157,7 +157,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "const available=this.allowedTopics(p).includes(k);",
-            "const available=this.gradeTopics(p).some(id=>this.curriculumUnit(id)&&this.curriculumUnit(id).topicId===k),introduced=this.allowedTopics(p).some(id=>this.curriculumUnit(id)&&this.curriculumUnit(id).topicId===k);",
+            "const available=progression.availableTopicIds.has(k),introduced=progression.introducedTopicIds.has(k);",
             StringComparison.Ordinal);
         markup = ReplaceRequired(markup,
             "const status=(!available?'対象外':ready?",
@@ -177,6 +177,11 @@ internal static partial class LearningMarkupPatcher
             markup,
             "const achieved=this.topicComplete(p,k),ready=this.topicReady(p,k),due=this.topicDue(p,k);",
             "const achieved=this.topicMastered(p,k),complete=this.topicComplete(p,k),ready=this.topicReady(p,k),due=this.topicDue(p,k),retaining=complete&&!achieved,retentionStep=this.topicStat(p,k).retentionStep||0;",
+            StringComparison.Ordinal);
+        markup = ReplaceRequired(
+            markup,
+            "const currentLearningUnit=this.curriculumUnit(this.nextCurriculumTopic(p));",
+            "const currentLearningUnit=this.curriculumUnit(progression.nextTopic);",
             StringComparison.Ordinal);
         markup = ReplaceRequired(markup, "const status=", "const legacyStatus=", StringComparison.Ordinal);
         markup = ReplaceRequired(

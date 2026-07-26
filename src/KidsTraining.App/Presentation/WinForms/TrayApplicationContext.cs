@@ -21,6 +21,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly CancellationTokenSource lifetimeCancellation = new();
     private readonly UpdateService updateService;
     private readonly ILearningPagePreparer learningPagePreparer;
+    private readonly ILegacyLearningStorageMigrationStateStore legacyLearningStorageMigrationStateStore;
     private readonly IParentPinProvider parentPinProvider;
     private readonly IUserProfileNameProvider profileNameProvider;
     private readonly ParentPasswordService parentPasswordService;
@@ -38,6 +39,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     public TrayApplicationContext(
         bool startTrainingOnLaunch,
         ILearningPagePreparer learningPagePreparer,
+        ILegacyLearningStorageMigrationStateStore legacyLearningStorageMigrationStateStore,
         IParentPinProvider parentPinProvider,
         IUserProfileNameProvider profileNameProvider,
         ParentPasswordService parentPasswordService,
@@ -46,6 +48,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         UpdateService updateService)
     {
         this.learningPagePreparer = learningPagePreparer;
+        this.legacyLearningStorageMigrationStateStore = legacyLearningStorageMigrationStateStore;
         this.parentPinProvider = parentPinProvider;
         this.profileNameProvider = profileNameProvider;
         this.parentPasswordService = parentPasswordService;
@@ -150,6 +153,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             var form = new TrainingForm(
                 learningPagePreparer,
+                legacyLearningStorageMigrationStateStore,
                 parentPinProvider,
                 profileNameProvider,
                 parentLearningSettingsService,
