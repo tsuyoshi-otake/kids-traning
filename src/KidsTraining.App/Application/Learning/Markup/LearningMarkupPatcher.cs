@@ -43,7 +43,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true},count:this.props.questionCount??10,pass:this.props.passLine??8};}",
-            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true,eigo:true,money:true,groups:true,order:true,soroban:true,seikatsu:true,shakai:true,rika:true,kateika:true,gijutsu:true,doutoku:true,jouhou:true,sougou:true,tokubetsu:true,keyboard:true},count:this.props.questionCount??20,pass:this.props.passLine??15,attentionEnabled:true,preferSchoolGrade:false};}",
+            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true,eigo:true,money:true,groups:true,order:true,soroban:true,seikatsu:true,shakai:true,rika:true,kateika:true,gijutsu:true,doutoku:true,jouhou:true,sougou:true,tokubetsu:true,keyboard:true},count:this.props.questionCount??20,pass:this.props.passLine??15,preferSchoolGrade:false};}",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
@@ -218,7 +218,6 @@ internal static partial class LearningMarkupPatcher
         markup = PatchFractionalScoring(markup);
         markup = PatchSessionPassGate(markup);
         markup = PatchLearningCheckpoint(markup);
-        markup = PatchAttentionCamera(markup);
 
         return markup;
     }

@@ -584,33 +584,19 @@ internal static class Program
             trainingFormSource.Contains("SetVirtualHostNameToFolderMapping", StringComparison.Ordinal) &&
             trainingFormSource.Contains("https://{LearningVirtualHostName}", StringComparison.Ordinal) &&
             !trainingFormSource.Contains("webView.CoreWebView2.Navigate(new Uri", StringComparison.Ordinal),
-            "camera-capable learning content is not hosted in a constrained secure context");
+            "learning content is not hosted in a constrained local virtual host");
         Assert(
             trainingFormSource.Contains("ReadLegacyLearningStorageAsync", StringComparison.Ordinal) &&
             trainingFormSource.Contains("if (localStorage.getItem(key) === null", StringComparison.Ordinal),
             "the secure-origin transition can discard or overwrite legacy learning progress");
         Assert(
-            trainingFormSource.Contains("args.PermissionKind == CoreWebView2PermissionKind.Camera", StringComparison.Ordinal) &&
-            trainingFormSource.Contains("args.IsUserInitiated", StringComparison.Ordinal) &&
-            trainingFormSource.Contains("args.SavesInProfile = false", StringComparison.Ordinal) &&
-            trainingFormSource.Contains("CoreWebView2PermissionState.Deny", StringComparison.Ordinal),
-            "WebView camera permission is not scoped to a user-initiated request or is persisted");
-        Assert(
-            html.Contains("attentionEnabled:true", StringComparison.Ordinal) &&
-            html.Contains("getUserMedia({audio:false", StringComparison.Ordinal) &&
-            html.Contains("new FaceDetector({fastMode:true,maxDetectedFaces:1})", StringComparison.Ordinal),
-            "the local attention estimate is not enabled by default or does not avoid microphone capture");
-        Assert(
-            html.Contains("this._attentionAverage*.75+instant*.25", StringComparison.Ordinal) &&
-            html.Contains("this._attentionLowSamples>=4", StringComparison.Ordinal) &&
-            html.Contains("this._attentionNextPromptAt=now+30000", StringComparison.Ordinal) &&
-            html.Contains("prompt.textContent='集中してね'", StringComparison.Ordinal),
-            "attention guidance lacks smoothing, sustained-low confirmation, or a prompt cooldown");
-        Assert(
-            html.Contains("componentWillUnmount(){this._attentionDisposed=true", StringComparison.Ordinal) &&
-            html.Contains("this._attentionStream.getTracks().forEach(track=>track.stop())", StringComparison.Ordinal) &&
-            html.Contains("if(this._attentionDisposed){this.stopAttentionCamera('stopped',true);return;}", StringComparison.Ordinal),
-            "camera acquisition or component teardown can leave a capture stream running");
+            !trainingFormSource.Contains("CoreWebView2PermissionKind.Camera", StringComparison.Ordinal) &&
+            !trainingFormSource.Contains("PermissionRequested", StringComparison.Ordinal) &&
+            !html.Contains("getUserMedia(", StringComparison.Ordinal) &&
+            !html.Contains("FaceDetector", StringComparison.Ordinal) &&
+            !html.Contains("attentionEnabled", StringComparison.Ordinal) &&
+            !html.Contains("kt-attention-video", StringComparison.Ordinal),
+            "camera-based attention monitoring or its permission/UI hooks remain");
         Assert(
             !trainingFormSource.Contains("CompletionBridgeScript", StringComparison.Ordinal) &&
             !trainingFormSource.Contains("document.body.innerText", StringComparison.Ordinal),

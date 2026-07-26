@@ -363,23 +363,6 @@ internal sealed class TrainingForm : Form
         };
 
         core.NewWindowRequested += (_, args) => args.Handled = true;
-        core.PermissionRequested += (_, args) =>
-        {
-            var isTrustedLearningPage =
-                Uri.TryCreate(args.Uri, UriKind.Absolute, out var origin) &&
-                string.Equals(origin.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(origin.Host, LearningVirtualHostName, StringComparison.OrdinalIgnoreCase);
-            var allowCamera =
-                args.PermissionKind == CoreWebView2PermissionKind.Camera &&
-                args.IsUserInitiated &&
-                isTrustedLearningPage;
-
-            args.SavesInProfile = false;
-            args.State = allowCamera
-                ? CoreWebView2PermissionState.Allow
-                : CoreWebView2PermissionState.Deny;
-            args.Handled = true;
-        };
     }
 
     private void ApplyWindowIcon()

@@ -171,11 +171,6 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("stage-attempts", "stageAttempts"),
         ("bounded-stage", "Math.min(5,Number(stage)||1)"),
         ("mastery-achievement", "masteredAt"),
-        ("attention-enabled-default", "attentionEnabled:true"),
-        ("attention-local-camera", "getUserMedia({audio:false"),
-        ("attention-face-detection", "new FaceDetector({fastMode:true,maxDetectedFaces:1})"),
-        ("attention-low-sample-threshold", "this._attentionLowSamples>=4"),
-        ("attention-gentle-prompt", "prompt.textContent='集中してね'"),
         ("multiplication-pair-curriculum", "fromPairs([[1,2],[2,1],[2,2]"),
         ("multiplication-symbol", "prompt:a+' × '+b"),
         ("three-digit-times-one-digit", "this.rand(123,899)"),
@@ -234,7 +229,12 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("avatar-parts-state", "avatarParts"),
         ("avatar-finish-action", "finishAvatar"),
         ("avatar-fallback-markup", "<div style=\"{{ avatarStyle }}\">{{ profileInitial }}</div>"),
-        ("avatar-fallback-state", "profileInitial:p.name.charAt(0), avatarStyle")
+        ("avatar-fallback-state", "profileInitial:p.name.charAt(0), avatarStyle"),
+        ("camera-media-api", "getUserMedia("),
+        ("camera-face-detector", "FaceDetector"),
+        ("camera-preview", "kt-attention-video"),
+        ("camera-setting", "attentionEnabled"),
+        ("camera-permission-copy", "カメラを許可")
     ];
 
     public static IReadOnlyList<GeneratedLearningRuntimeContractFailure> Validate(
