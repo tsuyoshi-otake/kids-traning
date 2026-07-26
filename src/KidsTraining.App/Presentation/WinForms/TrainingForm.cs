@@ -264,6 +264,12 @@ internal sealed class TrainingForm : Form
                 return;
             }
 
+            // Page preparation is CPU/file-I/O work and does not depend on WebView2. Start it before
+            // the browser environment so the two longest independent startup spans overlap. The
+            // wrapper converts every worker failure into an observed result, even when WebView2
+            // initialization fails before this task is awaited.
+            var preparationTask = Task.Run(PrepareLearningPage);
+
             CoreWebView2Environment.GetAvailableBrowserVersionString();
             var environmentOptions = new CoreWebView2EnvironmentOptions
             {
@@ -275,7 +281,7 @@ internal sealed class TrainingForm : Form
             await webView.EnsureCoreWebView2Async(environment);
 
             ConfigureWebView(webView.CoreWebView2);
-            var preparation = learningPagePreparer.Prepare();
+            var preparation = await preparationTask.WaitAsync(cancellationToken);
             if (!preparation.IsSuccess || preparation.RuntimePagePath is null)
             {
                 throw new InvalidOperationException(
@@ -374,6 +380,19 @@ internal sealed class TrainingForm : Form
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
             ExitAfterUnlock();
+        }
+    }
+
+    private LearningPagePreparationResult PrepareLearningPage()
+    {
+        try
+        {
+            return learningPagePreparer.Prepare();
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Learning page preparation failed on the startup worker", exception);
+            return LearningPagePreparationResult.Failed(exception.Message);
         }
     }
 

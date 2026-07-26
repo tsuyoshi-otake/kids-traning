@@ -33,6 +33,7 @@ internal static class Program
         Run("Review schedule uses bounded spaced intervals", TestReviewSchedule);
         Run("Learning markup contains evidence-based progression", () => TestEducationalProgressionMarkup(repositoryRoot));
         Run("Learning hot paths retain bounded-work performance contracts", () => TestPerformanceContracts(repositoryRoot));
+        Run("Generated learning algorithms keep bounded operation counts", () => TestAlgorithmPerformanceAudit(repositoryRoot));
         Run("Generated questions satisfy curriculum invariants", () => TestGeneratedQuestionAudit(repositoryRoot));
         Run("Learning page builder rejects missing placeholder", () => TestMissingPlaceholder(repositoryRoot));
         Run("Learning page builder rejects duplicate placeholder", () => TestDuplicatePlaceholder(repositoryRoot));
@@ -50,7 +51,7 @@ internal static class Program
 
         if (Failures.Count == 0)
         {
-            Console.WriteLine("Architecture tests passed: 21");
+            Console.WriteLine("Architecture tests passed: 22");
             return 0;
         }
 
@@ -454,7 +455,7 @@ internal static class Program
             html.Contains("s.reviewTopics.splice(index,1)", StringComparison.Ordinal),
             "fresh sessions can start with unscheduled random review questions");
         Assert(
-            html.Contains("const practice=allowed.filter(k=>!this.topicComplete(p,k)||this.topicDue(p,k))", StringComparison.Ordinal),
+            html.Contains("practice=allowed.filter(k=>!this.topicComplete(p,k)||this.topicDue(p,k))", StringComparison.Ordinal),
             "retention topics can reappear as ordinary mixed practice before review is due");
         Assert(
             html.Contains("targetTotal=Math.max(4,Math.floor(n*.25))", StringComparison.Ordinal) &&
@@ -584,6 +585,23 @@ internal static class Program
             trainingFormSource.Contains("SetLearningSessionSettingsAsync", StringComparison.Ordinal) &&
             trainingFormSource.Contains("SetParentPasswordAsync", StringComparison.Ordinal),
             "WebView setting synchronization does not expose an observable completion result");
+        var pagePreparationStart = trainingFormSource.IndexOf(
+            "Task.Run(PrepareLearningPage)",
+            StringComparison.Ordinal);
+        var webViewEnvironmentStart = trainingFormSource.IndexOf(
+            "CoreWebView2Environment.CreateAsync",
+            StringComparison.Ordinal);
+        var pagePreparationJoin = trainingFormSource.IndexOf(
+            "preparationTask.WaitAsync(cancellationToken)",
+            StringComparison.Ordinal);
+        Assert(
+            pagePreparationStart >= 0 &&
+            pagePreparationStart < webViewEnvironmentStart &&
+            webViewEnvironmentStart < pagePreparationJoin &&
+            trainingFormSource.Contains(
+                "private LearningPagePreparationResult PrepareLearningPage()",
+                StringComparison.Ordinal),
+            "learning-page preparation is not safely overlapped with the independent WebView2 startup span");
         Assert(
             trainingFormSource.Contains("SetVirtualHostNameToFolderMapping", StringComparison.Ordinal) &&
             trainingFormSource.Contains("https://{LearningVirtualHostName}", StringComparison.Ordinal) &&
@@ -829,9 +847,27 @@ internal static class Program
             html.Contains("progression.introducedTopicIds.has(k)", StringComparison.Ordinal),
             "derived progression data is recomputed inside the per-topic render loop");
         Assert(
+            html.Contains("source=Object.create(base)", StringComparison.Ordinal) &&
+            html.Contains("source._stageUnitStat=Object.freeze(", StringComparison.Ordinal) &&
+            html.Contains("p&&p._stageUnitId===id&&p._stageUnitStat", StringComparison.Ordinal) &&
+            html.Contains("seen=new Set()", StringComparison.Ordinal) &&
+            html.Contains("let best=front[0],bestProgress=", StringComparison.Ordinal) &&
+            !html.Contains("front.slice().sort(", StringComparison.Ordinal) &&
+            !html.Contains("mastery:{...((p&&p.mastery)||{})}", StringComparison.Ordinal),
+            "question generation still clones full progress maps or uses superlinear ordered-set work");
+        Assert(
+            html.Contains("const previous=this._progressionScope,scope={profile:p,values:new Map()}", StringComparison.Ordinal) &&
+            html.Contains("if(deterministic)break", StringComparison.Ordinal) &&
+            html.Contains("finally{this._progressionScope=previous;}", StringComparison.Ordinal),
+            "question generation does not reuse one progression scope or bound deterministic duplicates");
+        Assert(
             html.Contains("componentDidUpdate(prevProps,prevState)", StringComparison.Ordinal) &&
+            html.Contains("this.scheduleProfilesSave(prevState)", StringComparison.Ordinal) &&
             html.Contains("this.scheduleLearningCheckpoint(prevState)", StringComparison.Ordinal) &&
+            html.Contains("_profilesSaveTimer=setTimeout", StringComparison.Ordinal) &&
             html.Contains("_checkpointSaveTimer=setTimeout", StringComparison.Ordinal) &&
+            html.Contains("if(!profilesSaved||!checkpointSaved)", StringComparison.Ordinal) &&
+            !html.Contains("if(this.profilesChangedSince(prevState))this.saveProfiles()", StringComparison.Ordinal) &&
             !html.Contains("componentDidUpdate(){try{const s=JSON.stringify(this.state.profiles)", StringComparison.Ordinal),
             "every UI update still serializes profiles or writes a checkpoint synchronously");
 
@@ -854,7 +890,37 @@ internal static class Program
             "the learning startup path still depends on an external HTTP resource");
     }
 
-    private static (int ExitCode, string Output) RunNodeAudit(string scriptPath, string pagePath)
+    private static void TestAlgorithmPerformanceAudit(string repositoryRoot)
+    {
+        var auditScript = Path.Combine(
+            repositoryRoot,
+            "tests",
+            "KidsTraining.ArchitectureTests",
+            "AlgorithmPerformanceAudit.mjs");
+        Assert(File.Exists(auditScript), $"the algorithm performance audit is missing: {auditScript}");
+
+        var (template, appDefinition) = ReadLearningSource(repositoryRoot);
+        var html = new LearningPageBuilder().Build(
+            template,
+            appDefinition,
+            "Algorithm Performance Test",
+            ParentPin.FromOrDefault("4456"));
+        var auditedPage = Path.Combine(
+            Path.GetTempPath(),
+            "kids-training-algorithm-performance-audit.html");
+        File.WriteAllText(auditedPage, html, new UTF8Encoding(false));
+
+        var (exitCode, output) = RunNodeAudit(auditScript, auditedPage, "--verify");
+        Assert(
+            exitCode == 0,
+            $"the generated runtime exceeds its bounded-work contracts (node exit {exitCode}):" +
+            Environment.NewLine + output);
+    }
+
+    private static (int ExitCode, string Output) RunNodeAudit(
+        string scriptPath,
+        string pagePath,
+        params string[] additionalArguments)
     {
         var startInfo = new ProcessStartInfo("node")
         {
@@ -866,6 +932,10 @@ internal static class Program
         };
         startInfo.ArgumentList.Add(scriptPath);
         startInfo.ArgumentList.Add(pagePath);
+        foreach (var argument in additionalArguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
 
         Process? process;
         try
