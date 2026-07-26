@@ -45,6 +45,14 @@ class DCLogic {
     Object.assign(this.state, patch);
   }
 }
+const React = {
+  isValidElement(value) {
+    return !!value && typeof value === 'object' && typeof value.type === 'string';
+  },
+  createElement(type, props, ...children) {
+    return { type, props: props || {}, children };
+  },
+};
 
 // Deterministic randomness: a failure reported by the audit must reproduce verbatim.
 let randomState = (Number(process.argv[4]) || 0x2f6e2b1) | 0;
@@ -58,7 +66,7 @@ Math.random = () => {
 
 let app;
 try {
-  const Component = new Function('DCLogic', `${appSource}\nreturn Component;`)(DCLogic);
+  const Component = new Function('DCLogic', 'React', `${appSource}\nreturn Component;`)(DCLogic, React);
   app = new Component();
   app.props = app.props || {};
 } catch (error) {
@@ -81,6 +89,30 @@ const violated = (check, detail, sample) => {
 // declares what it counted and the audit fails when the count is zero.
 const observed = new Map();
 const observe = (check, amount = 1) => observed.set(check, (observed.get(check) || 0) + amount);
+
+const assertFurigana = (surface, reading) => {
+  const rendered = app.withFurigana(surface);
+  const ruby = Array.isArray(rendered) ? rendered.find((entry) => entry && entry.type === 'ruby') : null;
+  const annotation = ruby && ruby.children.find((entry) => entry && entry.type === 'rt');
+  observe('compound furigana overrides single-character readings');
+  if (!ruby || ruby.children[0] !== surface || !annotation || annotation.children[0] !== reading) {
+    violated('compound furigana overrides single-character readings', `${surface} did not render as ${reading}`, JSON.stringify(rendered));
+  }
+};
+assertFurigana('外国', 'がいこく');
+assertFurigana('外国語', 'がいこくご');
+assertFurigana('学級', 'がっきゅう');
+assertFurigana('課題', 'かだい');
+assertFurigana('必要', 'ひつよう');
+assertFurigana('共通', 'きょうつう');
+assertFurigana('目標', 'もくひょう');
+assertFurigana('判断', 'はんだん');
+assertFurigana('基準', 'きじゅん');
+assertFurigana('共有', 'きょうゆう');
+assertFurigana('一人', 'ひとり');
+assertFurigana('担当', 'たんとう');
+assertFurigana('学校', 'がっこう');
+assertFurigana('記録', 'きろく');
 
 // --- fixtures ---------------------------------------------------------------------------
 
@@ -226,16 +258,18 @@ const beginnerAtGrade = (grade) => app.ensureLearningProfile({
   skillStats: {},
   cleared: {},
 });
-const gradeOneBeginner = beginnerAtGrade(1);
-const gradeSixBeginner = beginnerAtGrade(6);
-const gradeOneFrontier = app.frontierTopics(gradeOneBeginner);
-const gradeSixFrontier = app.frontierTopics(gradeSixBeginner);
-observe('school grade never caps curriculum', 2);
-if (JSON.stringify(gradeOneFrontier) !== JSON.stringify(gradeSixFrontier)) {
-  violated('school grade never caps curriculum', 'registered grades 1 and 6 start with different lane frontiers', `${gradeOneFrontier} vs ${gradeSixFrontier}`);
+const originalSettings = app.state.settings;
+app.state.settings = { ...app.defaultSettings(), preferSchoolGrade: false };
+const normalProfiles = [1, 3, 6].map((grade) => beginnerAtGrade(grade));
+observe('mode-aware curriculum starts at the correct grade', normalProfiles.length);
+for (const profile of normalProfiles) {
+  const activeGrade = app.activeCurriculumGrade(profile);
+  const frontierGrades = new Set(app.frontierTopics(profile).map((id) => app.curriculumUnit(id).grade));
+  if (activeGrade !== 1 || frontierGrades.size !== 1 || !frontierGrades.has(1)) {
+    violated('mode-aware curriculum starts at the correct grade', `normal mode registered grade ${profile.grade} did not start at grade 1`, `${activeGrade}: ${[...frontierGrades]}`);
+  }
 }
 
-const originalSettings = app.state.settings;
 const preferenceProfile = beginnerAtGrade(4);
 app.state.settings = { ...app.defaultSettings(), preferSchoolGrade: false };
 const preferenceOffFrontier = app.frontierTopics(preferenceProfile);
@@ -251,6 +285,9 @@ const preferredMath = preferenceOnFrontier.find((id) => id.startsWith('math.'));
 if (!preferredMath || app.curriculumUnit(preferredMath).grade !== 4) {
   violated('school-grade preference is optional and reversible', 'grade 4 did not begin at the first grade-4 mathematics unit', String(preferredMath));
 }
+if (app.activeCurriculumGrade(preferenceProfile) !== 4 || preferenceOnFrontier.some((id) => app.curriculumUnit(id).grade !== 4)) {
+  violated('mode-aware curriculum starts at the correct grade', 'registered-grade preference did not restrict the first frontier to grade 4', preferenceOnFrontier.join(','));
+}
 if (JSON.stringify(preferenceProfile.unitStats) !== preferenceStatsBefore) {
   violated('school-grade preference is optional and reversible', 'enabling the preference changed unit progress', preferenceProfile.name);
 }
@@ -262,8 +299,8 @@ if (JSON.stringify(preferenceRestoredFrontier) !== JSON.stringify(preferenceOffF
 app.state.settings = originalSettings;
 
 const mathLane = app.curriculumLaneIds().find((lane) => lane.some((id) => id.startsWith('math.')));
-const japaneseLane = app.curriculumLaneIds().find((lane) => lane.some((id) => id.startsWith('japanese.')));
-observe('subject lanes unlock independently', 2);
+const gradeOneBeginner = normalProfiles[0];
+const gradeSixBeginner = normalProfiles[2];
 observe('question generation uses unit grade, not school grade', 2);
 if (mathLane) {
   const firstMathGrade = app.curriculumUnit(mathLane[0]).grade;
@@ -275,26 +312,55 @@ if (mathLane) {
     violated('question generation uses unit grade, not school grade', 'a grade-1 registration changed the last mathematics unit generator grade', mathLane[mathLane.length - 1]);
   }
 }
-if (!mathLane || app.frontierTopics(gradeOneBeginner).find((id) => id.startsWith('math.')) !== mathLane[0]) {
-  violated('subject lanes unlock independently', 'a beginner does not start at the first mathematics unit', String(mathLane && mathLane[0]));
-} else {
-  gradeOneBeginner.unitStats[mathLane[0]].retentionStartedAt = 1;
-  const nextMath = app.frontierTopics(gradeOneBeginner).find((id) => id.startsWith('math.'));
-  if (nextMath !== mathLane[1]) {
-    violated('subject lanes unlock independently', 'starting retention did not unlock the next mathematics unit', `${nextMath} vs ${mathLane[1]}`);
-  }
-  if (japaneseLane && app.frontierTopics(gradeOneBeginner).find((id) => id.startsWith('japanese.')) !== japaneseLane[0]) {
-    violated('subject lanes unlock independently', 'advancing mathematics also advanced Japanese', japaneseLane[0]);
-  }
-  for (const id of mathLane) {
-    if ((app.curriculumUnit(id)?.grade || 0) >= 6) break;
-    gradeOneBeginner.unitStats[id].retentionStartedAt = 1;
-  }
-  const earlyLearningUnit = app.frontierTopics(gradeOneBeginner).find((id) => id.startsWith('math.'));
-  if ((app.curriculumUnit(earlyLearningUnit)?.grade || 0) !== 6) {
-    violated('school grade never caps curriculum', 'a registered grade-1 profile could not reach grade-6 mathematics', String(earlyLearningUnit));
-  }
+
+app.state.settings = { ...app.defaultSettings(), preferSchoolGrade: false };
+const cohortProfile = beginnerAtGrade(3);
+const completeUnits = (profile, ids) => {
+  for (const id of ids) profile.unitStats[id].retentionStartedAt = 1;
+};
+const topology = app.curriculumTopology(cohortProfile);
+const gradeIds = (grade) => topology.unitIdsByGrade.get(grade) || [];
+const mathIdsAtGrade = (grade) => gradeIds(grade).filter((id) => id.startsWith('math.'));
+observe('grade cohorts unlock sequentially', 6);
+completeUnits(cohortProfile, mathIdsAtGrade(1));
+if (app.activeCurriculumGrade(cohortProfile) !== 1) {
+  violated('grade cohorts unlock sequentially', 'finishing grade-1 mathematics unlocked grade 2 before the other subjects', app.activeCurriculumGrade(cohortProfile));
 }
+completeUnits(cohortProfile, gradeIds(7));
+if (app.activeCurriculumGrade(cohortProfile) !== 1) {
+  violated('grade cohorts unlock sequentially', 'historical grade-7 evidence bypassed the active grade', app.activeCurriculumGrade(cohortProfile));
+}
+completeUnits(cohortProfile, gradeIds(1));
+if (app.activeCurriculumGrade(cohortProfile) !== 2 || app.frontierTopics(cohortProfile).some((id) => app.curriculumUnit(id).grade !== 2)) {
+  violated('grade cohorts unlock sequentially', 'completing grade 1 did not unlock only grade 2', app.frontierTopics(cohortProfile).join(','));
+}
+completeUnits(cohortProfile, gradeIds(2));
+if (app.activeCurriculumGrade(cohortProfile) !== 3) {
+  violated('grade cohorts unlock sequentially', 'completing grade 2 did not unlock grade 3', app.activeCurriculumGrade(cohortProfile));
+}
+completeUnits(cohortProfile, mathIdsAtGrade(3));
+if (app.activeCurriculumGrade(cohortProfile) !== 3) {
+  violated('grade cohorts unlock sequentially', 'finishing grade-3 mathematics unlocked grade 4 before the other subjects', app.activeCurriculumGrade(cohortProfile));
+}
+completeUnits(cohortProfile, gradeIds(3));
+if (app.activeCurriculumGrade(cohortProfile) !== 4) {
+  violated('grade cohorts unlock sequentially', 'completing grade 3 did not unlock grade 4', app.activeCurriculumGrade(cohortProfile));
+}
+
+const disabledProfile = beginnerAtGrade(1);
+const disabledTopic = app.curriculumCatalog().find((unit) => unit.grade === 1).topicId;
+app.state.settings = {
+  ...app.defaultSettings(),
+  preferSchoolGrade: false,
+  topics: { ...app.defaultSettings().topics, [disabledTopic]: false },
+};
+const disabledTopology = app.curriculumTopology(disabledProfile);
+completeUnits(disabledProfile, disabledTopology.unitIdsByGrade.get(1) || []);
+observe('disabled units do not block grade completion');
+if (app.activeCurriculumGrade(disabledProfile) !== 2) {
+  violated('disabled units do not block grade completion', `disabling ${disabledTopic} still blocked grade 1`, app.activeCurriculumGrade(disabledProfile));
+}
+app.state.settings = originalSettings;
 
 for (const unit of UNITS) {
   const topic = unit.topicId;

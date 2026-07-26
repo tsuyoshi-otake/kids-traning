@@ -138,6 +138,18 @@ internal static partial class LearningMarkupPatcher
     -webkit-font-smoothing: antialiased;
   }
 
+  [data-screen-label] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
   ruby {
     ruby-position: over;
     ruby-align: center;
@@ -178,21 +190,34 @@ internal static partial class LearningMarkupPatcher
 
   .kt-choice-grid {
     width: min(880px, 92vw) !important;
+    max-width: min(880px, 92vw) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: var(--kt-space-4) !important;
     margin-top: var(--kt-space-6) !important;
   }
 
-  .kt-choice {
+  .kt-choice,
+  .kt-choice-button {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     min-height: 96px !important;
     padding: var(--kt-space-3) var(--kt-space-4) !important;
-    font-size: clamp(24px, 2.2vw, 36px) !important;
+    font-size: clamp(21px, 1.8vw, 26px) !important;
     line-height: 1.5 !important;
     text-align: center;
     white-space: normal !important;
-    overflow-wrap: break-word;
-    word-break: normal;
-    line-break: strict;
-    text-wrap: pretty;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+    line-break: anywhere;
+    text-wrap: balance;
+    overflow: hidden;
+  }
+
+  .kt-choice ruby,
+  .kt-choice-button ruby {
+    white-space: normal;
   }
 
   .kt-feedback-answer {
@@ -504,9 +529,10 @@ internal static partial class LearningMarkupPatcher
       margin-top: var(--kt-space-3) !important;
     }
 
-    .kt-choice {
+    .kt-choice,
+    .kt-choice-button {
       min-height: 72px !important;
-      font-size: clamp(20px, 2.7vw, 30px) !important;
+      font-size: clamp(18px, 2vw, 24px) !important;
     }
 
     .kt-feedback-answer {

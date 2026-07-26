@@ -441,6 +441,16 @@ internal static class Program
         Assert(html.Contains("nextCurriculumTopic(p)", StringComparison.Ordinal) && html.Contains("frontierTopics(p)", StringComparison.Ordinal), "curriculum frontier selection is missing");
         Assert(html.Contains("prefer=!!(cfg&&cfg.preferSchoolGrade)", StringComparison.Ordinal), "the school-grade preference is not read by curriculum progression");
         Assert(html.Contains(".grade>=minimumGrade", StringComparison.Ordinal), "the school-grade preference does not select units at or above the registered grade");
+        Assert(
+            html.Contains("unitIdsByGrade=new Map()", StringComparison.Ordinal) &&
+            html.Contains("activeCurriculumGrade(p)", StringComparison.Ordinal) &&
+            html.Contains("unlockedGradeTopics(p)", StringComparison.Ordinal) &&
+            html.Contains("gradeTopics(p){return this.unlockedGradeTopics(p);}", StringComparison.Ordinal),
+            "curriculum progression is not gated by the earliest incomplete enabled grade");
+        Assert(
+            html.Contains("const unlocked=new Set(this.unlockedGradeTopics(p))", StringComparison.Ordinal) &&
+            html.Contains("item=>this.curriculumUnit(item).grade===activeGrade", StringComparison.Ordinal),
+            "subject frontiers or progress can expose units beyond the active grade");
         Assert(html.Contains("登録学年の単元を優先", StringComparison.Ordinal), "the protected parent UI does not expose the school-grade preference");
         Assert(html.Contains("preferSchoolGradeLabel", StringComparison.Ordinal), "the protected parent UI does not expose the school-grade preference state");
         Assert(html.Contains("prerequisites", StringComparison.Ordinal) && html.Contains("directPrerequisites(p,k)", StringComparison.Ordinal) && html.Contains("(unit.prerequisites||[])", StringComparison.Ordinal), "the curriculum prerequisite graph is missing from generated markup");
@@ -545,6 +555,10 @@ internal static class Program
         Assert(html.Contains("localStorage.setItem('kt_profiles_v1',persisted)", StringComparison.Ordinal) && !html.Contains("localStorage.clear()", StringComparison.Ordinal), "learning reset is not scoped to profile progress");
         Assert(html.Contains("aria-modal=", StringComparison.Ordinal) && html.Contains("cancelLearningReset", StringComparison.Ordinal), "learning reset confirmation is inaccessible or cannot be cancelled");
         Assert(html.Contains("kt_session_checkpoint_v1", StringComparison.Ordinal) && html.Contains("restoreLearningCheckpoint()", StringComparison.Ordinal), "in-progress learning cannot be resumed");
+        Assert(
+            html.Contains("unlockedIds.has(q.unitId)", StringComparison.Ordinal) &&
+            html.Contains("grade>=minimumGrade&&grade<=activeGrade", StringComparison.Ordinal),
+            "saved learning sessions can bypass the active-grade gate");
         Assert(html.Contains("n===1?0.5:(n===2?0.25:0)", StringComparison.Ordinal) && html.Contains("if(miss>=3)", StringComparison.Ordinal), "three-attempt fractional scoring is missing");
         var trainingFormSource = File.ReadAllText(Path.Combine(
             repositoryRoot,
@@ -664,7 +678,8 @@ internal static class Program
             "reading-comprehension text and its explicit question label are not separated");
         Assert(
             html.Contains("React.createElement('ruby'", StringComparison.Ordinal) &&
-            html.Contains("React.createElement('rt'", StringComparison.Ordinal),
+            html.Contains("React.createElement('rt'", StringComparison.Ordinal) &&
+            html.Contains("React.createElement('wbr'", StringComparison.Ordinal),
             "question furigana does not render semantic ruby markup");
         Assert(
             html.Contains("kokuPre:this.withFurigana(kokuPre), kokuWord:kokuWord, kokuPost:this.withFurigana(kokuPost)", StringComparison.Ordinal) &&
@@ -675,6 +690,11 @@ internal static class Program
             html.Contains("(cq.topic==='kokugo'&&cq.subtype==='kanji-choice')?c:this.withFurigana(c)", StringComparison.Ordinal),
             "kanji-selection choices expose their readings through furigana");
         Assert(html.Contains("interrogative=before.endsWith('なん')", StringComparison.Ordinal), "interrogative counter readings are missing");
+        Assert(
+            html.Contains("['外国語','がいこくご'],['外国','がいこく'],['学級','がっきゅう'],['課題','かだい'],['必要','ひつよう']", StringComparison.Ordinal) &&
+            html.Contains("['共通','きょうつう'],['目標','もくひょう'],['判断','はんだん'],['基準','きじゅん'],['共有','きょうゆう'],['一人','ひとり'],['担当','たんとう']", StringComparison.Ordinal) &&
+            html.Contains("surface==='残'&&after.startsWith('さ')", StringComparison.Ordinal),
+            "common compound furigana can fall back to incorrect single-character readings");
         Assert(
             html.Contains("""<html lang="ja"><head>""", StringComparison.Ordinal) &&
             !html.Contains("<html><head>", StringComparison.Ordinal),
@@ -699,6 +719,23 @@ internal static class Program
             html.Contains("select:focus-visible", StringComparison.Ordinal) &&
             html.Contains("@media (prefers-reduced-motion: reduce)", StringComparison.Ordinal),
             "responsive typography, focus, or reduced-motion markup is missing");
+        Assert(
+            html.Contains("grid-template-columns: repeat(2, minmax(0, 1fr)) !important", StringComparison.Ordinal) &&
+            html.Contains("max-width: min(880px, 92vw) !important", StringComparison.Ordinal) &&
+            html.Contains(".kt-choice-button", StringComparison.Ordinal) &&
+            html.Contains("font-size: clamp(21px, 1.8vw, 26px) !important", StringComparison.Ordinal) &&
+            html.Contains("overflow-wrap: anywhere", StringComparison.Ordinal) &&
+            html.Contains("word-break: break-all", StringComparison.Ordinal) &&
+            html.Contains("line-break: anywhere", StringComparison.Ordinal) &&
+            html.Contains("text-wrap: balance", StringComparison.Ordinal) &&
+            html.Contains("overflow: hidden", StringComparison.Ordinal),
+            "long choice text can overflow or widen the choice grid");
+        Assert(
+            html.Contains("[data-screen-label]", StringComparison.Ordinal) &&
+            html.Contains("user-select: none", StringComparison.Ordinal) &&
+            html.Contains("[contenteditable=\"true\"]", StringComparison.Ordinal) &&
+            html.Contains("user-select: text", StringComparison.Ordinal),
+            "learning-screen text selection is not disabled while editable controls remain selectable");
 
         // The runtime lowercases every HTML attribute, so viewBox / pathLength only survive
         // through the sc-camel- escape hatch. Losing it silently breaks scaling and the draw animation.
