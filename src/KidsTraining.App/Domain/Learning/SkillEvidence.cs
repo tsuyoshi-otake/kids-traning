@@ -15,24 +15,30 @@ internal sealed record SkillEvidence(
     int Errors = 0,
     double Confidence = 0.05,
     int ReviewStep = 0,
+    int RetentionStep = 0,
     DateTimeOffset? LastAttemptAt = null,
     DateTimeOffset? NextReviewAt = null,
+    DateTimeOffset? RetentionStartedAt = null,
     DateTimeOffset? MasteredAt = null)
 {
-    public const int RequiredIndependentCorrect = 8;
-    public const int RequiredAttempts = 10;
-    public const double RequiredIndependentAccuracy = 0.8;
-    public const double RequiredConfidence = 0.8;
+    public const int RequiredStageIndependentCorrect = 5;
+    public const int RequiredStageAttempts = 6;
+    public const int RequiredRetentionConfirmations = 3;
 
     public bool IsAchievement => MasteredAt.HasValue;
 
+    public bool IsRetentionActive => RetentionStartedAt.HasValue;
+
     public double IndependentAccuracy => Attempts == 0 ? 0 : (double)IndependentCorrect / Attempts;
 
+    public bool IsQualifiedForRetention =>
+        IndependentCorrect >= RequiredStageIndependentCorrect &&
+        Attempts >= RequiredStageAttempts &&
+        IndependentAccuracy >= (double)RequiredStageIndependentCorrect / RequiredStageAttempts;
+
     public bool IsReady(DateTimeOffset now) =>
-        IndependentCorrect >= RequiredIndependentCorrect &&
-        Attempts >= RequiredAttempts &&
-        IndependentAccuracy >= RequiredIndependentAccuracy &&
-        Confidence >= RequiredConfidence &&
+        IsAchievement &&
+        RetentionStep >= RequiredRetentionConfirmations &&
         (!NextReviewAt.HasValue || NextReviewAt.Value > now);
 
     public bool IsDue(DateTimeOffset now) => NextReviewAt.HasValue && NextReviewAt.Value <= now;
@@ -96,8 +102,80 @@ internal sealed record SkillEvidence(
             NextReviewAt = nextReview
         };
 
-        return updated.IsReady(answeredAt) && !updated.MasteredAt.HasValue
-            ? updated with { MasteredAt = answeredAt }
-            : updated;
+        return updated;
+    }
+
+    public SkillEvidence StartRetention(DateTimeOffset startedAt)
+    {
+        if (IsRetentionActive || !IsQualifiedForRetention)
+        {
+            return this;
+        }
+
+        return this with
+        {
+            ReviewStep = 0,
+            RetentionStep = 0,
+            RetentionStartedAt = startedAt,
+            NextReviewAt = ReviewSchedule.NextReview(startedAt, 0)
+        };
+    }
+
+    public SkillEvidence RecordRetentionReview(LearningOutcome outcome, DateTimeOffset answeredAt)
+    {
+        if (!IsRetentionActive || !IsDue(answeredAt))
+        {
+            return this;
+        }
+
+        var independent = IndependentCorrect;
+        var assisted = AssistedCorrect;
+        var errors = Errors;
+        var confidence = Confidence;
+        var retentionStep = RetentionStep;
+        DateTimeOffset nextReview;
+
+        if (outcome == LearningOutcome.IndependentCorrect)
+        {
+            independent++;
+            confidence = Math.Clamp(confidence + 0.12, 0.05, 0.99);
+            retentionStep = Math.Min(retentionStep + 1, RequiredRetentionConfirmations);
+            nextReview = ReviewSchedule.NextReview(answeredAt, retentionStep);
+        }
+        else
+        {
+            if (outcome is LearningOutcome.AssistedCorrect or LearningOutcome.Revealed)
+            {
+                assisted++;
+            }
+
+            if (outcome is LearningOutcome.Revealed or LearningOutcome.Incorrect)
+            {
+                errors++;
+            }
+
+            confidence = Math.Clamp(
+                confidence - (outcome == LearningOutcome.AssistedCorrect ? 0.03 : outcome == LearningOutcome.Revealed ? 0.08 : 0.10),
+                0.05,
+                0.99);
+            retentionStep = 0;
+            nextReview = ReviewSchedule.NextReview(answeredAt, 0);
+        }
+
+        return this with
+        {
+            Attempts = Attempts + 1,
+            IndependentCorrect = independent,
+            AssistedCorrect = assisted,
+            Errors = errors,
+            Confidence = confidence,
+            ReviewStep = retentionStep,
+            RetentionStep = retentionStep,
+            LastAttemptAt = answeredAt,
+            NextReviewAt = nextReview,
+            MasteredAt = retentionStep >= RequiredRetentionConfirmations
+                ? MasteredAt ?? answeredAt
+                : MasteredAt
+        };
     }
 }

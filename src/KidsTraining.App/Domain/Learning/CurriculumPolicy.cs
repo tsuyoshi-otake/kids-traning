@@ -5,7 +5,8 @@ internal static class CurriculumPolicy
     private static readonly string[] TopicKeys =
     [
         "add", "sub", "mul", "clock", "kokugo", "hissan", "moji", "measure", "kazu", "shape", "div",
-        "frac", "chart", "story", "bun", "goi", "dokkai", "eigo", "money", "groups", "order", "keyboard"
+        "frac", "chart", "story", "bun", "goi", "dokkai", "eigo", "money", "groups", "order", "keyboard",
+        "soroban", "seikatsu", "shakai", "rika", "doutoku", "sougou", "jouhou", "tokubetsu"
     ];
 
     private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> TopicPrerequisites =
@@ -32,13 +33,25 @@ internal static class CurriculumPolicy
             ["goi"] = ["moji"],
             ["dokkai"] = ["bun", "kokugo", "goi"],
             ["eigo"] = [],
-            ["keyboard"] = []
+            ["keyboard"] = [],
+            ["soroban"] = ["kazu"],
+            ["seikatsu"] = [],
+            ["shakai"] = [],
+            ["rika"] = [],
+            ["doutoku"] = [],
+            ["sougou"] = ["jouhou"],
+            ["jouhou"] = [],
+            ["tokubetsu"] = []
         };
 
     private static readonly string[][] GradeOneLanes =
     [
         ["kazu", "shape", "add", "sub", "clock", "measure", "story", "money", "groups", "chart"],
         ["moji", "bun", "kokugo", "goi", "dokkai"],
+        ["seikatsu"],
+        ["doutoku"],
+        ["jouhou"],
+        ["tokubetsu"],
         ["keyboard"]
     ];
 
@@ -46,14 +59,23 @@ internal static class CurriculumPolicy
     [
         ["chart", "clock", "add", "sub", "measure", "hissan", "story", "kazu", "money", "order", "groups", "mul", "shape", "frac"],
         ["kokugo", "bun", "goi", "dokkai", "moji"],
+        ["seikatsu"],
+        ["doutoku"],
+        ["jouhou"],
+        ["tokubetsu"],
         ["keyboard"]
     ];
 
     private static readonly string[][] GradeThreeLanes =
     [
-        ["mul", "div", "shape", "hissan", "kazu", "add", "sub", "clock", "measure", "story", "order", "chart", "frac", "money", "groups"],
+        ["mul", "div", "shape", "hissan", "kazu", "soroban", "add", "sub", "clock", "measure", "story", "order", "chart", "frac", "money", "groups"],
         ["kokugo", "bun", "goi", "dokkai", "moji"],
+        ["shakai"],
+        ["rika"],
         ["eigo"],
+        ["doutoku"],
+        ["jouhou", "sougou"],
+        ["tokubetsu"],
         ["keyboard"]
     ];
 

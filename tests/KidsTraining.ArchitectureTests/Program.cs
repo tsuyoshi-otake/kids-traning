@@ -105,16 +105,35 @@ internal static class Program
         Assert(CurriculumPolicy.IsAvailable(1, "kokugo"), "grade 1 Japanese was unexpectedly locked");
         Assert(CurriculumPolicy.IsAvailable(1, "chart"), "grade 1 math strands were unexpectedly locked");
         Assert(CurriculumPolicy.IsAvailable(1, "money") && CurriculumPolicy.IsAvailable(1, "groups"), "grade 1 foundations are incomplete");
+        Assert(
+            CurriculumPolicy.IsAvailable(1, "seikatsu") && CurriculumPolicy.IsAvailable(1, "doutoku") &&
+            CurriculumPolicy.IsAvailable(1, "jouhou") && CurriculumPolicy.IsAvailable(1, "tokubetsu"),
+            "grade 1 cross-curricular scope is incomplete");
+        Assert(!CurriculumPolicy.IsAvailable(1, "shakai") && !CurriculumPolicy.IsAvailable(1, "rika"), "grade 3 subjects leaked into grade 1");
         Assert(!CurriculumPolicy.IsAvailable(1, "hissan"), "grade 2 written arithmetic leaked into grade 1");
         Assert(CurriculumPolicy.IsAvailable(2, "mul") && CurriculumPolicy.IsAvailable(2, "order"), "grade 2 calculation order or multiplication was unavailable");
+        Assert(CurriculumPolicy.IsAvailable(2, "seikatsu") && CurriculumPolicy.IsAvailable(2, "jouhou"), "grade 2 life or information activity was unavailable");
         Assert(!CurriculumPolicy.IsAvailable(2, "eigo"), "supplementary English started before grade 3");
-        Assert(CurriculumPolicy.IsAvailable(3, "div") && CurriculumPolicy.IsAvailable(3, "eigo"), "grade 3 scope is incomplete");
+        Assert(!CurriculumPolicy.IsAvailable(2, "shakai") && !CurriculumPolicy.IsAvailable(2, "rika") && !CurriculumPolicy.IsAvailable(2, "sougou"), "grade 3 subjects leaked into grade 2");
+        Assert(
+            CurriculumPolicy.IsAvailable(3, "div") && CurriculumPolicy.IsAvailable(3, "soroban") &&
+            CurriculumPolicy.IsAvailable(3, "shakai") && CurriculumPolicy.IsAvailable(3, "rika") &&
+            CurriculumPolicy.IsAvailable(3, "eigo") && CurriculumPolicy.IsAvailable(3, "sougou"),
+            "grade 3 scope is incomplete");
+        Assert(!CurriculumPolicy.IsAvailable(3, "seikatsu"), "life studies continued after the grade 3 subject transition");
+        Assert(
+            !CurriculumPolicy.AllTopics.Contains("ongaku", StringComparer.Ordinal) &&
+            !CurriculumPolicy.AllTopics.Contains("taiiku", StringComparer.Ordinal) &&
+            !CurriculumPolicy.AllTopics.Contains("zukou", StringComparer.Ordinal),
+            "explicitly excluded music, physical education, or arts and crafts entered the curriculum");
         Assert(
             CurriculumPolicy.IsAvailable(1, "keyboard") &&
             CurriculumPolicy.IsAvailable(2, "keyboard") &&
             CurriculumPolicy.IsAvailable(3, "keyboard"),
             "physical keyboard practice is not independently available in every implemented grade");
         Assert(CurriculumPolicy.PrerequisitesFor("keyboard").Count == 0, "keyboard practice unexpectedly has a prerequisite");
+        Assert(CurriculumPolicy.PrerequisitesFor("soroban").SequenceEqual(["kazu"]), "soroban is not gated by number foundations");
+        Assert(CurriculumPolicy.PrerequisitesFor("sougou").SequenceEqual(["jouhou"]), "integrated study is not gated by information literacy");
 
         var gradeOneLanes = CurriculumPolicy.TopicLanesForGrade(1);
         var gradeTwoLanes = CurriculumPolicy.TopicLanesForGrade(2);
@@ -208,16 +227,48 @@ internal static class Program
         Assert(evidence.Errors == 2 && evidence.AssistedCorrect == 1, "revealed and incorrect outcomes were not recorded separately");
         Assert(evidence.IndependentCorrect == 0, "helped work counted as independent evidence");
 
-        for (var index = 0; index < 8; index++)
+        for (var index = 0; index < 10; index++)
         {
             evidence = evidence.Record(LearningOutcome.IndependentCorrect, now.AddMinutes(index + 2));
         }
 
-        var lastAnswer = now.AddMinutes(9);
-        Assert(evidence.Attempts == 10 && evidence.IndependentAccuracy == 0.8, "evidence totals are incorrect");
-        Assert(evidence.IsAchievement && evidence.IsReady(lastAnswer), "qualified independent evidence did not create readiness and an achievement");
-        Assert(evidence.NextReviewAt.HasValue && !evidence.IsReady(evidence.NextReviewAt.Value), "overdue review did not make current readiness expire");
+        var lastAnswer = now.AddMinutes(11);
+        Assert(
+            evidence.Attempts == 12 && Math.Abs(evidence.IndependentAccuracy - (10d / 12d)) < 0.0001,
+            "evidence totals are incorrect");
+        Assert(evidence.IsQualifiedForRetention && !evidence.IsAchievement, "stage-five evidence did not qualify for retention or created mastery too early");
+
+        evidence = evidence.StartRetention(lastAnswer);
+        Assert(evidence.IsRetentionActive && evidence.RetentionStep == 0, "the sixth retention stage did not start");
+        Assert(evidence.NextReviewAt == lastAnswer.AddDays(1) && !evidence.IsReady(lastAnswer), "retention did not begin with a one-day delayed review");
+
+        var firstReview = evidence.NextReviewAt.GetValueOrDefault();
+        evidence = evidence.RecordRetentionReview(LearningOutcome.IndependentCorrect, firstReview);
+        Assert(evidence.RetentionStep == 1 && evidence.NextReviewAt == firstReview.AddDays(3), "the first retention confirmation did not schedule the three-day review");
+        Assert(!evidence.IsAchievement, "one delayed success created mastery too early");
+
+        var secondReview = evidence.NextReviewAt.GetValueOrDefault();
+        evidence = evidence.RecordRetentionReview(LearningOutcome.IndependentCorrect, secondReview);
+        Assert(evidence.RetentionStep == 2 && evidence.NextReviewAt == secondReview.AddDays(7), "the second retention confirmation did not schedule the seven-day review");
+
+        var thirdReview = evidence.NextReviewAt.GetValueOrDefault();
+        evidence = evidence.RecordRetentionReview(LearningOutcome.IndependentCorrect, thirdReview);
+        Assert(evidence.RetentionStep == SkillEvidence.RequiredRetentionConfirmations, "three delayed successes did not complete retention");
+        Assert(evidence.IsAchievement && evidence.IsReady(thirdReview), "completed retention did not create readiness and a sticky achievement");
+        Assert(evidence.NextReviewAt == thirdReview.AddDays(21) && !evidence.IsReady(evidence.NextReviewAt.Value), "the continuing 21-day review did not make current readiness expire");
         Assert(evidence.IsAchievement, "an overdue review erased the historical achievement");
+
+        var maintenanceReview = evidence.NextReviewAt.GetValueOrDefault();
+        var failedReview = evidence.RecordRetentionReview(LearningOutcome.Incorrect, maintenanceReview);
+        Assert(failedReview.IsAchievement && failedReview.RetentionStep == 0, "a failed review should reset current retention without erasing the achievement");
+        Assert(failedReview.NextReviewAt == maintenanceReview.AddDays(1), "a failed review did not schedule a one-day reconfirmation");
+        Assert(!failedReview.IsReady(maintenanceReview), "failed retention remained currently ready");
+        for (var confirmation = 0; confirmation < SkillEvidence.RequiredRetentionConfirmations; confirmation++)
+        {
+            var dueAt = failedReview.NextReviewAt.GetValueOrDefault();
+            failedReview = failedReview.RecordRetentionReview(LearningOutcome.IndependentCorrect, dueAt);
+        }
+        Assert(failedReview.IsAchievement && failedReview.IsReady(failedReview.LastAttemptAt.GetValueOrDefault()), "three delayed reconfirmations did not restore current readiness");
 
         var assisted = new SkillEvidence().Record(LearningOutcome.AssistedCorrect, now);
         Assert(assisted.IndependentCorrect == 0 && assisted.IsDue(now), "assistance was counted as independent or was not scheduled immediately");
@@ -242,7 +293,12 @@ internal static class Program
         var html = new LearningPageBuilder().Build(template, appDefinition, "Progression Test", ParentPin.Default);
 
         Assert(html.Contains("migrateProfiles(profiles)", StringComparison.Ordinal), "legacy profile migration is missing");
-        Assert(html.Contains("learningSchema===3", StringComparison.Ordinal) && html.Contains("stageAttempts", StringComparison.Ordinal), "ordered five-stage migration is missing");
+        Assert(html.Contains("learningSchema===4", StringComparison.Ordinal) && html.Contains("stageAttempts", StringComparison.Ordinal), "ordered six-stage migration is missing");
+        Assert(html.Contains("topicLearningStage(p,k){return this.topicStat(p,k).retentionStartedAt?6", StringComparison.Ordinal), "the sixth retention stage is missing");
+        Assert(html.Contains("retentionStep", StringComparison.Ordinal) && html.Contains("retentionStartedAt", StringComparison.Ordinal), "retention evidence is not persisted");
+        Assert(html.Contains("retentionReview=!!s.retentionStartedAt&&wasDue&&q.sessionRole==='review'&&difficulty===5", StringComparison.Ordinal), "only due difficulty-five review questions may confirm retention");
+        Assert(html.Contains("s.retentionStep=Math.min(3,s.retentionStep+1)", StringComparison.Ordinal), "three delayed retention confirmations are not required");
+        Assert(html.Contains("else{s.retentionStep=0;s.reviewStep=0;s.nextReviewAt=now+intervals[0];}", StringComparison.Ordinal), "failed retention does not restart after one day");
         Assert(html.Contains("masteredAt", StringComparison.Ordinal) && html.Contains("topicReady", StringComparison.Ordinal), "achievement and readiness are not separate");
         Assert(html.Contains("outcome==='revealed'", StringComparison.Ordinal), "revealed answers have no distinct evidence path");
         Assert(html.Contains("intervals=[86400000,259200000,604800000,1814400000]", StringComparison.Ordinal), "spaced-review intervals are missing");
@@ -293,9 +349,13 @@ internal static class Program
         Assert(html.Contains("candidates=remedial.length?remedial:[k]", StringComparison.Ordinal) && html.Contains("if(!ks.length)throw new Error('No enabled curriculum topics')", StringComparison.Ordinal), "weighted selection does not fall back explicitly after prerequisite remediation");
         Assert(html.Contains("configured[k]!==false", StringComparison.Ordinal), "new curriculum topics are disabled for migrated settings");
         Assert(
-            html.Contains("reviewCount=due.length?", StringComparison.Ordinal) &&
-            html.Contains("s.reviewTopics.length?s.reviewTopics:allowed", StringComparison.Ordinal),
+            html.Contains("reviewCount=due.length?Math.min(due.length", StringComparison.Ordinal) &&
+            html.Contains("const due=s.reviewTopics.filter(k=>this.topicDue(p,k))", StringComparison.Ordinal) &&
+            html.Contains("s.reviewTopics.splice(index,1)", StringComparison.Ordinal),
             "fresh sessions can start with unscheduled random review questions");
+        Assert(
+            html.Contains("const practice=allowed.filter(k=>!this.topicComplete(p,k)||this.topicDue(p,k))", StringComparison.Ordinal),
+            "retention topics can reappear as ordinary mixed practice before review is due");
         Assert(
             html.Contains("targetTotal=Math.max(4,Math.floor(n*.25))", StringComparison.Ordinal) &&
             html.Contains("mixedCount=n-reviewCount-targetCount-1", StringComparison.Ordinal),
@@ -422,6 +482,36 @@ internal static class Program
             trainingFormSource.Contains("SetLearningSessionSettingsAsync", StringComparison.Ordinal) &&
             trainingFormSource.Contains("SetParentPasswordAsync", StringComparison.Ordinal),
             "WebView setting synchronization does not expose an observable completion result");
+        Assert(
+            trainingFormSource.Contains("SetVirtualHostNameToFolderMapping", StringComparison.Ordinal) &&
+            trainingFormSource.Contains("https://{LearningVirtualHostName}", StringComparison.Ordinal) &&
+            !trainingFormSource.Contains("webView.CoreWebView2.Navigate(new Uri", StringComparison.Ordinal),
+            "camera-capable learning content is not hosted in a constrained secure context");
+        Assert(
+            trainingFormSource.Contains("ReadLegacyLearningStorageAsync", StringComparison.Ordinal) &&
+            trainingFormSource.Contains("if (localStorage.getItem(key) === null", StringComparison.Ordinal),
+            "the secure-origin transition can discard or overwrite legacy learning progress");
+        Assert(
+            trainingFormSource.Contains("args.PermissionKind == CoreWebView2PermissionKind.Camera", StringComparison.Ordinal) &&
+            trainingFormSource.Contains("args.IsUserInitiated", StringComparison.Ordinal) &&
+            trainingFormSource.Contains("args.SavesInProfile = false", StringComparison.Ordinal) &&
+            trainingFormSource.Contains("CoreWebView2PermissionState.Deny", StringComparison.Ordinal),
+            "WebView camera permission is not scoped to a user-initiated request or is persisted");
+        Assert(
+            html.Contains("attentionEnabled:true", StringComparison.Ordinal) &&
+            html.Contains("getUserMedia({audio:false", StringComparison.Ordinal) &&
+            html.Contains("new FaceDetector({fastMode:true,maxDetectedFaces:1})", StringComparison.Ordinal),
+            "the local attention estimate is not enabled by default or does not avoid microphone capture");
+        Assert(
+            html.Contains("this._attentionAverage*.75+instant*.25", StringComparison.Ordinal) &&
+            html.Contains("this._attentionLowSamples>=4", StringComparison.Ordinal) &&
+            html.Contains("this._attentionNextPromptAt=now+30000", StringComparison.Ordinal),
+            "attention guidance lacks smoothing, sustained-low confirmation, or a prompt cooldown");
+        Assert(
+            html.Contains("componentWillUnmount(){this._attentionDisposed=true", StringComparison.Ordinal) &&
+            html.Contains("this._attentionStream.getTracks().forEach(track=>track.stop())", StringComparison.Ordinal) &&
+            html.Contains("if(this._attentionDisposed){this.stopAttentionCamera('stopped',true);return;}", StringComparison.Ordinal),
+            "camera acquisition or component teardown can leave a capture stream running");
         Assert(
             !trainingFormSource.Contains("CompletionBridgeScript", StringComparison.Ordinal) &&
             !trainingFormSource.Contains("document.body.innerText", StringComparison.Ordinal),

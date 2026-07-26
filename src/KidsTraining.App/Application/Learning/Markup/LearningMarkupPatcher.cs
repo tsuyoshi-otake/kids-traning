@@ -43,7 +43,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true},count:this.props.questionCount??10,pass:this.props.passLine??8};}",
-            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true,eigo:true,money:true,groups:true,order:true,keyboard:true},count:this.props.questionCount??20,pass:this.props.passLine??15};}",
+            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true,eigo:true,money:true,groups:true,order:true,soroban:true,seikatsu:true,shakai:true,rika:true,doutoku:true,jouhou:true,sougou:true,tokubetsu:true,keyboard:true},count:this.props.questionCount??20,pass:this.props.passLine??15,attentionEnabled:true};}",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
@@ -53,7 +53,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "    kokugo:{label:'こくご',color:'#d2691e'},\n  };",
-            "    kokugo:{label:'こくご',color:'#d2691e'},\n    moji:{label:'もじ',color:'#4f7edb'},\n    measure:{label:'たんい',color:'#3aa655'},\n    kazu:{label:'かず',color:'#c2891f'},\n    shape:{label:'かたち',color:'#9a4fd6'},\n    div:{label:'わりざん',color:'#0f8fbf'},\n    frac:{label:'ぶんすう',color:'#d64f8e'},\n    chart:{label:'グラフ',color:'#5a8f29'},\n    story:{label:'ぶんしょうだい',color:'#8a6d3b'},\n    bun:{label:'ぶん',color:'#7a5cd6'},\n    goi:{label:'ことば',color:'#2f9e8f'},\n    dokkai:{label:'よみとり',color:'#c2503f'},\n    eigo:{label:'えいご',color:'#2563eb'},\n    money:{label:'おかね',color:'#b7791f'},\n    groups:{label:'おなじかず',color:'#0f8f78'},\n    order:{label:'しきのじゅんじょ',color:'#8b5cf6'},\n    keyboard:{label:'キーボード',color:'#0d9488'},\n  };",
+            "    kokugo:{label:'こくご',color:'#d2691e'},\n    moji:{label:'もじ',color:'#4f7edb'},\n    measure:{label:'たんい',color:'#3aa655'},\n    kazu:{label:'かず',color:'#c2891f'},\n    shape:{label:'かたち',color:'#9a4fd6'},\n    div:{label:'わりざん',color:'#0f8fbf'},\n    frac:{label:'ぶんすう',color:'#d64f8e'},\n    chart:{label:'グラフ',color:'#5a8f29'},\n    story:{label:'ぶんしょうだい',color:'#8a6d3b'},\n    bun:{label:'ぶん',color:'#7a5cd6'},\n    goi:{label:'ことば',color:'#2f9e8f'},\n    dokkai:{label:'よみとり',color:'#c2503f'},\n    eigo:{label:'えいご',color:'#2563eb'},\n    money:{label:'おかね',color:'#b7791f'},\n    groups:{label:'おなじかず',color:'#0f8f78'},\n    order:{label:'しきのじゅんじょ',color:'#8b5cf6'},\n    soroban:{label:'そろばん',color:'#8b6f47'},\n    seikatsu:{label:'せいかつ',color:'#2f855a'},\n    shakai:{label:'しゃかい',color:'#9c6b30'},\n    rika:{label:'りか',color:'#16846b'},\n    doutoku:{label:'どうとく',color:'#b05279'},\n    jouhou:{label:'じょうほう',color:'#3366a8'},\n    sougou:{label:'そうごう',color:'#6b5bb5'},\n    tokubetsu:{label:'学校かつどう',color:'#b45f45'},\n    keyboard:{label:'キーボード',color:'#0d9488'},\n  };",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
@@ -111,11 +111,11 @@ internal static partial class LearningMarkupPatcher
             markup,
             "pickKokugo(){",
             "\n  genFor(k){",
-            BuildKanjiCurriculumScript() + "\n  " + BuildPickKokugoScript());
+            BuildKanjiCurriculumScript() + "\n  " + BuildPickKokugoScript() + "\n  " + BuildCrossCurriculumScript());
 
         markup = ReplaceRequired(markup,
             "genFor(k){return k==='add'?this.genAdd():k==='sub'?this.genSub():k==='hissan'?this.genHissan():k==='mul'?this.pickMul():k==='clock'?this.pickClock():this.pickKokugo();}",
-            "genFor(k,p,stageOverride){const requested=Number(stageOverride),stage=Number.isFinite(requested)?this.clamp(requested,1,5):this.reviewStage(p,k),sp=this.profileAtStage(p,k,stage),q=k==='add'?this.genAdd(sp):k==='sub'?this.genSub(sp):k==='hissan'?this.genHissan(sp):k==='mul'?this.pickMul(sp):k==='clock'?this.pickClock(sp):k==='measure'?this.pickMeasure(sp):k==='kazu'?this.pickKazu(sp):k==='shape'?this.pickShape(sp):k==='div'?this.pickDiv(sp):k==='frac'?this.pickFrac(sp):k==='chart'?this.pickChart(sp):k==='story'?this.pickStory(sp):k==='money'?this.pickMoney(sp):k==='groups'?this.pickGroups(sp):k==='order'?this.pickOrder(sp):k==='kokugo'?this.pickKokugo(sp):k==='bun'?this.pickBun(sp):k==='goi'?this.pickGoi(sp):k==='dokkai'?this.pickDokkai(sp):k==='eigo'?this.pickEigo(sp):k==='keyboard'?this.pickKeyboard(sp):this.pickMoji(sp);q.difficulty=this.clamp(Number(q.difficulty)||stage,1,5);q.grade=this.effectiveGrade(sp);return q;}",
+            "genFor(k,p,stageOverride){const requested=Number(stageOverride),stage=Number.isFinite(requested)?this.clamp(requested,1,5):this.reviewStage(p,k),sp=this.profileAtStage(p,k,stage),q=k==='add'?this.genAdd(sp):k==='sub'?this.genSub(sp):k==='hissan'?this.genHissan(sp):k==='mul'?this.pickMul(sp):k==='clock'?this.pickClock(sp):k==='measure'?this.pickMeasure(sp):k==='kazu'?this.pickKazu(sp):k==='shape'?this.pickShape(sp):k==='div'?this.pickDiv(sp):k==='frac'?this.pickFrac(sp):k==='chart'?this.pickChart(sp):k==='story'?this.pickStory(sp):k==='money'?this.pickMoney(sp):k==='groups'?this.pickGroups(sp):k==='order'?this.pickOrder(sp):k==='soroban'?this.pickSoroban(sp):k==='seikatsu'?this.pickSeikatsu(sp):k==='shakai'?this.pickShakai(sp):k==='rika'?this.pickRika(sp):k==='doutoku'?this.pickDoutoku(sp):k==='jouhou'?this.pickJouhou(sp):k==='sougou'?this.pickSougou(sp):k==='tokubetsu'?this.pickTokubetsu(sp):k==='kokugo'?this.pickKokugo(sp):k==='bun'?this.pickBun(sp):k==='goi'?this.pickGoi(sp):k==='dokkai'?this.pickDokkai(sp):k==='eigo'?this.pickEigo(sp):k==='keyboard'?this.pickKeyboard(sp):this.pickMoji(sp);q.difficulty=this.clamp(Number(q.difficulty)||stage,1,5);q.grade=this.effectiveGrade(sp);return q;}",
             StringComparison.Ordinal);
         markup = ReplaceBlock(
             markup,
@@ -163,6 +163,23 @@ internal static partial class LearningMarkupPatcher
             "const bc=introduced?levelColors[masteryLevel-1]:'#d8d1c4';const sc2=!available||!introduced?",
             StringComparison.Ordinal);
 
+        markup = ReplaceRequired(
+            markup,
+            "const masteryLevel=this.topicStage(p,k);",
+            "const masteryLevel=this.topicLearningStage(p,k);",
+            StringComparison.Ordinal);
+        markup = ReplaceRequired(
+            markup,
+            "const achieved=this.topicComplete(p,k),ready=this.topicReady(p,k),due=this.topicDue(p,k);",
+            "const achieved=this.topicMastered(p,k),complete=this.topicComplete(p,k),ready=this.topicReady(p,k),due=this.topicDue(p,k),retaining=complete&&!achieved,retentionStep=this.topicStat(p,k).retentionStep||0;",
+            StringComparison.Ordinal);
+        markup = ReplaceRequired(markup, "const status=", "const legacyStatus=", StringComparison.Ordinal);
+        markup = ReplaceRequired(
+            markup,
+            "const levelColors=['#ff8a8a','#f2a03d','#e0c13d','#79b85a','#3aa655'];",
+            "const status=(!available?'対象外':!introduced?'これから':ready?'定着':due?'復習':retaining?'定着確認 '+retentionStep+'/3':achieved?'再確認':'練習')+(achieved?' ★':'');const levelColors=['#ff8a8a','#f2a03d','#e0c13d','#79b85a','#3aa655','#5470c6'];",
+            StringComparison.Ordinal);
+
         markup = ReplaceRequired(markup,
             "const gradeOpts=[1,2,3,4,5,6].map(g=>",
             "const gradeOpts=[1,2,3].map(g=>",
@@ -196,6 +213,7 @@ internal static partial class LearningMarkupPatcher
         markup = PatchFractionalScoring(markup);
         markup = PatchSessionPassGate(markup);
         markup = PatchLearningCheckpoint(markup);
+        markup = PatchAttentionCamera(markup);
 
         return markup;
     }
@@ -212,11 +230,11 @@ calibAnswer(c){const cb=this.state.calib,it=cb.items[cb.idx],ok=String(c)===Stri
         return """
 questionIdentity(q){const omit=new Set(['choices','explanation','sessionRole','difficulty']),normalize=v=>{if(Array.isArray(v))return v.map(normalize);if(v&&typeof v==='object'){const out={};for(const k of Object.keys(v).sort())if(!omit.has(k))out[k]=normalize(v[k]);return out;}return v;};return JSON.stringify(normalize(q));}
   refreshSessionTarget(p,s){const current=s.activeTargetTopic;if(current&&!this.topicComplete(p,current))return current;const next=this.nextCurriculumTopic(p);if(next&&next!==current)s.targetTopics.push(next);s.activeTargetTopic=next||current;return s.activeTargetTopic;}
-  sessionTopic(p,s,role){const allowed=this.allowedTopics(p);if(role==='review')return this.weightedPick(p,s.reviewTopics.length?s.reviewTopics:allowed);const target=this.refreshSessionTarget(p,s);if(role==='target'||role==='exit')return target;const mixed=allowed.filter(k=>k!==target);return this.weightedPick(p,mixed.length?mixed:allowed);}
+  sessionTopic(p,s,role){const allowed=this.allowedTopics(p),target=this.refreshSessionTarget(p,s);if(role==='review'){const due=s.reviewTopics.filter(k=>this.topicDue(p,k));if(due.length){const topic=this.weightedPick(p,due),index=s.reviewTopics.indexOf(topic);if(index>=0)s.reviewTopics.splice(index,1);return topic;}}if(role==='target'||role==='exit'||role==='review')return target;const practice=allowed.filter(k=>!this.topicComplete(p,k)||this.topicDue(p,k)),mixed=practice.filter(k=>k!==target),pool=mixed.length?mixed:(practice.length?practice:allowed);return this.weightedPick(p,pool);}
   sessionStage(p,s,topic,role){const base=role==='review'?this.reviewStage(p,topic):this.topicStage(p,topic),support=s.supportTopics[topic]?1:0;return this.clamp(base-support,1,5);}
   registerSessionQuestion(s,q,key,role){q.sessionRole=role;s.questionCounts[key]=(s.questionCounts[key]||0)+1;s.lastQuestionKey=key;return q;}
   generateSessionQuestion(p,s,role){let best=null,bestKey='',bestScore=Infinity;for(let attempt=0;attempt<24;attempt++){const topic=this.sessionTopic(p,s,role),stage=this.sessionStage(p,s,topic,role),candidate=this.genFor(topic,p,stage),key=this.questionIdentity(candidate),count=s.questionCounts[key]||0,score=count*2+(key===s.lastQuestionKey?1:0);if(count===0)return this.registerSessionQuestion(s,candidate,key,role);if(score<bestScore){best=candidate;bestKey=key;bestScore=score;}}if(!best)throw new Error('Unable to generate a learning question');return this.registerSessionQuestion(s,best,bestKey,role);}
-  buildSession(p,attempt){this.ensureLearningProfile(p);const n=this.total(),due=this.dueTopics(p),target=this.nextCurriculumTopic(p),reviewCount=due.length?Math.max(2,Math.floor(n*.2)):0,targetTotal=Math.max(4,Math.floor(n*.25)),targetCount=targetTotal-1,mixedCount=n-reviewCount-targetCount-1,rolePlan=[];for(let i=0;i<reviewCount;i++)rolePlan.push('review');for(let i=0;i<targetCount;i++)rolePlan.push('target');for(let i=0;i<mixedCount;i++)rolePlan.push('mixed');rolePlan.push('exit');const session={questions:[],rolePlan:rolePlan,idx:0,correct:0,activeTargetTopic:target,targetTopics:[target],targetAsked:0,targetIndependent:0,reviewTopics:due.slice(),supportTopics:{},questionCounts:{},lastQuestionKey:'',attempt:attempt,startStars:p.stars,startXp:Number(p.xp)||0};session.questions.push(this.generateSessionQuestion(p,session,rolePlan[0]));return session;}
+  buildSession(p,attempt){this.ensureLearningProfile(p);const n=this.total(),due=this.dueTopics(p),target=this.nextCurriculumTopic(p),reviewCount=due.length?Math.min(due.length,Math.max(1,Math.floor(n*.2))):0,targetTotal=Math.max(4,Math.floor(n*.25)),targetCount=targetTotal-1,mixedCount=n-reviewCount-targetCount-1,rolePlan=[];for(let i=0;i<reviewCount;i++)rolePlan.push('review');for(let i=0;i<targetCount;i++)rolePlan.push('target');for(let i=0;i<mixedCount;i++)rolePlan.push('mixed');rolePlan.push('exit');const session={questions:[],rolePlan:rolePlan,idx:0,correct:0,activeTargetTopic:target,targetTopics:[target],targetAsked:0,targetIndependent:0,reviewTopics:due.slice(),supportTopics:{},questionCounts:{},lastQuestionKey:'',attempt:attempt,startStars:p.stars,startXp:Number(p.xp)||0};session.questions.push(this.generateSessionQuestion(p,session,rolePlan[0]));return session;}
 """;
     }
 

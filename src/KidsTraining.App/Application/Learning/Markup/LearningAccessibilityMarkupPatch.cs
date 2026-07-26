@@ -24,7 +24,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "q=this.cur();const t=T[q.topic];topicLabel=t.label;",
-            "q=this.cur();const t=T[q.topic];practicePrompt=q.topic==='eigo'?'補助活動：音声を聞き、声に出してまねしてから答えよう。':(q.topic==='kokugo'&&q.subtype==='kanji-choice'?'ノートに漢字を書いてから答えよう。':'');topicLabel=t.label;",
+            "q=this.cur();const t=T[q.topic];practicePrompt=q.activityPrompt||(q.topic==='eigo'?'補助活動：音声を聞き、声に出してまねしてから答えよう。':(q.topic==='kokugo'&&q.subtype==='kanji-choice'?'ノートに漢字を書いてから答えよう。':''));topicLabel=t.label;",
             StringComparison.Ordinal);
         markup = ReplaceRequired(
             markup,

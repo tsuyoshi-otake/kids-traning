@@ -86,7 +86,8 @@ const observe = (check, amount = 1) => observed.set(check, (observed.get(check) 
 const TOPICS = [
   'add', 'sub', 'hissan', 'mul', 'clock', 'kokugo', 'moji', 'measure', 'kazu', 'shape',
   'div', 'frac', 'chart', 'story', 'bun', 'goi', 'dokkai', 'eigo', 'money', 'groups',
-  'order', 'keyboard',
+  'order', 'soroban', 'seikatsu', 'shakai', 'rika', 'doutoku', 'jouhou', 'sougou',
+  'tokubetsu', 'keyboard',
 ];
 const GRADES = [1, 2, 3];
 const STAGES = [1, 2, 3, 4, 5];
@@ -156,9 +157,9 @@ for (const entry of curriculum) {
 const expectedMinuteWord = (minute) => ([0, 1, 3, 4, 6, 8].includes(minute % 10) ? 'ぷん' : 'ふん');
 
 const GOJUON = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわん';
-// を is deliberately outside the drill: kunrei and hepburn both spell it "o", which would
-// collide with お and make two choices correct.
-const KUNREI_PRIMARY = { し: 'si', ち: 'ti', つ: 'tu', ふ: 'hu' };
+// を is deliberately outside the drill: it shares "o" with お and would make two choices correct.
+const STANDARD_ROMAJI = { し: 'shi', ち: 'chi', つ: 'tsu', ふ: 'fu' };
+const LEGACY_INPUT_ROMAJI = new Set(['si', 'ti', 'tu', 'hu']);
 const romajiKanaSeen = new Set();
 const romajiSpellingsSeen = new Map();
 
@@ -281,6 +282,17 @@ for (const topic of TOPICS) {
           }
         }
 
+        if (topic === 'frac' && grade === 2) {
+          observe('grade-2 fractions stay within simple fractional meaning');
+          if (/\d+\.\d+/.test(prompt + explanation) || /\s[+＋−-]\s/.test(prompt)) {
+            violated(
+              'grade-2 fractions stay within simple fractional meaning',
+              'decimal or fraction arithmetic leaked into the grade-2 question bank',
+              `${context} | ${explanation}`,
+            );
+          }
+        }
+
         for (const text of [answer, explanation, ...((question.choices || []).map(String))]) {
           for (const match of text.matchAll(/(\d+)\s*(ふん|ぷん)/g)) {
             observe('minute readings follow the ふん / ぷん rule');
@@ -299,10 +311,17 @@ for (const topic of TOPICS) {
         if (topic === 'moji') {
           const romaji = prompt.match(/ローマ字「([a-z]+)」/);
           if (romaji) {
-            observe('the romaji drill covers the gojuon in kunrei-shiki');
+            observe('the romaji drill covers the gojuon in the current standard spelling');
             romajiKanaSeen.add(answer);
             if (!romajiSpellingsSeen.has(answer)) romajiSpellingsSeen.set(answer, new Set());
             romajiSpellingsSeen.get(answer).add(romaji[1]);
+            if (LEGACY_INPUT_ROMAJI.has(romaji[1])) {
+              violated(
+                'the romaji drill uses the current standard spelling',
+                `${romaji[1]} is an input hint, not the primary spelling shown for ${answer}`,
+                context,
+              );
+            }
           }
         }
 
@@ -342,15 +361,15 @@ for (const topic of TOPICS) {
 
 const missingKana = [...GOJUON].filter((kana) => !romajiKanaSeen.has(kana));
 if (missingKana.length) {
-  violated('the romaji drill covers the gojuon in kunrei-shiki', `the drill never teaches ${missingKana.join('')}`, '');
+  violated('the romaji drill covers the gojuon in the current standard spelling', `the drill never teaches ${missingKana.join('')}`, '');
 }
-for (const [kana, kunrei] of Object.entries(KUNREI_PRIMARY)) {
+for (const [kana, standard] of Object.entries(STANDARD_ROMAJI)) {
   const spellings = romajiSpellingsSeen.get(kana);
   if (!spellings) continue;
-  if (!spellings.has(kunrei)) {
+  if (!spellings.has(standard)) {
     violated(
-      'the romaji drill covers the gojuon in kunrei-shiki',
-      `${kana} is never spelled the kunrei way (${kunrei}); seen ${[...spellings].join('/')}`,
+      'the romaji drill covers the gojuon in the current standard spelling',
+      `${kana} is never spelled the standard way (${standard}); seen ${[...spellings].join('/')}`,
       '',
     );
   }

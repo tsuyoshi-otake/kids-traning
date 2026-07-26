@@ -11,6 +11,8 @@ internal sealed class TrainingForm : Form
     private const string UnlockMessage = "kidsTraining.unlock";
     private const string PauseMessage = "kidsTraining.pause";
     private const string ResetAppliedMessagePrefix = "kidsTraining.resetApplied:";
+    private const string LearningVirtualHostName = "learning.kidstraining.local";
+    private const string ExperimentalWebPlatformFeaturesArgument = "--enable-experimental-web-platform-features";
 
     private readonly WebView2 webView = new();
     private readonly System.Windows.Forms.Timer lockTimer = new();
@@ -241,7 +243,13 @@ internal sealed class TrainingForm : Form
             }
 
             CoreWebView2Environment.GetAvailableBrowserVersionString();
-            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: AppPaths.WebViewUserDataFolder);
+            var environmentOptions = new CoreWebView2EnvironmentOptions
+            {
+                AdditionalBrowserArguments = ExperimentalWebPlatformFeaturesArgument,
+            };
+            var environment = await CoreWebView2Environment.CreateAsync(
+                userDataFolder: AppPaths.WebViewUserDataFolder,
+                options: environmentOptions);
             await webView.EnsureCoreWebView2Async(environment);
 
             ConfigureWebView(webView.CoreWebView2);
@@ -253,7 +261,23 @@ internal sealed class TrainingForm : Form
             }
 
             await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(BuildProfileStorageScript());
-            webView.CoreWebView2.Navigate(new Uri(preparation.RuntimePagePath).AbsoluteUri);
+            var learningAssetsFolder = Path.GetDirectoryName(preparation.RuntimePagePath)
+                ?? throw new InvalidOperationException("The learning assets folder could not be resolved.");
+            webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                LearningVirtualHostName,
+                learningAssetsFolder,
+                CoreWebView2HostResourceAccessKind.DenyCors);
+            webView.Visible = false;
+            var legacyStorage = await ReadLegacyLearningStorageAsync(
+                webView.CoreWebView2,
+                new Uri(preparation.RuntimePagePath).AbsoluteUri);
+            await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                BuildLegacyStorageMigrationScript(legacyStorage));
+            var runtimePageName = Uri.EscapeDataString(Path.GetFileName(preparation.RuntimePagePath));
+            await NavigateAsync(
+                webView.CoreWebView2,
+                $"https://{LearningVirtualHostName}/{runtimePageName}");
+            webView.Visible = true;
         }
         catch (WebView2RuntimeNotFoundException)
         {
@@ -305,6 +329,23 @@ internal sealed class TrainingForm : Form
         };
 
         core.NewWindowRequested += (_, args) => args.Handled = true;
+        core.PermissionRequested += (_, args) =>
+        {
+            var isTrustedLearningPage =
+                Uri.TryCreate(args.Uri, UriKind.Absolute, out var origin) &&
+                string.Equals(origin.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(origin.Host, LearningVirtualHostName, StringComparison.OrdinalIgnoreCase);
+            var allowCamera =
+                args.PermissionKind == CoreWebView2PermissionKind.Camera &&
+                args.IsUserInitiated &&
+                isTrustedLearningPage;
+
+            args.SavesInProfile = false;
+            args.State = allowCamera
+                ? CoreWebView2PermissionState.Allow
+                : CoreWebView2PermissionState.Deny;
+            args.Handled = true;
+        };
     }
 
     private void ApplyWindowIcon()
@@ -367,6 +408,64 @@ internal sealed class TrainingForm : Form
                 webView.Focus();
             }
         }));
+    }
+
+    private static async Task<IReadOnlyDictionary<string, string>> ReadLegacyLearningStorageAsync(
+        CoreWebView2 core,
+        string legacyRuntimeUri)
+    {
+        try
+        {
+            await NavigateAsync(core, legacyRuntimeUri);
+            var serialized = await core.ExecuteScriptAsync(
+                "(() => { const data = {}; for (const key of ['kt_profiles_v1','kt_settings_v1','kt_muted_v1','kt_session_checkpoint_v1']) { const value = localStorage.getItem(key); if (value !== null) data[key] = value; } return data; })()");
+            return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(serialized)
+                ?? new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Could not read legacy file-origin learning storage", exception);
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+    }
+
+    private static string BuildLegacyStorageMigrationScript(IReadOnlyDictionary<string, string> legacyStorage)
+    {
+        var serialized = System.Text.Json.JsonSerializer.Serialize(legacyStorage);
+        return
+            "(() => { try { const legacy = " + serialized +
+            "; for (const [key, value] of Object.entries(legacy)) { if (localStorage.getItem(key) === null && typeof value === 'string') localStorage.setItem(key, value); } } catch {} })();";
+    }
+
+    private static Task NavigateAsync(CoreWebView2 core, string uri)
+    {
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        EventHandler<CoreWebView2NavigationCompletedEventArgs>? handler = null;
+        handler = (_, args) =>
+        {
+            core.NavigationCompleted -= handler;
+            if (args.IsSuccess)
+            {
+                completion.TrySetResult();
+            }
+            else
+            {
+                completion.TrySetException(new InvalidOperationException(
+                    $"WebView navigation failed with status {args.WebErrorStatus}: {uri}"));
+            }
+        };
+        core.NavigationCompleted += handler;
+        try
+        {
+            core.Navigate(uri);
+        }
+        catch (Exception exception)
+        {
+            core.NavigationCompleted -= handler;
+            completion.TrySetException(exception);
+        }
+
+        return completion.Task;
     }
 
     private string BuildProfileStorageScript()
