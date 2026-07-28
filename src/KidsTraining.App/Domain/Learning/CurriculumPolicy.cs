@@ -1,12 +1,20 @@
 namespace KidsTraining.App.Domain.Learning;
 
+internal sealed record CurriculumQuestionDisplay(
+    string? Prompt = null,
+    string? Answer = null,
+    IReadOnlyList<string>? Choices = null,
+    string? Explanation = null,
+    string? ActivityPrompt = null);
+
 internal sealed record CurriculumQuestion(
     int Stage,
     string Prompt,
     string Answer,
     IReadOnlyList<string> Distractors,
     string Explanation,
-    string? ActivityPrompt = null);
+    string? ActivityPrompt = null,
+    CurriculumQuestionDisplay? Display = null);
 
 internal sealed record CurriculumUnit(
     string Id,
@@ -241,8 +249,16 @@ internal static partial class CurriculumPolicy
 
         add("math", "frac", 6, "fraction-expression", "6年 分数の乗除・文字式", MathematicsSource,
         [
-            Q(1, "2/3×3/5は？", "2/5", ["5/8", "6/8", "1/5"], "分子どうし・分母どうしを掛けて約分する。"),
-            Q(2, "3/4÷2/5は？", "15/8", ["6/20", "5/6", "8/15"], "割る数の逆数5/2を掛ける。"),
+            Q(1, "2/3×3/5は？", "2/5", ["5/8", "6/8", "1/5"], "分子どうし・分母どうしを掛けて約分する。", display: D(
+                prompt: @"\(\frac{2}{3}\times\frac{3}{5}\) は？",
+                answer: @"\(\frac{2}{5}\)",
+                choices: [@"\(\frac{5}{8}\)", @"\(\frac{6}{8}\)", @"\(\frac{1}{5}\)"],
+                explanation: @"分子どうし・分母どうしを掛けて約分します。**答えは \(\frac{2}{5}\) です。**")),
+            Q(2, "3/4÷2/5は？", "15/8", ["6/20", "5/6", "8/15"], "割る数の逆数5/2を掛ける。", display: D(
+                prompt: @"\(\frac{3}{4}\div\frac{2}{5}\) は？",
+                answer: @"\(\frac{15}{8}\)",
+                choices: [@"\(\frac{6}{20}\)", @"\(\frac{5}{6}\)", @"\(\frac{8}{15}\)"],
+                explanation: @"割る数の逆数 \(\frac{5}{2}\) を掛けます。")),
             Q(3, "1個x円の品を6個買う代金は？", "6x円", ["x+6円", "x÷6円", "6-x円"], "1個の値段×個数。"),
             Q(4, "分数で割るときに行うことは？", "逆数を掛ける", ["分母だけ足す", "分子だけ引く", "小数点を消す"], "a÷b/c は a×c/b。"),
             Q(5, "速さを求める式は？", "道のり÷時間", ["道のり×時間", "時間÷道のり", "道のり+時間"], "単位時間あたりの道のりを求める。")
@@ -271,8 +287,17 @@ internal static partial class CurriculumPolicy
         string answer,
         IReadOnlyList<string> distractors,
         string explanation,
-        string? activity = null) =>
-        new(stage, prompt, answer, distractors, explanation, activity);
+        string? activity = null,
+        CurriculumQuestionDisplay? display = null) =>
+        new(stage, prompt, answer, distractors, explanation, activity, display);
+
+    private static CurriculumQuestionDisplay D(
+        string? prompt = null,
+        string? answer = null,
+        IReadOnlyList<string>? choices = null,
+        string? explanation = null,
+        string? activityPrompt = null) =>
+        new(prompt, answer, choices, explanation, activityPrompt);
 
     private static string TopicLabel(string topic) => topic switch
     {

@@ -96,8 +96,8 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(
             markup,
-            "else{calibPrompt=cq.prompt;}}",
-            "else{calibPrompt=cq.prompt;}calibEq=cq.mode==='num'&&!/[=?]/.test(String(cq.prompt||''))?' = ?':'';}",
+            "else{calibPrompt=this.questionRich(cq,'prompt',cq.prompt);}}",
+            "else{calibPrompt=this.questionRich(cq,'prompt',cq.prompt);}calibEq=cq.mode==='num'&&!/[=?]/.test(String(cq.prompt||''))?' = ?':'';}",
             StringComparison.Ordinal);
         markup = ReplaceBlock(
             markup,

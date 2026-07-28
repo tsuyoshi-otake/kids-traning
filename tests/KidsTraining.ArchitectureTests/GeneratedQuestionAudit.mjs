@@ -47,6 +47,7 @@ class DCLogic {
   }
 }
 const React = {
+  Fragment: 'fragment',
   isValidElement(value) {
     return !!value && typeof value === 'object' && typeof value.type === 'string';
   },
@@ -90,6 +91,16 @@ const violated = (check, detail, sample) => {
 // declares what it counted and the audit fails when the count is zero.
 const observed = new Map();
 const observe = (check, amount = 1) => observed.set(check, (observed.get(check) || 0) + amount);
+
+observe('the generated application reaches an explicit initial render state');
+try {
+  const initialView = app.renderVals();
+  if (!initialView || typeof initialView !== 'object') {
+    violated('the generated application reaches an explicit initial render state', 'renderVals returned no view model', JSON.stringify(initialView));
+  }
+} catch (error) {
+  violated('the generated application reaches an explicit initial render state', String(error && error.message), String(error && error.stack));
+}
 
 const assertFurigana = (surface, reading) => {
   const rendered = app.withFurigana(surface);
@@ -190,6 +201,89 @@ assertNotation('English ordering separators', 'I / play / tennis', { unchanged: 
 assertNotation('English grammar notation', 'have+過去分詞', { unchanged: true });
 assertNotation('English colon label', 'note: value', { unchanged: true });
 assertNotation('English hyphenated word', 'e-mail', { unchanged: true });
+
+// Rich display content is an additive presentation layer: authored Markdown and constrained
+// TeX become React nodes, while canonical prompt/answer/choice values remain grading data.
+const richRendered = app.withRichText('**学校**で \\(\\frac{2}{3}\\times\\frac{3}{5}\\) を考える。');
+observe('rich text renders safe Markdown and constrained TeX as semantic React nodes');
+if (
+  notationByClass(richRendered, 'kt-rich-strong').length !== 1 ||
+  notationByClass(richRendered, 'kt-fraction').length !== 2 ||
+  notationByClass(richRendered, 'kt-rich-math').length !== 1 ||
+  !notationNodes(richRendered).some((node) => node.type === 'ruby') ||
+  !notationLabels(richRendered).some((label) => label.includes('3分の2') && label.includes('5分の3'))
+) {
+  violated('rich text renders safe Markdown and constrained TeX as semantic React nodes', 'strong text, furigana, fractions, or the math label is missing', JSON.stringify(richRendered));
+}
+
+const richBlocks = app.withRichText('# 手順\n\n1. `x^2` はコード\n2. $$\\sqrt{x^2}\\ge 0$$');
+observe('rich text supports bounded block structure without interpreting code spans');
+if (
+  !notationNodes(richBlocks).some((node) => node.type === 'h1') ||
+  !notationNodes(richBlocks).some((node) => node.type === 'ol') ||
+  notationByClass(richBlocks, 'kt-rich-code').length !== 1 ||
+  notationByClass(richBlocks, 'kt-rich-math-block').length !== 1 ||
+  notationByClass(richBlocks, 'kt-tex-radical').length !== 1 ||
+  notationText(notationByClass(richBlocks, 'kt-rich-code')[0]) !== 'x^2'
+) {
+  violated('rich text supports bounded block structure without interpreting code spans', 'a heading, list, code span, or block formula was not rendered correctly', JSON.stringify(richBlocks));
+}
+
+const inertMarkup = app.withRichText('<img src=x onerror=alert(1)> [bad](javascript:alert(1))');
+const rejectedTex = app.withRichInline('$\\href{javascript:alert(1)}{x}$ and $\\frac{1}$');
+observe('rich text keeps HTML, links, unsafe TeX, and malformed TeX inert and visible');
+if (
+  notationNodes(inertMarkup).some((node) => ['img', 'script', 'a'].includes(node.type)) ||
+  notationByClass(rejectedTex, 'kt-rich-math').length !== 0 ||
+  !notationText(inertMarkup).includes('<img src=x onerror=alert(1)>') ||
+  !notationText(rejectedTex).includes('\\href') ||
+  !notationText(rejectedTex).includes('\\frac{1}')
+) {
+  violated('rich text keeps HTML, links, unsafe TeX, and malformed TeX inert and visible', 'unsafe or malformed source became active markup or disappeared', JSON.stringify({ inertMarkup, rejectedTex }));
+}
+
+const fractionUnit = app.curriculumCatalog().find((unit) => unit.grade === 6 && unit.topicId === 'frac');
+const fractionQuestion = fractionUnit && app.pickCurriculumBank(fractionUnit, 1);
+const fractionDisplayByCanonical = new Map([
+  ['2/5', '\\(\\frac{2}{5}\\)'],
+  ['5/8', '\\(\\frac{5}{8}\\)'],
+  ['6/8', '\\(\\frac{6}{8}\\)'],
+  ['1/5', '\\(\\frac{1}{5}\\)'],
+]);
+observe('rich choice display follows shuffled canonical choices without changing grading');
+if (!fractionQuestion || fractionQuestion.prompt !== '2/3×3/5は？' || fractionQuestion.answer !== '2/5') {
+  violated('rich choice display follows shuffled canonical choices without changing grading', 'the grade-6 fraction question lost its canonical prompt or answer', JSON.stringify(fractionQuestion));
+} else {
+  const canonicalBefore = JSON.stringify({
+    prompt: fractionQuestion.prompt,
+    answer: fractionQuestion.answer,
+    choices: fractionQuestion.choices,
+    explanation: fractionQuestion.explanation,
+  });
+  const promptNodes = app.questionRich(fractionQuestion, 'prompt', fractionQuestion.prompt);
+  for (const [index, canonicalChoice] of fractionQuestion.choices.entries()) {
+    const expectedDisplay = fractionDisplayByCanonical.get(String(canonicalChoice));
+    const actualDisplay = fractionQuestion.display?.choices?.[index];
+    const choiceNodes = app.questionChoiceRich(fractionQuestion, index, canonicalChoice);
+    if (actualDisplay !== expectedDisplay || notationByClass(choiceNodes, 'kt-fraction').length !== 1) {
+      violated('rich choice display follows shuffled canonical choices without changing grading', `${canonicalChoice} rendered from ${actualDisplay}`, JSON.stringify(choiceNodes));
+    }
+  }
+  const identityBefore = app.questionIdentity({ ...fractionQuestion, display: { prompt: 'first presentation' } });
+  const identityAfter = app.questionIdentity({ ...fractionQuestion, display: { prompt: 'second presentation' } });
+  if (
+    JSON.stringify({
+      prompt: fractionQuestion.prompt,
+      answer: fractionQuestion.answer,
+      choices: fractionQuestion.choices,
+      explanation: fractionQuestion.explanation,
+    }) !== canonicalBefore ||
+    notationByClass(promptNodes, 'kt-fraction').length !== 2 ||
+    identityBefore !== identityAfter
+  ) {
+    violated('rich choice display follows shuffled canonical choices without changing grading', 'rendering mutated canonical fields, lost the prompt fractions, or changed question identity', JSON.stringify(fractionQuestion));
+  }
+}
 
 // Written arithmetic is an assessed, bounded state machine. It must teach every intermediate
 // operation while keeping unfinished values out of the rendered and accessible view.

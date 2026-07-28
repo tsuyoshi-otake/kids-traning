@@ -27,7 +27,15 @@ internal static partial class LearningMarkupPatcher
                 answer = question.Answer,
                 distractors = question.Distractors,
                 explanation = question.Explanation,
-                activityPrompt = question.ActivityPrompt
+                activityPrompt = question.ActivityPrompt,
+                display = question.Display is null ? null : new
+                {
+                    prompt = question.Display.Prompt,
+                    answer = question.Display.Answer,
+                    choices = question.Display.Choices,
+                    explanation = question.Display.Explanation,
+                    activityPrompt = question.Display.ActivityPrompt
+                }
             })
         });
         var catalogJson = JsonSerializer.Serialize(catalog);

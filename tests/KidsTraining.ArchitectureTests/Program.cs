@@ -176,6 +176,39 @@ internal static class Program
             html.Contains("if(roleButton&&(e.key==='Enter'||e.key===' '))return", StringComparison.Ordinal) &&
             !html.Contains("if(e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button')return", StringComparison.Ordinal),
             "numeric keyboard input is blocked whenever focus remains on an on-screen keypad button");
+        var notationPatchSource = File.ReadAllText(Path.Combine(
+            repositoryRoot,
+            "src",
+            "KidsTraining.App",
+            "Application",
+            "Learning",
+            "Markup",
+            "LearningNotationPatch.cs"));
+        Assert(
+            html.Contains("withRichText(source)", StringComparison.Ordinal) &&
+            html.Contains("withRichInline(source)", StringComparison.Ordinal) &&
+            html.Contains("questionRich(q,field,fallback)", StringComparison.Ordinal) &&
+            html.Contains("questionChoiceRich(q,index,fallback)", StringComparison.Ordinal) &&
+            html.Contains("className:'kt-math kt-rich-math'", StringComparison.Ordinal),
+            "safe Markdown and TeX display helpers are not present in the generated learning runtime");
+        Assert(
+            html.Contains("@media (min-width:761px) and (max-height:700px)", StringComparison.Ordinal) &&
+            html.Contains(":has(.kt-question-prompt .kt-rich-math)", StringComparison.Ordinal) &&
+            html.Contains("height:44px!important; min-height:44px!important", StringComparison.Ordinal) &&
+            html.Contains(".kt-feedback-screen:has(.kt-feedback-explanation .kt-rich-math) { box-sizing:border-box!important; min-height:100dvh!important; padding:12px", StringComparison.Ordinal),
+            "rich mathematics questions do not compact into one low-height desktop viewport");
+        Assert(
+            notationPatchSource.Contains("React.createElement", StringComparison.Ordinal) &&
+            !notationPatchSource.Contains("dangerouslySetInnerHTML", StringComparison.Ordinal) &&
+            !notationPatchSource.Contains(".innerHTML", StringComparison.Ordinal),
+            "rich content rendering is not constrained to escaped React nodes");
+        Assert(
+            html.Contains("const authored=[item.answer].concat(item.distractors||[])", StringComparison.Ordinal) &&
+            html.Contains("displayChoices=q.choices.map", StringComparison.Ordinal) &&
+            html.Contains("onClick:()=>this.submit(c)", StringComparison.Ordinal) &&
+            html.Contains("onSpeak:()=>this.speakEnglish(c)", StringComparison.Ordinal) &&
+            html.Contains("['choices','explanation','display','sessionRole','difficulty']", StringComparison.Ordinal),
+            "rich choice labels can drift from canonical grading, speech, or question identity data");
     }
 
     private static void TestCurriculumPolicy(string repositoryRoot)

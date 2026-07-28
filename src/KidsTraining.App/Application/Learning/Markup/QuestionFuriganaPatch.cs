@@ -18,20 +18,14 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(
             markup,
-            "return{text:c,rowStyle:",
-            "return{text:(q.topic==='kokugo'&&q.subtype==='kanji-choice')?c:this.withFurigana(c),rowStyle:",
-            StringComparison.Ordinal);
-
-        markup = ReplaceRequired(
-            markup,
             "calibChoices=it.choices.map(c=>({text:c,style:choiceTile,onClick:()=>this.calibAnswer(c)}));",
-            "calibChoices=it.choices.map(c=>({text:(cq.topic==='kokugo'&&cq.subtype==='kanji-choice')?c:this.withFurigana(c),style:choiceTile,onClick:()=>this.calibAnswer(c)}));",
+            "calibChoices=it.choices.map((c,index)=>{const choiceFallback=(cq.topic==='kokugo'&&cq.subtype==='kanji-choice')?c:this.withFurigana(c);return{text:this.questionChoiceRich(cq,index,choiceFallback),style:choiceTile,onClick:()=>this.calibAnswer(c)};});",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
             markup,
-            "calibIsPlain:calibIsPlain, calibPrompt:calibPrompt, calibEq:",
-            "calibIsPlain:calibIsPlain, calibPrompt:this.withFurigana(calibPrompt), calibEq:",
+            "else{calibPrompt=cq.prompt;}}",
+            "else{calibPrompt=this.questionRich(cq,'prompt',cq.prompt);}}",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -43,7 +37,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "prompt:q?q.prompt:'', choices:choices,",
-            "prompt:q?this.withFurigana(q.prompt):'', choices:choices,",
+            "prompt:q?this.questionRich(q,'prompt',q.prompt):'', choices:choices,",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -61,13 +55,19 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "fbCorrect:!!lr.correct, fbWrong:lr.correct===false, fbPrompt:fb.prompt||'', fbAnswer:fb.answer||'', fbExplanation:fb.explanation||'',",
-            "fbCorrect:!!lr.correct, fbWrong:lr.correct===false, fbPrompt:this.withFurigana(fb.prompt||''), fbAnswer:this.withFurigana(fb.answer||''), fbExplanation:this.withFurigana(fb.explanation||''),",
+            "fbCorrect:!!lr.correct, fbWrong:lr.correct===false, fbPrompt:this.questionRich(fb,'prompt',fb.prompt||''), fbAnswer:this.questionRich(fb,'answer',fb.answer||''), fbExplanation:this.questionRich(fb,'explanation',fb.explanation||''),",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
             markup,
             "hasPracticePrompt:!!practicePrompt, practicePrompt:practicePrompt,",
             "hasPracticePrompt:!!practicePrompt, practicePrompt:this.withFurigana(practicePrompt),",
+            StringComparison.Ordinal);
+
+        markup = ReplaceRequired(
+            markup,
+            "topicLabel=t.label;",
+            "practicePrompt=this.questionRich(q,'activityPrompt',practicePrompt);topicLabel=t.label;",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -137,6 +137,8 @@ internal static partial class LearningMarkupPatcher
   ]);}
   furiganaTrie(){if(this._furiganaTrie)return this._furiganaTrie;const root=Object.create(null);for(const entry of this.furiganaEntries()){let node=root;for(const ch of entry[0]){if(!node[ch])node[ch]=Object.create(null);node=node[ch];}node.$=entry;}this._furiganaTrie=root;return root;}
   contextualFurigana(surface,reading,text,index){const before=text.slice(0,index),after=text.slice(index+surface.length),number=(before.match(/(\d+)$/)||[])[1],interrogative=before.endsWith('なん');if(surface==='何')return /^[をがに]/.test(after)?'なに':'なん';if(surface==='本'&&interrogative)return 'ぼん';if(surface==='分'&&interrogative)return 'ぷん';if(surface==='分後'&&interrogative)return 'ぷんご';if(surface==='人'&&interrogative)return 'にん';if(surface==='日'&&interrogative)return 'にち';if(surface==='人'){if(number==='1')return 'ひとり';if(number==='2')return 'ふたり';return number?'にん':'ひと';}if(surface==='人分'&&number==='1')return 'ひとりぶん';if(surface==='日')return number?'にち':'ひ';if(surface==='数'&&after.startsWith('え'))return 'かぞ';if(surface==='話'&&after.startsWith('す'))return 'はな';if(surface==='残'&&after.startsWith('さ'))return 'のこ';if(surface==='生'){if(after.startsWith('ま'))return 'う';if(after.startsWith('き'))return 'い';}if(surface==='分'&&after.startsWith('け'))return 'わ';if((surface==='分'||surface==='分後')&&number){const last=Number(number.slice(-1)),pun=last===0||last===1||last===3||last===4||last===6||last===8;return (pun?'ぷん':'ふん')+(surface==='分後'?'ご':'');}if(surface==='本'&&number){const last=Number(number.slice(-1));return last===3?'ぼん':(last===0||last===1||last===6||last===8?'ぽん':'ほん');}return reading;}
+  questionRich(q,field,fallback){const display=q&&q.display;const value=display&&typeof display==='object'&&!Array.isArray(display)?display[field]:(field==='prompt'?display:undefined);return typeof value==='string'&&value.trim()?this.withRichText(value):this.withFurigana(fallback);}
+  questionChoiceRich(q,index,fallback){const display=q&&q.display;const choices=display&&typeof display==='object'&&!Array.isArray(display)?display.choices:undefined;const value=Array.isArray(choices)?choices[index]:undefined;return typeof value==='string'&&value.trim()?this.withRichInline(value):this.withFurigana(fallback);}
   withFurigana(value,skip){if(value===null||value===undefined)return '';if(skip||Array.isArray(value)||React.isValidElement(value))return value;const text=String(value);if(!/[一-龯々]/.test(text))return this.withLearningNotation(text);const trie=this.furiganaTrie(),out=[];let plain='',i=0;const flush=()=>{if(plain){out.push(this.withLearningNotation(plain));plain='';}};while(i<text.length){let node=trie,j=i,best=null;while(j<text.length&&node[text[j]]){node=node[text[j]];j++;if(node.$)best=node.$;}if(!best){plain+=text[i];i++;continue;}flush();const surface=best[0],reading=this.contextualFurigana(surface,best[1],text,i),key='ruby-'+i+'-'+out.length,ruby=React.createElement('ruby',{key:key,style:{rubyPosition:'over'}},surface,React.createElement('rt',{'aria-hidden':true,style:{fontSize:'.46em',fontWeight:700,lineHeight:1}},reading));out.push(ruby,React.createElement('wbr',{key:'break-'+i+'-'+out.length}));i+=surface.length;}flush();return out;}
 """;
     }
