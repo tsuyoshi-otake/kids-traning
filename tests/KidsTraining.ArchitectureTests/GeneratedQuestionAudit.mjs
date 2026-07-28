@@ -256,6 +256,23 @@ for (const sample of writtenCases) {
     violated('long division uses one clean textbook column grid', 'products or remainder did not align with the dividend digits', JSON.stringify(view.lines));
   }
 }
+
+{
+  const plan = app.writtenArithmeticPlan(writtenCases.find((sample) => sample.name === 'two-by-two multiplication').question);
+  const view = app.writtenArithmeticView(plan, 4);
+  const partials = view.lines.filter((line) => line.tone === 'partial');
+  observe('long multiplication shifts partial products by place without printing placeholder zeroes');
+  if (
+    partials.length !== 2 ||
+    partials[0].text.trim() !== '48' ||
+    partials[1].text.trim() !== '36' ||
+    partials[1].text.indexOf('36') !== partials[0].text.indexOf('48') - 1 ||
+    partials.some((line) => /←|段目|□/.test(line.text))
+  ) {
+    violated('long multiplication shifts partial products by place without printing placeholder zeroes', 'partial products were not placed on the textbook column grid', JSON.stringify(view.lines));
+  }
+}
+
 for (const question of [
   { topic: 'mul', difficulty: 5, prompt: '9 × 8', answer: '72' },
   { topic: 'div', difficulty: 4, prompt: '72 ÷ 8', answer: '9' },

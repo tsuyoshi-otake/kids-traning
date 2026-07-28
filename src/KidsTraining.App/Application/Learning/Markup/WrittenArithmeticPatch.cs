@@ -16,7 +16,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "if(modeTyping){const canonical=String(q.answer||'').toLowerCase(),",
-            "const writtenPlan=this.writtenArithmeticPlan(q);if(writtenPlan){modeWrittenSteps=true;modeNumeric=false;modeChoices=false;modeHissan=false;isPlainEq=false;const writtenView=this.writtenArithmeticView(writtenPlan,S.waStep);writtenStepLabel=writtenView.stepLabel;writtenStepPrompt=writtenView.stepPrompt;writtenAria=writtenView.aria;writtenNote=writtenView.note;writtenHasNote=!!writtenView.note;writtenBoardLines=writtenView.lines;writtenDensity=writtenView.lines.length>7?'dense':'normal';writtenPrevious=writtenView.previous;writtenHasPrevious=!!writtenView.previous;writtenHasError=!!S.waError;writtenError=S.waError||'';if(S.waStepChoices){showWrittenChoices=true;writtenChoiceTiles=S.waStepChoices.map(c=>({text:c,ariaLabel:c+' を途中の答えとして入力',style:choiceSm,onClick:()=>this.submitWrittenStep(c)}));}}\n      if(modeTyping){const canonical=String(q.answer||'').toLowerCase(),",
+            "const writtenPlan=this.writtenArithmeticPlan(q);if(writtenPlan){modeWrittenSteps=true;modeNumeric=false;modeChoices=false;modeHissan=false;isPlainEq=false;const writtenView=this.writtenArithmeticView(writtenPlan,S.waStep);writtenStepLabel=writtenView.stepLabel;writtenStepPrompt=writtenView.stepPrompt;writtenAria=writtenView.aria;writtenNote=writtenView.note;writtenHasNote=!!writtenView.note;writtenBoardLines=writtenView.lines;writtenDensity=writtenView.lines.length>10?'ultra':writtenView.lines.length>7?'dense':'normal';writtenPrevious=writtenView.previous;writtenHasPrevious=!!writtenView.previous;writtenHasError=!!S.waError;writtenError=S.waError||'';if(S.waStepChoices){showWrittenChoices=true;writtenChoiceTiles=S.waStepChoices.map(c=>({text:c,ariaLabel:c+' を途中の答えとして入力',style:choiceSm,onClick:()=>this.submitWrittenStep(c)}));}}\n      if(modeTyping){const canonical=String(q.answer||'').toLowerCase(),",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
@@ -148,7 +148,7 @@ internal static partial class LearningMarkupPatcher
       lines.push({text:'  '+pad(readyLeft?plan.leftDigits:blank,width),tone:'number'});
       lines.push({text:'× '+pad(readyRight?plan.rightDigits:blank,width),tone:'number'});
       lines.push({text:'─'.repeat(width+2),tone:'rule'});
-      const partialRows=plan.partials.map((value,row)=>{const chars=Array(width).fill(blank);for(let i=0;i<row;i++)chars[i]='0';for(const step of done.filter(item=>item.phase==='partial'&&item.row===row))for(const write of step.writes)chars[write.position]=write.digit;return chars.reverse().join('');});
+      const partialRows=plan.partials.map((value,row)=>{const chars=Array(width).fill(blank);for(const step of done.filter(item=>item.phase==='partial'&&item.row===row))for(const write of step.writes)chars[write.position]=write.digit;return chars.reverse().join('');});
       partialRows.forEach(text=>lines.push({text:'  '+text,tone:'partial'}));
       if(plan.partials.length>1){const result=Array(width).fill(blank);for(const step of done.filter(item=>item.phase==='sum')){result[step.column]=step.writeDigit;if(step.carry&&step.column+1<result.length)result[step.column+1]=String(step.carry);}lines.push({text:'─'.repeat(width+2),tone:'rule'});lines.push({text:'  '+result.reverse().join(''),tone:'result'});}
       if(plan.decimalPlaces)lines.push({text:doneHas('decimal')?'小数点を右から'+plan.decimalPlaces+'けた戻す':'小数点の位置　'+blank,tone:'caption'});
@@ -225,6 +225,7 @@ internal static partial class LearningMarkupPatcher
   .kt-written-step-note{background:#fff7ec;border:3px solid #f0e2c8;border-radius:16px;padding:9px 14px;color:#765f3d;font-size:17px;font-weight:800;text-align:center;}
   .kt-written-step-board{box-sizing:border-box;max-width:100%;min-height:190px;overflow-x:auto;background:#fffdf8;border:4px solid #f0e2c8;border-radius:26px;padding:18px 24px;box-shadow:0 5px 0 #ead9bd;color:#3a3326;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:clamp(29px,4.6vw,48px);font-weight:900;line-height:1.08;font-variant-numeric:tabular-nums;}
   .kt-written-step-board[data-density="dense"]{font-size:clamp(27px,3.5vw,38px);}
+  .kt-written-step-board[data-density="ultra"]{font-size:clamp(22px,2.7vw,30px);}
   .kt-written-step-line{width:max-content;min-width:0;margin-inline:auto;white-space:pre;text-align:left;}
   .kt-written-step-line[data-tone="marks"]{color:#b85e1f;line-height:.9;}
   .kt-written-step-line[data-tone="caption"]{width:100%;color:#b85e1f;font-family:'Zen Maru Gothic',sans-serif;font-size:.42em;line-height:1.5;text-align:center;}
@@ -250,9 +251,9 @@ internal static partial class LearningMarkupPatcher
   }
   @media (min-width:761px) and (max-height:700px){
     .kt-written-step-shell{gap:18px;margin-top:6px;}.kt-written-step-work,.kt-written-step-controls{gap:5px;}
-    .kt-written-step-note{display:none;}.kt-written-step-board{min-height:0;padding:5px 12px;border-width:3px;border-radius:18px;box-shadow:0 3px 0 #ead9bd;font-size:clamp(24px,5.1vh,30px);line-height:1.01;}.kt-written-step-board[data-density="dense"]{font-size:clamp(20px,3.9vh,23px);}
+    .kt-written-step-note{display:none;}.kt-written-step-board{min-height:0;max-height:248px;overflow:auto;padding:5px 12px;border-width:3px;border-radius:18px;box-shadow:0 3px 0 #ead9bd;font-size:clamp(27px,5.3vh,30px);line-height:.99;}.kt-written-step-board[data-density="dense"]{font-size:clamp(27px,5.2vh,29px);}.kt-written-step-board[data-density="ultra"]{font-size:clamp(18px,3.6vh,21px);}
     .kt-written-step-instruction{padding:5px 10px;border-width:2px;border-radius:12px;}.kt-written-step-count{font-size:12px;}.kt-written-step-prompt{font-size:clamp(16px,2.8vh,20px);line-height:1.2;margin-top:1px;}
-    .kt-written-step-previous{padding:4px 9px;border-width:2px;border-radius:10px;font-size:13px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .kt-written-step-previous{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important;}
     .kt-written-step-answer{min-height:44px;border-width:3px;border-radius:12px;font-size:28px;}.kt-written-step-hint,.kt-written-step-error{padding:5px 9px;border-width:2px;border-radius:10px;font-size:13px;line-height:1.2;}
     .kt-written-step-choice-label{font-size:13px;margin-bottom:4px;}.kt-written-step-choice-grid{gap:6px;}.kt-written-step-pad{gap:6px;}.kt-written-step-pad [role="button"]{height:44px!important;min-height:44px!important;font-size:20px!important;border-radius:12px!important;}
     .kt-written-step-controls:has(.kt-written-step-choices) .kt-written-step-pad{display:none;}

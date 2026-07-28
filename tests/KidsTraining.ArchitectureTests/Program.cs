@@ -165,7 +165,9 @@ internal static class Program
             html.Contains("@media (min-width:761px) and (max-height:700px)", StringComparison.Ordinal) &&
             html.Contains("@media (max-width:760px) and (max-height:900px)", StringComparison.Ordinal) &&
             html.Contains("div:has(> .kt-written-step-shell) > .kt-question-metadata{display:grid!important", StringComparison.Ordinal) &&
-            html.Contains("writtenDensity=writtenView.lines.length>7?'dense':'normal'", StringComparison.Ordinal) &&
+            html.Contains("writtenDensity=writtenView.lines.length>10?'ultra':writtenView.lines.length>7?'dense':'normal'", StringComparison.Ordinal) &&
+            html.Contains(".kt-written-step-board[data-density=\"ultra\"]", StringComparison.Ordinal) &&
+            html.Contains("max-height:248px;overflow:auto", StringComparison.Ordinal) &&
             html.Contains("height:44px!important;min-height:44px!important", StringComparison.Ordinal) &&
             html.Contains(".kt-written-step-controls:has(.kt-written-step-choices) .kt-written-step-pad{display:none;}", StringComparison.Ordinal),
             "written-work controls do not compact into one no-scroll desktop viewport");
