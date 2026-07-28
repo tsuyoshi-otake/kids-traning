@@ -41,8 +41,9 @@ const appSource = page.slice(sourceStart, sourceEnd);
 // The audit only calls pure generator methods, so the framework base class needs no more
 // than a state sink. Anything that reaches for the DOM would throw and be reported.
 class DCLogic {
-  setState(patch) {
+  setState(patch, callback) {
     Object.assign(this.state, patch);
+    if (typeof callback === 'function') callback();
   }
 }
 const React = {
@@ -190,33 +191,161 @@ assertNotation('English grammar notation', 'have+過去分詞', { unchanged: tru
 assertNotation('English colon label', 'note: value', { unchanged: true });
 assertNotation('English hyphenated word', 'e-mail', { unchanged: true });
 
-// Written arithmetic is intentionally presentation-only. Check its narrow gate directly so
-// ordinary multiplication tables and fractions never become a long-division-style exercise.
-const writtenLayout = (question, check) => {
-  observe(check);
-  const layout = app.writtenArithmeticLayout(question);
-  if (!layout) violated(check, `did not produce a layout for ${question.prompt}`, JSON.stringify(question));
-  return layout;
-};
-for (const prompt of ['1234 + 111', '9000 - 111', '123 × 7', '12 × 34']) {
-  const layout = writtenLayout({ topic: 'hissan', difficulty: 5, prompt, answer: 'hidden' }, 'advanced hissan arithmetic renders in columns');
-  if (layout?.kind !== 'column') violated('advanced hissan arithmetic renders in columns', `${prompt} returned ${layout?.kind}`, JSON.stringify(layout));
+// Written arithmetic is an assessed, bounded state machine. It must teach every intermediate
+// operation while keeping unfinished values out of the rendered and accessible view.
+const writtenCases = [
+  { name: 'multi-digit addition', question: { topic: 'hissan', difficulty: 5, prompt: '1234 + 111', answer: '1345' }, kind: 'addition', expects: ['5', '4', '3', '1'] },
+  { name: 'multi-digit subtraction', question: { topic: 'hissan', difficulty: 5, prompt: '9000 - 111', answer: '8889' }, kind: 'subtraction', expects: ['9', '8', '8', '8'] },
+  { name: 'three-by-one multiplication', question: { topic: 'hissan', difficulty: 5, prompt: '123 × 7', answer: '861' }, kind: 'multiplication', expects: ['21', '16', '8'] },
+  { name: 'two-by-two multiplication', question: { topic: 'hissan', difficulty: 5, prompt: '12 × 34', answer: '408' }, kind: 'multiplication', expects: ['8', '4', '6', '3', '8', '10', '4'] },
+  { name: '864 long division', question: { topic: 'kazu', difficulty: 2, prompt: '864÷24は？', answer: '36' }, kind: 'division', expects: ['3', '72', '14', '144', '6', '144', '0'] },
+  { name: 'one-place decimal multiplication', question: { topic: 'kazu', difficulty: 3, prompt: '3.6×4は？', answer: '14.4' }, kind: 'multiplication', expects: ['36', '24', '14', '1'] },
+  { name: 'two-place decimal multiplication', question: { topic: 'kazu', difficulty: 3, prompt: '2.4×0.5は？', answer: '1.2' }, kind: 'multiplication', expects: ['24', '5', '20', '12', '2'] },
+  { name: 'decimal long division', question: { topic: 'kazu', difficulty: 4, prompt: '3.6÷0.9は？', answer: '4' }, kind: 'division', expects: ['36', '9', '4', '36', '0'] },
+  { name: 'remainder long division', question: { topic: 'div', difficulty: 5, prompt: '157 ÷ 9', answer: '17 あまり 4' }, kind: 'division', expects: ['1', '9', '6', '67', '7', '63', '4'] },
+];
+for (const sample of writtenCases) {
+  observe('written arithmetic plans every required intermediate operation');
+  const plan = app.writtenArithmeticPlan(sample.question);
+  if (!plan) {
+    violated('written arithmetic plans every required intermediate operation', `${sample.name} produced no plan`, JSON.stringify(sample.question));
+    continue;
+  }
+  const expects = plan.steps.map((step) => String(step.expect));
+  if (plan.kind !== sample.kind || JSON.stringify(expects) !== JSON.stringify(sample.expects)) {
+    violated('written arithmetic plans every required intermediate operation', `${sample.name} returned ${plan.kind} ${JSON.stringify(expects)}`, JSON.stringify(plan));
+  }
+  for (let completed = 0; completed <= plan.steps.length; completed += 1) {
+    observe('written arithmetic views are bounded and never expose unfinished answers');
+    const view = app.writtenArithmeticView(plan, completed);
+    const rendered = JSON.stringify(view);
+    if (/undefined|NaN|\[object/.test(rendered) || !Array.isArray(view.lines) || !view.aria) {
+      violated('written arithmetic views are bounded and never expose unfinished answers', `${sample.name} rendered invalid state at ${completed}`, rendered);
+    }
+    if (completed === 0 && rendered.includes(String(sample.question.answer))) {
+      violated('written arithmetic views are bounded and never expose unfinished answers', `${sample.name} exposed the final answer before work began`, rendered);
+    }
+    const active = plan.steps[completed];
+    if (active && view.stepPrompt !== active.prompt) {
+      violated('written arithmetic views are bounded and never expose unfinished answers', `${sample.name} skipped active step ${completed}`, rendered);
+    }
+  }
 }
-for (const prompt of ['864÷24は？', '3.6×4は？', '2.4×0.5は？', '3.6÷0.9は？']) {
-  const layout = writtenLayout({ topic: 'audit', difficulty: 1, prompt, answer: 'secret-answer' }, 'fixed upper-grade arithmetic renders as written arithmetic');
-  if (!['column', 'division'].includes(layout?.kind)) violated('fixed upper-grade arithmetic renders as written arithmetic', `${prompt} returned ${layout?.kind}`, JSON.stringify(layout));
-  if (layout?.kind === 'division' && (layout.quotient || String(layout.aria || '').includes('secret-answer'))) {
-    violated('division layouts never reveal the answer', `${prompt} exposed ${layout.quotient || layout.aria}`, JSON.stringify(layout));
-  } else if (layout?.kind === 'division') observe('division layouts never reveal the answer');
+
+{
+  const plan = app.writtenArithmeticPlan(writtenCases.find((sample) => sample.name === '864 long division').question);
+  const view = app.writtenArithmeticView(plan, plan.steps.length);
+  const arithmeticLines = view.lines.filter((line) => line.tone !== 'caption');
+  const widths = new Set(arithmeticLines.map((line) => line.text.length));
+  observe('long division uses one clean textbook column grid');
+  if (widths.size !== 1 || arithmeticLines.some((line) => /←|を下ろす|段目|□/.test(line.text))) {
+    violated('long division uses one clean textbook column grid', 'rows were not equally aligned or contained inline teaching annotations', JSON.stringify(view.lines));
+  }
+  const dividendLine = arithmeticLines.find((line) => line.tone === 'number' && line.text.includes('864'));
+  const firstProduct = arithmeticLines.find((line) => line.tone === 'partial' && line.text.includes('72'));
+  const secondProducts = arithmeticLines.filter((line) => line.tone === 'partial' && line.text.includes('144'));
+  const finalRemainder = [...arithmeticLines].reverse().find((line) => line.tone === 'result' && line.text.trim() === '0');
+  const dividendStart = dividendLine?.text.indexOf('864') ?? -1;
+  if (
+    dividendStart < 0 ||
+    firstProduct?.text.indexOf('72') !== dividendStart ||
+    secondProducts.length !== 1 ||
+    secondProducts[0].text.indexOf('144') !== dividendStart ||
+    finalRemainder?.text.indexOf('0') !== dividendStart + 2
+  ) {
+    violated('long division uses one clean textbook column grid', 'products or remainder did not align with the dividend digits', JSON.stringify(view.lines));
+  }
 }
 for (const question of [
   { topic: 'mul', difficulty: 5, prompt: '9 × 8', answer: '72' },
+  { topic: 'div', difficulty: 4, prompt: '72 ÷ 8', answer: '9' },
   { topic: 'frac', difficulty: 5, prompt: '2/3×3/5', answer: '2/5' },
+  { topic: 'frac', difficulty: 5, prompt: '3/4÷2/5', answer: '15/8' },
 ]) {
-  observe('ordinary multiplication and fractions stay out of written-arithmetic layout');
-  if (app.writtenArithmeticLayout(question) !== null) {
-    violated('ordinary multiplication and fractions stay out of written-arithmetic layout', `${question.prompt} was incorrectly converted`, JSON.stringify(question));
+  observe('basic facts and fractions stay out of written-arithmetic steps');
+  if (app.writtenArithmeticPlan(question) !== null) {
+    violated('basic facts and fractions stay out of written-arithmetic steps', `${question.prompt} was incorrectly converted`, JSON.stringify(question));
   }
+}
+
+// Exercise the actual controller, including assisted work, success, terminal failure, and
+// duplicate-submit protection. All branches must release the in-flight guard.
+{
+  const question = writtenCases.find((sample) => sample.name === '864 long division').question;
+  const plan = app.writtenArithmeticPlan(question);
+  const originals = { finish: app.finishScoredQuestion, exhaust: app.exhaustQuestion, reveal: app.revealAnswer, sfx: app.sfx };
+  let finished = 0;
+  let exhausted = 0;
+  let revealed = 0;
+  app.sfx = () => {};
+  app.finishScoredQuestion = () => { finished += 1; app._terminalQuestionToken = app.currentQuestionToken(); };
+  app.exhaustQuestion = () => { exhausted += 1; app._terminalQuestionToken = app.currentQuestionToken(); };
+  app.revealAnswer = () => { revealed += 1; app._terminalQuestionToken = app.currentQuestionToken(); };
+  app.state = { session: { attempt: 1, idx: 0, questions: [question], rolePlan: ['kazu'] }, input: '', waStep: 0, waMistakes: 0, waStepMiss: 0, waStepChoices: null, combo: 0 };
+  app._terminalQuestionToken = '';
+  app._answerBusy = false;
+  app.submitWrittenStep('99');
+  observe('written arithmetic controller reaches exactly one explicit terminal state');
+  if (app.state.waStep !== 0 || app.state.waMistakes !== 1 || app._answerBusy) {
+    violated('written arithmetic controller reaches exactly one explicit terminal state', 'a recoverable error skipped a step or retained the busy lock', JSON.stringify(app.state));
+  }
+  for (const step of plan.steps) app.submitWrittenStep(step.expect);
+  app.submitWrittenStep(plan.steps.at(-1).expect);
+  if (finished !== 1 || exhausted !== 0 || revealed !== 0 || app._answerBusy) {
+    violated('written arithmetic controller reaches exactly one explicit terminal state', `success terminals: finish=${finished}, exhaust=${exhausted}, reveal=${revealed}, busy=${app._answerBusy}`, JSON.stringify(app.state));
+  }
+  app.state = { session: { attempt: 2, idx: 0, questions: [question], rolePlan: ['kazu'] }, input: '', waStep: 0, waMistakes: 0, waStepMiss: 0, waStepChoices: null, combo: 0 };
+  app._terminalQuestionToken = '';
+  app._answerBusy = false;
+  app.submitWrittenStep('99');
+  app.submitWrittenStep('99');
+  app.submitWrittenStep('99');
+  if (finished !== 1 || exhausted !== 1 || revealed !== 0 || app._answerBusy) {
+    violated('written arithmetic controller reaches exactly one explicit terminal state', `failure terminals: finish=${finished}, exhaust=${exhausted}, reveal=${revealed}, busy=${app._answerBusy}`, JSON.stringify(app.state));
+  }
+  Object.assign(app, { finishScoredQuestion: originals.finish, exhaustQuestion: originals.exhaust, revealAnswer: originals.reveal, sfx: originals.sfx });
+}
+
+// A paused exercise must reopen on the same intermediate operation, with the same assisted
+// choices and error accounting. The checkpoint stores state, never a second copy of the plan.
+{
+  const question = writtenCases.find((sample) => sample.name === 'two-by-two multiplication').question;
+  const originals = { curP: app.curP, valid: app.validLearningCheckpoint };
+  const priorStorage = globalThis.localStorage;
+  const values = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: (key) => values.delete(key),
+  };
+  app.curP = () => ({ name: 'audit' });
+  app.state = {
+    screen: 'quiz',
+    session: { attempt: 3, idx: 0, questions: [question], rolePlan: ['hissan'] },
+    combo: 0,
+    input: '1',
+    waStep: 3,
+    waMistakes: 2,
+    waStepMiss: 1,
+    waStepChoices: null,
+    waHint: '途中のヒント',
+    waError: '',
+  };
+  const checkpoint = app.checkpointState();
+  observe('written arithmetic checkpoint restores the exact active step');
+  if (!checkpoint || checkpoint.waStep !== 3 || checkpoint.waMistakes !== 2 || checkpoint.waHint !== '途中のヒント') {
+    violated('written arithmetic checkpoint restores the exact active step', 'checkpoint serialization dropped written-work state', JSON.stringify(checkpoint));
+  }
+  values.set(app.learningCheckpointKey(), JSON.stringify(checkpoint));
+  app.validLearningCheckpoint = () => true;
+  app.state = {};
+  if (!app.restoreLearningCheckpoint() || app.state.waStep !== 3 || app.state.waMistakes !== 2 || app.state.input !== '1' || app.state.waHint !== '途中のヒント') {
+    violated('written arithmetic checkpoint restores the exact active step', 'checkpoint restore changed the active written-work state', JSON.stringify(app.state));
+  }
+  app.curP = originals.curP;
+  app.validLearningCheckpoint = originals.valid;
+  if (priorStorage === undefined) delete globalThis.localStorage;
+  else globalThis.localStorage = priorStorage;
 }
 const shouldAppendNumericQuestionMark = (question) => question.mode === 'num' && question.topic !== 'story' && !/[=?]/.test(String(question.prompt || ''));
 observe('numeric prompts add exactly one answer marker only when needed', 2);
@@ -549,6 +678,39 @@ for (const unit of UNITS) {
               `the walkthrough writes ${written} while the answer is ${answer}`,
               `${context} | ${explanation}`,
             );
+          }
+        }
+
+        const writtenPlan = app.writtenArithmeticPlan(question);
+        if (writtenPlan) {
+          observe('generated written arithmetic has a complete finite step plan');
+          if (!Array.isArray(writtenPlan.steps) || writtenPlan.steps.length < 1 || writtenPlan.steps.length > 40) {
+            violated('generated written arithmetic has a complete finite step plan', `step count was ${writtenPlan.steps?.length}`, context);
+          }
+          for (const [stepIndex, step] of (writtenPlan.steps || []).entries()) {
+            if (!step || !/^\d+$/.test(String(step.expect)) || !step.prompt || !step.explain || !step.completeText) {
+              violated('generated written arithmetic has a complete finite step plan', `step ${stepIndex} is incomplete`, `${context} | ${JSON.stringify(step)}`);
+            }
+          }
+          const arithmetic = String(question.prompt).replace(/\s+/g, '').replace(/は？$/, '').replace(/[？?]$/, '').match(/^(\d+(?:\.\d+)?)([+\-−×÷])(\d+(?:\.\d+)?)$/);
+          if (!arithmetic) {
+            violated('generated written arithmetic has a complete finite step plan', 'a non-arithmetic prompt entered the written-work gate', context);
+          } else {
+            const left = Number(arithmetic[1]);
+            const right = Number(arithmetic[3]);
+            const operator = arithmetic[2] === '−' ? '-' : arithmetic[2];
+            const expected = operator === '+' ? String(left + right) : operator === '-' ? String(left - right) : operator === '×' ? String(left * right) : null;
+            if (expected !== null && Number(question.answer) !== Number(expected)) {
+              violated('generated written arithmetic has a complete finite step plan', `canonical answer ${question.answer} disagrees with ${expected}`, context);
+            }
+            if (operator === '÷') {
+              const quotient = Math.floor(left / right);
+              const remainder = Math.round((left - quotient * right) * 1e9) / 1e9;
+              const canonical = remainder === 0 ? String(quotient) : `${quotient} あまり ${remainder}`;
+              if (String(question.answer) !== canonical) {
+                violated('generated written arithmetic has a complete finite step plan', `division answer ${question.answer} disagrees with ${canonical}`, context);
+              }
+            }
           }
         }
 

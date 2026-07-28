@@ -130,6 +130,50 @@ internal static class Program
             html.Contains("if(q.isFracViz)row.ariaLabel=", StringComparison.Ordinal) &&
             html.Contains("if(q.isTape)row.ariaLabel=", StringComparison.Ordinal),
             "order, fraction, or tape-diagram visuals are missing answer-relevant accessible descriptions");
+        Assert(
+            html.Contains("modeWrittenSteps:modeWrittenSteps", StringComparison.Ordinal) &&
+            html.Contains("submitWrittenStep(val)", StringComparison.Ordinal) &&
+            html.Contains("writtenArithmeticPlan(q)", StringComparison.Ordinal),
+            "written multiplication and division are not routed through an interactive step controller");
+        Assert(
+            html.Contains("class=\"kt-written-step-board\" data-density=\"{{ writtenDensity }}\" role=\"img\" aria-label=\"{{ writtenAria }}\"", StringComparison.Ordinal) &&
+            html.Contains("class=\"kt-written-step-line\" data-tone=\"{{ line.tone }}\" aria-hidden=\"true\"", StringComparison.Ordinal) &&
+            html.Contains("role=\"status\" aria-live=\"polite\" aria-atomic=\"true\"", StringComparison.Ordinal),
+            "written-work progress does not expose one answer-safe description and a live active-step announcement");
+        Assert(
+            html.Contains("const arithmeticLines=lines.filter(line=>line.tone!==\'caption\')", StringComparison.Ordinal) &&
+            html.Contains("line.text=String(line.text).padEnd(boardWidth,\' \')", StringComparison.Ordinal) &&
+            html.Contains(".kt-written-step-line{width:max-content;min-width:0;margin-inline:auto;white-space:pre;text-align:left;}", StringComparison.Ordinal) &&
+            !html.Contains("← \'+iteration.nextDigit+\'を下ろす", StringComparison.Ordinal) &&
+            !html.Contains("← \'+(row+1)+\'段目", StringComparison.Ordinal) &&
+            !html.Contains("const blank=\'□\'", StringComparison.Ordinal),
+            "written-work rows are not a clean shared column grid or still show placeholder/inline annotations");
+        Assert(
+            html.Contains("class=\"kt-written-step-controls\"", StringComparison.Ordinal) &&
+            html.Contains("@media (min-width:761px) and (max-height:900px)", StringComparison.Ordinal) &&
+            html.Contains(".kt-written-step-board{min-height:0", StringComparison.Ordinal) &&
+            html.Contains("height:clamp(48px,7.2vh,64px)!important", StringComparison.Ordinal),
+            "written-work does not use a viewport-height-aware control column and compact board");
+        Assert(
+            html.Contains("aria-label=\"{{ k.ariaLabel }}\" onclick=\"{{ k.onClick }}\"", StringComparison.Ordinal) &&
+            html.Contains("min-width:44px;min-height:44px", StringComparison.Ordinal) &&
+            html.Contains(":focus-visible{outline:4px solid #155eef", StringComparison.Ordinal) &&
+            html.Contains("@media (prefers-reduced-motion:reduce)", StringComparison.Ordinal),
+            "written-work controls lack keyboard semantics, target size, focus indication, or reduced-motion handling");
+        Assert(
+            html.Contains("class=\"kt-written-step-controls\"", StringComparison.Ordinal) &&
+            html.Contains("@media (min-width:761px) and (max-height:700px)", StringComparison.Ordinal) &&
+            html.Contains("@media (max-width:760px) and (max-height:900px)", StringComparison.Ordinal) &&
+            html.Contains("div:has(> .kt-written-step-shell) > .kt-question-metadata{display:grid!important", StringComparison.Ordinal) &&
+            html.Contains("writtenDensity=writtenView.lines.length>7?'dense':'normal'", StringComparison.Ordinal) &&
+            html.Contains("height:44px!important;min-height:44px!important", StringComparison.Ordinal) &&
+            html.Contains(".kt-written-step-controls:has(.kt-written-step-choices) .kt-written-step-pad{display:none;}", StringComparison.Ordinal),
+            "written-work controls do not compact into one no-scroll desktop viewport");
+        Assert(
+            html.Contains("const roleButton=!!(e.target&&e.target.getAttribute", StringComparison.Ordinal) &&
+            html.Contains("if(roleButton&&(e.key==='Enter'||e.key===' '))return", StringComparison.Ordinal) &&
+            !html.Contains("if(e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button')return", StringComparison.Ordinal),
+            "numeric keyboard input is blocked whenever focus remains on an on-screen keypad button");
     }
 
     private static void TestCurriculumPolicy(string repositoryRoot)

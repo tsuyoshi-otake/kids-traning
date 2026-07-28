@@ -83,7 +83,7 @@ Curriculum scope, stable unit IDs, assessment modes, and official references are
 Build new releases with a version that matches the release tag:
 
 ```powershell
-rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.27.0
+rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.27.1
 ```
 
 Publish a GitHub Release such as `v1.20.0` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
