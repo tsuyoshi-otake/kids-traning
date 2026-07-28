@@ -105,6 +105,31 @@ internal static class Program
         Assert(
             explicitFailures.Any(static failure => failure.Code == "unlock-message"),
             "a missing generated runtime marker did not produce an explicit contract failure");
+
+        Assert(
+            html.Contains("role=\"img\" aria-label=\"{{ mrow.ariaLabel }}\"", StringComparison.Ordinal) &&
+            html.Contains("<div aria-hidden=\"true\" style=\"{{ mcell.style }}\">", StringComparison.Ordinal),
+            "visual learning aids do not expose one concise accessible description while hiding decorative cells");
+        Assert(
+            html.Contains("role=\"img\" aria-label=\"{{ fr.ariaLabel }}\"", StringComparison.Ordinal) &&
+            html.Contains("<div aria-hidden=\"true\" style=\"{{ fr.boxStyle }}\">", StringComparison.Ordinal),
+            "addition and subtraction ten-frames lack an accessible description or expose decorative dots");
+        Assert(
+            html.Contains("width:100%; max-width:720px; min-width:0;", StringComparison.Ordinal) &&
+            html.Contains("overflow-x:auto;", StringComparison.Ordinal),
+            "wide visual learning aids can escape the question area instead of using a bounded local scroller");
+        Assert(
+            html.Contains("width:min(240px,72vw)", StringComparison.Ordinal) &&
+            html.Contains("Number(q.h)", StringComparison.Ordinal) &&
+            html.Contains("Number(q.m)", StringComparison.Ordinal) &&
+            html.Contains("+'時'+", StringComparison.Ordinal) &&
+            html.Contains("+'分を示す時計。'", StringComparison.Ordinal),
+            "clock accessibility does not describe the shown hour, minute, and question context");
+        Assert(
+            html.Contains("if(q.isOrder)row.ariaLabel=", StringComparison.Ordinal) &&
+            html.Contains("if(q.isFracViz)row.ariaLabel=", StringComparison.Ordinal) &&
+            html.Contains("if(q.isTape)row.ariaLabel=", StringComparison.Ordinal),
+            "order, fraction, or tape-diagram visuals are missing answer-relevant accessible descriptions");
     }
 
     private static void TestCurriculumPolicy(string repositoryRoot)

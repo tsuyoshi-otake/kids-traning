@@ -114,6 +114,119 @@ assertFurigana('担当', 'たんとう');
 assertFurigana('学校', 'がっこう');
 assertFurigana('記録', 'きろく');
 
+// The production formatter returns React nodes, so inspect the whole stub tree rather than
+// relying on a string snapshot. This protects the semantic class, accessible label, and
+// visible glyph independently.
+const notationNodes = (value, nodes = []) => {
+  if (Array.isArray(value)) {
+    for (const child of value) notationNodes(child, nodes);
+    return nodes;
+  }
+  if (!value || typeof value !== 'object' || !value.type) return nodes;
+  nodes.push(value);
+  for (const child of value.children || []) notationNodes(child, nodes);
+  return nodes;
+};
+const notationText = (value) => {
+  if (Array.isArray(value)) return value.map(notationText).join('');
+  if (value === null || value === undefined) return '';
+  if (typeof value !== 'object') return String(value);
+  return (value.children || []).map(notationText).join('');
+};
+const notationClass = (node, name) => String(node.props?.className || '').split(/\s+/).includes(name);
+const notationByClass = (rendered, name) => notationNodes(rendered).filter((node) => notationClass(node, name));
+const notationLabels = (rendered) => notationNodes(rendered).map((node) => node.props?.['aria-label']).filter(Boolean);
+const assertNotation = (name, source, expectation) => {
+  const gradingData = { prompt: source, answer: 'unchanged-answer', choices: ['unchanged-choice'] };
+  const canonical = JSON.stringify(gradingData);
+  const rendered = app.withLearningNotation(gradingData.prompt);
+  observe('learning notation keeps canonical grading data and exposes semantic React nodes');
+  if (JSON.stringify(gradingData) !== canonical) {
+    violated('learning notation keeps canonical grading data and exposes semantic React nodes', `${name} mutated a canonical question field`, canonical);
+  }
+  const text = notationText(rendered);
+  const labels = notationLabels(rendered);
+  const count = (className) => notationByClass(rendered, className).length;
+  if (expectation.unchanged) {
+    if (rendered !== source || notationNodes(rendered).length !== 0 || text !== source) {
+      violated('learning notation keeps canonical grading data and exposes semantic React nodes', `${name} was transformed although it is not mathematics`, JSON.stringify(rendered));
+    }
+    return;
+  }
+  if (count('kt-fraction') !== (expectation.fractions || 0)) {
+    violated('learning notation keeps canonical grading data and exposes semantic React nodes', `${name} rendered ${count('kt-fraction')} fractions, expected ${expectation.fractions || 0}`, JSON.stringify(rendered));
+  }
+  for (const className of [expectation.className, ...(expectation.classNames || [])].filter(Boolean)) {
+    if (count(className) === 0) {
+      violated('learning notation keeps canonical grading data and exposes semantic React nodes', `${name} lacks ${className}`, JSON.stringify(rendered));
+    }
+  }
+  for (const label of expectation.labels || []) {
+    if (!labels.includes(label)) {
+      violated('learning notation keeps canonical grading data and exposes semantic React nodes', `${name} lacks accessible operator label ${label}`, JSON.stringify(rendered));
+    }
+  }
+  if (expectation.text && !text.includes(expectation.text)) {
+    violated('learning notation keeps canonical grading data and exposes semantic React nodes', `${name} does not expose visible text ${expectation.text}`, JSON.stringify(rendered));
+  }
+};
+assertNotation('compact fraction multiplication', '2/3×3/5', { fractions: 2, className: 'kt-math-operator', labels: ['かける'] });
+assertNotation('ASCII fraction multiplication', '2/3*3/5', { fractions: 2, className: 'kt-math-operator', labels: ['かける'], text: '×' });
+assertNotation('spaced fraction multiplication', '2/3 × 3/5', { fractions: 2, className: 'kt-math-operator', labels: ['かける'] });
+assertNotation('spaced subtraction', '16 - 6', { className: 'kt-math-operator', labels: ['ひく'], text: '−' });
+assertNotation('algebraic fraction equation', 'x/3+2=6', { fractions: 1, className: 'kt-math-operator', labels: ['たす', 'イコール'] });
+assertNotation('radical', '√48', { className: 'kt-radical' });
+assertNotation('superscript', 'x²', { className: 'kt-power' });
+assertNotation('signed algebraic solution', 'x=±3', { className: 'kt-math-operator', labels: ['イコール', 'プラスマイナス'], text: '±' });
+assertNotation('unary negative literal', '-11', { className: 'kt-math-operator', labels: ['マイナス'], text: '−' });
+assertNotation('negative solution list', 'x=-2, -3', { className: 'kt-math-operator', labels: ['イコール', 'マイナス'], text: '−' });
+assertNotation('exponent subtraction', 'x²-9', { classNames: ['kt-power', 'kt-math-operator'], labels: ['ひく'], text: '−' });
+assertNotation('exponent addition', 'x²+2x', { classNames: ['kt-power', 'kt-math-operator'], labels: ['たす'] });
+assertNotation('ASCII ratio', '12:18', { className: 'kt-ratio', labels: ['12対18'] });
+assertNotation('full-width ratio', '2：3', { className: 'kt-ratio', labels: ['2対3'] });
+assertNotation('speed unit', '80km/h', { unchanged: true });
+assertNotation('English ordering separators', 'I / play / tennis', { unchanged: true });
+assertNotation('English grammar notation', 'have+過去分詞', { unchanged: true });
+assertNotation('English colon label', 'note: value', { unchanged: true });
+assertNotation('English hyphenated word', 'e-mail', { unchanged: true });
+
+// Written arithmetic is intentionally presentation-only. Check its narrow gate directly so
+// ordinary multiplication tables and fractions never become a long-division-style exercise.
+const writtenLayout = (question, check) => {
+  observe(check);
+  const layout = app.writtenArithmeticLayout(question);
+  if (!layout) violated(check, `did not produce a layout for ${question.prompt}`, JSON.stringify(question));
+  return layout;
+};
+for (const prompt of ['1234 + 111', '9000 - 111', '123 × 7', '12 × 34']) {
+  const layout = writtenLayout({ topic: 'hissan', difficulty: 5, prompt, answer: 'hidden' }, 'advanced hissan arithmetic renders in columns');
+  if (layout?.kind !== 'column') violated('advanced hissan arithmetic renders in columns', `${prompt} returned ${layout?.kind}`, JSON.stringify(layout));
+}
+for (const prompt of ['864÷24は？', '3.6×4は？', '2.4×0.5は？', '3.6÷0.9は？']) {
+  const layout = writtenLayout({ topic: 'audit', difficulty: 1, prompt, answer: 'secret-answer' }, 'fixed upper-grade arithmetic renders as written arithmetic');
+  if (!['column', 'division'].includes(layout?.kind)) violated('fixed upper-grade arithmetic renders as written arithmetic', `${prompt} returned ${layout?.kind}`, JSON.stringify(layout));
+  if (layout?.kind === 'division' && (layout.quotient || String(layout.aria || '').includes('secret-answer'))) {
+    violated('division layouts never reveal the answer', `${prompt} exposed ${layout.quotient || layout.aria}`, JSON.stringify(layout));
+  } else if (layout?.kind === 'division') observe('division layouts never reveal the answer');
+}
+for (const question of [
+  { topic: 'mul', difficulty: 5, prompt: '9 × 8', answer: '72' },
+  { topic: 'frac', difficulty: 5, prompt: '2/3×3/5', answer: '2/5' },
+]) {
+  observe('ordinary multiplication and fractions stay out of written-arithmetic layout');
+  if (app.writtenArithmeticLayout(question) !== null) {
+    violated('ordinary multiplication and fractions stay out of written-arithmetic layout', `${question.prompt} was incorrectly converted`, JSON.stringify(question));
+  }
+}
+const shouldAppendNumericQuestionMark = (question) => question.mode === 'num' && question.topic !== 'story' && !/[=?]/.test(String(question.prompt || ''));
+observe('numeric prompts add exactly one answer marker only when needed', 2);
+if (shouldAppendNumericQuestionMark({ mode: 'num', topic: 'add', prompt: '□ + 5 = 12' })) {
+  violated('numeric prompts add exactly one answer marker only when needed', 'a missing-operand equation would receive a duplicate = ?', '□ + 5 = 12');
+}
+if (!shouldAppendNumericQuestionMark({ mode: 'num', topic: 'add', prompt: '12 + 3' })) {
+  violated('numeric prompts add exactly one answer marker only when needed', 'a bare numeric expression lost its = ?', '12 + 3');
+}
+
 // --- fixtures ---------------------------------------------------------------------------
 
 const TOPICS = [
