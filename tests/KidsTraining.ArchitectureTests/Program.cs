@@ -656,6 +656,13 @@ internal static class Program
             html.Contains("['tokei','とけい']", StringComparison.Ordinal),
             "representative four- and five-letter romaji words are missing");
         Assert(html.Contains("isTape:true", StringComparison.Ordinal) && html.Contains("isTable:true", StringComparison.Ordinal), "tape-diagram or table questions are missing");
+        Assert(
+            html.Contains("subtype:'kanji-picture'", StringComparison.Ordinal) &&
+            html.Contains("pictureKind:'svg'", StringComparison.Ordinal) &&
+            html.Contains("kanjiPictureSvg(id,label)", StringComparison.Ordinal) &&
+            html.Contains("<sc-if value=\"{{ isKanjiPicture }}\"", StringComparison.Ordinal) &&
+            html.Contains("pictureId','pictureLabel", StringComparison.Ordinal),
+            "SVG picture-to-kanji questions are missing their generator, renderer, or parent-history fields");
         // Both division meanings are still taught, but in the words a third grader uses:
         // 等分除 and 包含除 are teacher-facing jargon and were removed from the questions.
         Assert(

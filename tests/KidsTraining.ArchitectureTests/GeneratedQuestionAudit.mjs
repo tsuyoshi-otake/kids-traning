@@ -935,6 +935,30 @@ for (const unit of UNITS) {
           }
         }
 
+        if (topic === 'kokugo' && question.subtype === 'kanji-picture') {
+          observe('SVG picture-to-kanji questions expose safe SVG metadata');
+          const svg = app.kanjiPictureSvg(question.pictureId, question.pictureLabel);
+          const svgProps = svg && svg.props ? svg.props : {};
+          const choices = (question.choices || []).map(String);
+          if (
+            question.pictureKind !== 'svg' ||
+            !question.pictureId ||
+            !question.pictureLabel ||
+            !choices.includes(String(question.answer)) ||
+            !svg ||
+            svg.type !== 'svg' ||
+            svgProps.role !== 'img' ||
+            !svgProps.viewBox ||
+            !svgProps['aria-label']
+          ) {
+            violated(
+              'SVG picture-to-kanji questions expose safe SVG metadata',
+              'picture question is missing safe SVG metadata or a fair answer choice',
+              context + `${JSON.stringify(question)}`,
+            );
+          }
+        }
+
         if (topic === 'kokugo' && question.subtype === 'reading') {
           observe('kanji readings are asked with their okurigana');
           const shown = String(question.word);
@@ -948,6 +972,51 @@ for (const unit of UNITS) {
         }
       }
     }
+}
+
+// The picture provider is random by design, so sweep the real low-grade generator until
+// the new format is observed at least once instead of allowing an unobserved check to pass.
+const pictureProfile = app.ensureLearningProfile(profileFor(1));
+let pictureSample = null;
+for (let i = 0; i < 1024 && !pictureSample; i += 1) {
+  const candidate = app.pickKokugo(pictureProfile);
+  if (candidate && candidate.subtype === 'kanji-picture') pictureSample = candidate;
+}
+observe('SVG picture-to-kanji questions are generated for grades 1-3', pictureSample ? 1 : 0);
+if (!pictureSample) {
+  violated(
+    'SVG picture-to-kanji questions are generated for grades 1-3',
+    'pickKokugo never produced the SVG picture format for a grade-1 profile',
+    'grade1',
+  );
+}
+if (pictureSample) {
+  const svg = app.kanjiPictureSvg(pictureSample.pictureId, pictureSample.pictureLabel);
+  if (pictureSample.pictureKind !== 'svg' || !svg || svg.type !== 'svg' || svg.props?.role !== 'img') {
+    violated(
+      'SVG picture-to-kanji questions are generated for grades 1-3',
+      'the sampled picture question did not expose a safe SVG image node',
+      JSON.stringify(pictureSample),
+    );
+  }
+}
+
+const upperGradePictureProfile = app.ensureLearningProfile(profileFor(4));
+let upperGradePictureSeen = false;
+for (let i = 0; i < 512; i += 1) {
+  const candidate = app.pickKokugo(upperGradePictureProfile);
+  if (candidate && candidate.subtype === 'kanji-picture') {
+    upperGradePictureSeen = true;
+    break;
+  }
+}
+observe('SVG picture-to-kanji questions stay within grades 1-3', upperGradePictureSeen ? 0 : 1);
+if (upperGradePictureSeen) {
+  violated(
+    'SVG picture-to-kanji questions stay within grades 1-3',
+    'a grade-4 profile received a grade-1-3 SVG picture question',
+    'grade4',
+  );
 }
 
 // --- aggregate checks -------------------------------------------------------------------
