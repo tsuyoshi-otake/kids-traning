@@ -344,6 +344,18 @@ internal static class Program
         var units = CurriculumPolicy.AllUnits;
         Assert(units.Count > 0, "the curriculum catalog is empty");
         Assert(units.Select(static unit => unit.Id).Distinct(StringComparer.Ordinal).Count() == units.Count, "curriculum unit IDs are not unique");
+        var thinkingUnits = units
+            .Where(static unit => unit.TopicId == "thinking")
+            .OrderBy(static unit => unit.Grade)
+            .ToArray();
+        Assert(
+            thinkingUnits.Length == 3 &&
+            thinkingUnits.Select(static unit => unit.Grade).SequenceEqual([1, 2, 3]) &&
+            thinkingUnits.All(static unit => unit.SubjectId == "thinking" && unit.GeneratorKey == "curriculum-bank" && unit.Questions.Count > 0),
+            "the grade 1-3 reasoning practice category is incomplete");
+        Assert(
+            thinkingUnits.All(static unit => Enumerable.Range(1, 5).All(stage => unit.Questions.Any(question => question.Stage == stage))),
+            "the reasoning practice category does not cover all five difficulty stages");
         Assert(
             Enumerable.Range(1, 9).All(grade => units.Any(unit => unit.Grade == grade)),
             "one or more grades from elementary 1 through junior-high 3 have no curriculum units");

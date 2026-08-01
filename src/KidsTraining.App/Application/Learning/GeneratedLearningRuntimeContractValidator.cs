@@ -147,6 +147,7 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("information-literacy-topic", "jouhou:{label:'じょうほう'"),
         ("integrated-study-topic", "sougou:{label:'そうごう'"),
         ("special-activities-topic", "tokubetsu:{label:'学校かつどう'"),
+        ("thinking-topic", "thinking:{label:'"),
         ("curriculum-lanes", "curriculumLanes(p)"),
         ("curriculum-frontier", "nextCurriculumTopic(p)"),
         ("english-translation-question", "を 英語で いうと？"),

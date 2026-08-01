@@ -21,22 +21,25 @@
 - [中学校 技術・家庭編](https://www.mext.go.jp/component/a_menu/education/micro_detail/__icsFiles/afieldfile/2019/03/18/1387018_009.pdf)
 - [中学校 外国語編](https://www.mext.go.jp/content/20210531-mxt_kyoiku01-100002608_010.pdf)
 
-## 1～3年の既存単元
+## 1～3年の単元
 
-1～3年の既存問題は、次の規則で一問一答・選択・入力式の自動採点単元へ割り当てる。IDはすべて `教科.g学年.トピック` で、表中の並びが教科レーン内の順序になる。各IDの公式根拠は、算数・国語・社会・理科・外国語は上記の各教科解説、それ以外は学習指導要領・解説一覧である。
+1～3年の問題は、次の規則で一問一答・選択・入力式の自動採点単元へ割り当てる。IDはすべて `教科.g学年.トピック` で、表中の並びが教科レーン内の順序になる。各IDの公式根拠は、算数・国語・社会・理科・外国語は上記の各教科解説、それ以外は学習指導要領・解説一覧である。
 
 | 学年 | 教科 | 単元ID（順序） | 評価 |
 |---|---|---|---|
 | 1 | 算数 | `math.g1.kazu`, `math.g1.shape`, `math.g1.add`, `math.g1.sub`, `math.g1.clock`, `math.g1.measure`, `math.g1.story`, `math.g1.money`, `math.g1.groups`, `math.g1.chart` | 自動採点 |
 | 1 | 国語 | `japanese.g1.moji`, `japanese.g1.bun`, `japanese.g1.kokugo`, `japanese.g1.goi`, `japanese.g1.dokkai` | 自動採点 |
 | 1 | 生活・道徳・情報・特別活動・キーボード | `life.g1.seikatsu`, `moral.g1.doutoku`, `information.g1.jouhou`, `special-activities.g1.tokubetsu`, `keyboard.g1.keyboard` | 自動採点＋既存活動 |
+| 1 | 思考トレーニング | `thinking.g1.patterns-and-logic` | 自動採点 |
 | 2 | 算数 | `math.g2.chart`, `math.g2.clock`, `math.g2.add`, `math.g2.sub`, `math.g2.measure`, `math.g2.hissan`, `math.g2.story`, `math.g2.kazu`, `math.g2.money`, `math.g2.order`, `math.g2.groups`, `math.g2.mul`, `math.g2.shape`, `math.g2.frac` | 自動採点 |
 | 2 | 国語 | `japanese.g2.kokugo`, `japanese.g2.bun`, `japanese.g2.goi`, `japanese.g2.dokkai`, `japanese.g2.moji` | 自動採点 |
 | 2 | 生活・道徳・情報・特別活動・キーボード | `life.g2.seikatsu`, `moral.g2.doutoku`, `information.g2.jouhou`, `special-activities.g2.tokubetsu`, `keyboard.g2.keyboard` | 自動採点＋既存活動 |
+| 2 | 思考トレーニング | `thinking.g2.patterns-and-space` | 自動採点 |
 | 3 | 算数 | `math.g3.mul`, `math.g3.div`, `math.g3.shape`, `math.g3.hissan`, `math.g3.kazu`, `math.g3.soroban`, `math.g3.add`, `math.g3.sub`, `math.g3.clock`, `math.g3.measure`, `math.g3.story`, `math.g3.order`, `math.g3.chart`, `math.g3.frac`, `math.g3.money`, `math.g3.groups` | 自動採点 |
 | 3 | 国語 | `japanese.g3.kokugo`, `japanese.g3.bun`, `japanese.g3.goi`, `japanese.g3.dokkai`, `japanese.g3.moji` | 自動採点 |
 | 3 | 社会・理科・外国語 | `social.g3.shakai`, `science.g3.rika`, `english.g3.eigo` | 自動採点＋活動カード |
 | 3 | 道徳・情報・総合・特別活動・キーボード | `moral.g3.doutoku`, `information.g3.jouhou`, `integrated.g3.sougou`, `special-activities.g3.tokubetsu`, `keyboard.g3.keyboard` | 自動採点＋活動カード |
+| 3 | 思考トレーニング | `thinking.g3.logic-and-strategy` | 自動採点 |
 
 ## 4～6年の追加単元
 

@@ -473,7 +473,7 @@ const TOPICS = [
   'add', 'sub', 'hissan', 'mul', 'clock', 'kokugo', 'moji', 'measure', 'kazu', 'shape',
   'div', 'frac', 'chart', 'story', 'bun', 'goi', 'dokkai', 'eigo', 'money', 'groups',
   'order', 'soroban', 'seikatsu', 'shakai', 'rika', 'kateika', 'gijutsu', 'doutoku', 'jouhou', 'sougou',
-  'tokubetsu', 'keyboard',
+  'tokubetsu', 'keyboard', 'thinking',
 ];
 const STAGES = [1, 2, 3, 4, 5];
 const SAMPLES_PER_COMBINATION = Math.max(1, Number(process.argv[3]) || 300);
