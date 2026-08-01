@@ -124,6 +124,15 @@ internal static class ParentControlPageRenderer
       </div>
       <div class="message" id="resetMessage" aria-live="polite"></div>
     </section>
+    <section class="panel" aria-labelledby="exportHeading">
+      <h2 id="exportHeading">学習データをJSONで保存</h2>
+      <p class="settings-copy">問題内容・回答履歴・進行状態を、現在の保護者パスワードで確認してJSONに保存します。保存したファイルは今後の学習サポートや改善に利用できます。</p>
+      <label for="exportPassword">現在のパスワード
+        <input id="exportPassword" inputmode="numeric" autocomplete="current-password" maxlength="4" type="password" aria-describedby="exportMessage">
+      </label>
+      <button class="save" id="exportData" type="button">JSONをダウンロード</button>
+      <div class="message" id="exportMessage" aria-live="polite"></div>
+    </section>
     <section class="panel">
       <button class="refresh" id="refresh" type="button">状態を更新</button>
       <ul>{{urlItems}}</ul>
@@ -198,6 +207,9 @@ internal static class ParentControlPageRenderer
     const saveLearningSettingsButton = document.getElementById('saveLearningSettings');
     const resetPassword = document.getElementById('resetPassword');
     const resetMessage = document.getElementById('resetMessage');
+    const exportPassword = document.getElementById('exportPassword');
+    const exportMessage = document.getElementById('exportMessage');
+    const exportButton = document.getElementById('exportData');
     const resetHistoryButton = document.getElementById('resetHistory');
     const resetFullButton = document.getElementById('resetFull');
 
@@ -320,6 +332,11 @@ internal static class ParentControlPageRenderer
       resetPassword.setAttribute('aria-invalid', 'false');
       resetMessage.textContent = '';
     });
+    exportPassword.addEventListener('input', () => {
+      cleanPin(exportPassword);
+      exportPassword.setAttribute('aria-invalid', 'false');
+      exportMessage.textContent = '';
+    });
 
     async function resetLearning(mode) {
       cleanPin(resetPassword);
@@ -353,6 +370,47 @@ internal static class ParentControlPageRenderer
       } finally {
         resetHistoryButton.disabled = false;
         resetFullButton.disabled = false;
+      }
+    }
+
+    async function exportLearningData() {
+      cleanPin(exportPassword);
+      if (exportPassword.value.length !== 4) {
+        exportPassword.setAttribute('aria-invalid', 'true');
+        exportMessage.textContent = '現在のパスワードを4桁の数字で入力してください。';
+        exportPassword.focus();
+        return;
+      }
+
+      exportPassword.setAttribute('aria-invalid', 'false');
+      exportButton.disabled = true;
+      exportMessage.textContent = 'JSONを準備しています…';
+      try {
+        const response = await fetch('/api/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword: exportPassword.value })
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.message || 'JSONの保存に失敗しました。');
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'kids-training-learning-history.json';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        exportPassword.value = '';
+        exportMessage.textContent = 'JSONを保存しました。';
+      } catch (error) {
+        exportPassword.setAttribute('aria-invalid', 'true');
+        exportMessage.textContent = error.message || 'JSONの保存に失敗しました。';
+      } finally {
+        exportButton.disabled = false;
       }
     }
 
@@ -393,6 +451,7 @@ internal static class ParentControlPageRenderer
     saveLearningSettingsButton.addEventListener('click', saveLearningSettings);
     resetHistoryButton.addEventListener('click', () => resetLearning('history'));
     resetFullButton.addEventListener('click', () => resetLearning('full'));
+    exportButton.addEventListener('click', exportLearningData);
     questionCount.addEventListener('input', () => { showSettingsError(''); cleanLearningSettings(); });
     passLine.addEventListener('input', () => showSettingsError(''));
     schoolGrade.addEventListener('change', () => showSettingsError(''));

@@ -1,6 +1,7 @@
 using KidsTraining.App.Application.Learning;
 using KidsTraining.App.Application.ParentControl;
 using KidsTraining.App.Domain.ParentControl;
+using KidsTraining.App.Infrastructure.Learning;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -12,6 +13,7 @@ internal sealed class TrainingForm : Form
     private const string PauseMessage = "kidsTraining.pause";
     private const string ResetAppliedMessagePrefix = "kidsTraining.resetApplied:";
     private const string LearningSettingsMessagePrefix = "kidsTraining.settings:";
+    private const string LearningHistoryMessagePrefix = "kidsTraining.learningHistory:";
     private const string LearningVirtualHostName = "learning.kidstraining.local";
     private const string ExperimentalWebPlatformFeaturesArgument = "--enable-experimental-web-platform-features";
     private const int NavigationMaxAttempts = 2;
@@ -30,6 +32,7 @@ internal sealed class TrainingForm : Form
     private readonly IUserProfileNameProvider profileNameProvider;
     private readonly ParentLearningSettingsService parentLearningSettingsService;
     private readonly ParentLearningResetService parentLearningResetService;
+    private readonly JsonLearningHistoryStore learningHistoryStore = new();
     private bool canExit;
     private bool webViewInitialized;
 
@@ -131,6 +134,32 @@ internal sealed class TrainingForm : Form
         catch (Exception exception)
         {
             UpdateLogger.Error("Could not pause the active learning session", exception);
+            return false;
+        }
+    }
+
+    public async Task<bool> FlushLearningHistoryAsync()
+    {
+        if (webView.CoreWebView2 is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var result = await webView.CoreWebView2.ExecuteScriptAsync(
+                "(() => typeof window.__kidsTrainingGetLearningData === 'function' ? window.__kidsTrainingGetLearningData() : null)()");
+            if (string.IsNullOrWhiteSpace(result) || string.Equals(result, "null", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            learningHistoryStore.WriteSnapshot(result);
+            return true;
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Could not flush learning history from the active WebView", exception);
             return false;
         }
     }
@@ -422,6 +451,28 @@ internal sealed class TrainingForm : Form
                 !parentLearningResetService.CompleteAppliedReset(appliedMode))
             {
                 UpdateLogger.Info("A pending learning reset was applied, but its completion marker could not be cleared.");
+            }
+
+            if (message.StartsWith(LearningHistoryMessagePrefix, StringComparison.Ordinal))
+            {
+                try
+                {
+                    var payload = message[LearningHistoryMessagePrefix.Length..];
+                    if (string.Equals(payload, "clear", StringComparison.Ordinal))
+                    {
+                        learningHistoryStore.Clear();
+                    }
+                    else
+                    {
+                        learningHistoryStore.WriteSnapshot(payload);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    UpdateLogger.Error("Could not persist learning history from the protected learning screen", exception);
+                }
+
+                return;
             }
 
             if (message.StartsWith(LearningSettingsMessagePrefix, StringComparison.Ordinal))

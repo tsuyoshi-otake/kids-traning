@@ -47,11 +47,12 @@ internal static class Program
         Run("Parent learning resets reach explicit terminal states", TestLearningResetServiceTerminals);
         Run("Update checks reach explicit terminal states", TestUpdateServiceTerminals);
         Run("Parent control server awaits actions and shuts down cleanly", TestParentControlServerLifecycle);
+        Run("Learning history snapshots stay bounded and PIN-free", TestLearningHistoryStore);
         Run("Single-instance requests reach the primary instance", TestSingleInstanceCoordinator);
 
         if (Failures.Count == 0)
         {
-            Console.WriteLine("Architecture tests passed: 22");
+            Console.WriteLine("Architecture tests passed: 23");
             return 0;
         }
 
@@ -482,12 +483,12 @@ internal static class Program
         var html = new LearningPageBuilder().Build(template, appDefinition, "Progression Test", ParentPin.Default);
 
         Assert(html.Contains("migrateProfiles(profiles)", StringComparison.Ordinal), "legacy profile migration is missing");
-        Assert(html.Contains("p.learningSchema=5", StringComparison.Ordinal) && html.Contains("unitStats", StringComparison.Ordinal) && html.Contains("stageAttempts", StringComparison.Ordinal), "unit-based schema-v5 migration is missing");
-        Assert(html.Contains("if(wasV5)", StringComparison.Ordinal) && html.Contains("legacyTopicStats", StringComparison.Ordinal), "schema-v5 migration is not idempotent or does not retain legacy evidence");
+        Assert(html.Contains("p.learningSchema=6", StringComparison.Ordinal) && html.Contains("unitStats", StringComparison.Ordinal) && html.Contains("stageAttempts", StringComparison.Ordinal), "unit-based schema-v6 migration is missing");
+        Assert(html.Contains("if(wasV5)", StringComparison.Ordinal) && html.Contains("legacyTopicStats", StringComparison.Ordinal), "schema migration is not idempotent or does not retain legacy evidence");
         Assert(html.Contains("curriculumLaneIds()", StringComparison.Ordinal) && !html.Contains("raw=g===1?g1", StringComparison.Ordinal), "school grade still caps curriculum lanes");
         Assert(html.Contains("topicLearningStage(p,k){return this.topicStat(p,k).retentionStartedAt?6", StringComparison.Ordinal), "the sixth retention stage is missing");
         Assert(html.Contains("retentionStep", StringComparison.Ordinal) && html.Contains("retentionStartedAt", StringComparison.Ordinal), "retention evidence is not persisted");
-        Assert(html.Contains("retentionReview=!!s.retentionStartedAt&&wasDue&&q.sessionRole==='review'&&difficulty===5", StringComparison.Ordinal), "only due difficulty-five review questions may confirm retention");
+        Assert(html.Contains("retentionReview=!!s.retentionStartedAt&&wasDue&&role==='review'&&difficulty===5", StringComparison.Ordinal), "only due difficulty-five review questions may confirm retention");
         Assert(html.Contains("s.retentionStep=Math.min(3,s.retentionStep+1)", StringComparison.Ordinal), "three delayed retention confirmations are not required");
         Assert(html.Contains("else{s.retentionStep=0;s.reviewStep=0;s.nextReviewAt=now+intervals[0];}", StringComparison.Ordinal), "failed retention does not restart after one day");
         Assert(html.Contains("masteredAt", StringComparison.Ordinal) && html.Contains("topicReady", StringComparison.Ordinal), "achievement and readiness are not separate");
@@ -508,9 +509,9 @@ internal static class Program
             html.Contains("if(!best)throw new Error('Unable to generate a learning question')", StringComparison.Ordinal),
             "session question deduplication is missing a bounded terminal fallback");
         Assert(
-            html.Contains("support=s.supportTopics[topic]?1:0", StringComparison.Ordinal) &&
+            html.Contains("Number(s.supportTopics[id])", StringComparison.Ordinal) &&
             html.Contains("delete sess.supportTopics[id]", StringComparison.Ordinal) &&
-            html.Contains("else sess.supportTopics[id]=true", StringComparison.Ordinal),
+            html.Contains("else if(supportEligible)sess.supportTopics[id]=Math.max", StringComparison.Ordinal),
             "assisted or incorrect outcomes do not adapt the next question difficulty");
         Assert(
             html.Contains("q.difficulty=stage;q.grade=unit.grade;q.unitGrade=unit.grade;q.unitId=unit.id", StringComparison.Ordinal),
@@ -654,7 +655,7 @@ internal static class Program
         Assert(html.Contains("q.isMoney", StringComparison.Ordinal) && html.Contains("q.isGroups", StringComparison.Ordinal) && html.Contains("q.isTape", StringComparison.Ordinal), "new visual scaffolding is missing");
         Assert(html.Contains("requestLearningReset('history')", StringComparison.Ordinal) && html.Contains("this.state.resetPin!==this.parentPin()", StringComparison.Ordinal), "learning reset bypasses PIN confirmation");
         Assert(html.Contains("stars:mode==='full'?0:(Number(current.stars)||0)", StringComparison.Ordinal) && html.Contains("xp:mode==='full'?0:(Number(current.xp)||0)", StringComparison.Ordinal), "history-only and full reset reward semantics are not separated");
-        Assert(html.Contains("level:1,stageAttempts:0,stageIndependent:0", StringComparison.Ordinal) && html.Contains("cleared:{}", StringComparison.Ordinal), "learning reset does not clear all progress evidence");
+        Assert(html.Contains("level:1,stageAttempts:0,stageIndependent:0", StringComparison.Ordinal) && html.Contains("unitStats:unitStats", StringComparison.Ordinal) && html.Contains("cleared:{}", StringComparison.Ordinal), "learning reset does not clear all progress evidence");
         Assert(html.Contains("const reset={...current", StringComparison.Ordinal) && html.Contains("progressResetAt:Date.now()", StringComparison.Ordinal), "learning reset does not preserve profile identity and grade");
         Assert(html.Contains("localStorage.setItem('kt_profiles_v1',persisted)", StringComparison.Ordinal) && !html.Contains("localStorage.clear()", StringComparison.Ordinal), "learning reset is not scoped to profile progress");
         Assert(html.Contains("aria-modal=", StringComparison.Ordinal) && html.Contains("cancelLearningReset", StringComparison.Ordinal), "learning reset confirmation is inaccessible or cannot be cancelled");
@@ -1319,6 +1320,7 @@ internal static class Program
         Assert(store.ReadLearningSettings() == saved.Settings, "valid learning settings were not persisted");
 
         var page = ParentControlPageRenderer.Build([], false, saved.Settings);
+        Assert(page.Contains("id=\"exportPassword\"", StringComparison.Ordinal) && page.Contains("fetch('/api/export'", StringComparison.Ordinal) && page.Contains("kids-training-learning-history.json", StringComparison.Ordinal), "parent page does not expose the protected learning-history JSON export");
         Assert(page.Contains("min=\"10\" max=\"30\"", StringComparison.Ordinal) && page.Contains("10〜30問", StringComparison.Ordinal), "parent page does not expose the 10-to-30 fixed question range");
         Assert(page.Contains("id=\"schoolGrade\"", StringComparison.Ordinal) && page.Contains("value=\"9\" selected", StringComparison.Ordinal) && page.Contains("中学3年", StringComparison.Ordinal), "parent page does not expose the persisted school grade");
         Assert(page.Contains("id=\"preferSchoolGrade\"", StringComparison.Ordinal) && page.Contains("type=\"checkbox\" checked", StringComparison.Ordinal), "parent page does not expose the persisted school-grade preference");
@@ -1410,6 +1412,40 @@ internal static class Program
         }
     }
 
+    private static void TestLearningHistoryStore()
+    {
+        var temporaryRoot = Path.Combine(Path.GetTempPath(), "KidsTraining.ArchitectureTests", Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(temporaryRoot, "history.json");
+        try
+        {
+            var store = new JsonLearningHistoryStore(path);
+            const string snapshot = "{\"schemaVersion\":1,\"history\":[{\"outcome\":\"independent\"}]}";
+            store.WriteSnapshot(snapshot);
+            Assert(store.ReadSnapshot() == snapshot, "a valid learning-history snapshot was not persisted");
+
+            var rejected = false;
+            try
+            {
+                store.WriteSnapshot("{\"schemaVersion\":1,\"parentPin\":\"1234\"}");
+            }
+            catch (InvalidDataException)
+            {
+                rejected = true;
+            }
+
+            Assert(rejected && store.ReadSnapshot() == snapshot, "a PIN-bearing or invalid snapshot was accepted or replaced the prior export");
+            store.Clear();
+            Assert(store.ReadSnapshot().Contains("\"history\": []", StringComparison.Ordinal), "clearing learning history did not produce an empty snapshot");
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryRoot))
+            {
+                Directory.Delete(temporaryRoot, recursive: true);
+            }
+        }
+    }
+
     private static void TestParentControlServerLifecycle()
     {
         var startCalls = 0;
@@ -1420,6 +1456,8 @@ internal static class Program
         var resetCalls = 0;
         string? resetPassword = null;
         string? resetMode = null;
+        var exportCalls = 0;
+        string? exportPassword = null;
         var server = new ParentControlServer(
             _ =>
             {
@@ -1461,6 +1499,13 @@ internal static class Program
                         "ok",
                         LearningResetMode.HistoryOnly,
                         true));
+            },
+            (currentPassword, _) =>
+            {
+                exportCalls++;
+                exportPassword = currentPassword;
+                return Task.FromResult(ParentLearningExportResult.Succeeded(
+                    "{\"schemaVersion\":1,\"history\":[{\"outcome\":\"independent\"}]}"));
             });
 
         Assert(
@@ -1498,6 +1543,15 @@ internal static class Program
                 .PostAsync($"http://127.0.0.1:{port}/api/reset", resetContent)
                 .GetAwaiter()
                 .GetResult();
+            using var exportContent = new StringContent(
+                "{\"currentPassword\":\"1234\"}",
+                Encoding.UTF8,
+                "application/json");
+            using var exportResponse = client
+                .PostAsync($"http://127.0.0.1:{port}/api/export", exportContent)
+                .GetAwaiter()
+                .GetResult();
+            var exportBody = exportResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult();
             using var settingsContent = new StringContent(
                 """{"questionCount":20,"passLine":15,"schoolGrade":9,"preferSchoolGrade":true}""",
                 Encoding.UTF8,
@@ -1527,13 +1581,19 @@ internal static class Program
                 returnResponse.StatusCode == System.Net.HttpStatusCode.OK &&
                 pauseResponse.StatusCode == System.Net.HttpStatusCode.OK &&
                 resetResponse.StatusCode == System.Net.HttpStatusCode.OK &&
+                exportResponse.StatusCode == System.Net.HttpStatusCode.OK &&
                 settingsResponse.StatusCode == System.Net.HttpStatusCode.OK &&
                 invalidSettingsResponse.StatusCode == System.Net.HttpStatusCode.BadRequest &&
                 outOfRangeSettingsResponse.StatusCode == System.Net.HttpStatusCode.BadRequest,
                 "parent actions returned before their actual success results were known");
             Assert(
-                startCalls == 1 && returnCalls == 1 && pauseCalls == 1 && resetCalls == 1,
+                startCalls == 1 && returnCalls == 1 && pauseCalls == 1 && resetCalls == 1 && exportCalls == 1,
                 "parent actions were not invoked exactly once");
+            Assert(
+                exportPassword == "1234" && exportBody.Contains("\"schemaVersion\":1", StringComparison.Ordinal) &&
+                exportResponse.Content.Headers.TryGetValues("Content-Disposition", out var disposition) &&
+                disposition.Any(value => value.Contains("kids-training-learning-history.json", StringComparison.Ordinal)),
+                "parent learning-history export did not preserve the PIN boundary, JSON payload, or download filename");
             Assert(settingsCalls == 2 && capturedPreference == true, "the parent settings API did not preserve a strict boolean preference or terminal grade validation");
             Assert(
                 resetPassword == "1234" && resetMode == LearningResetModeValues.HistoryOnly,

@@ -30,6 +30,7 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
     private readonly Func<LearningSessionSettings> getLearningSettings;
     private readonly Func<int?, int?, int?, bool?, CancellationToken, Task<LearningSessionSettingsUpdateResult>> changeLearningSettings;
     private readonly Func<string?, string?, CancellationToken, Task<LearningResetResult>> requestLearningReset;
+    private readonly Func<string?, CancellationToken, Task<ParentLearningExportResult>> exportLearningData;
     private readonly object lifecycleGate = new();
     private readonly object clientTasksGate = new();
     private readonly CancellationTokenSource stop = new();
@@ -48,7 +49,8 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
         Func<string?, string?, CancellationToken, Task<PasswordChangeResult>> changeParentPassword,
         Func<LearningSessionSettings> getLearningSettings,
         Func<int?, int?, int?, bool?, CancellationToken, Task<LearningSessionSettingsUpdateResult>> changeLearningSettings,
-        Func<string?, string?, CancellationToken, Task<LearningResetResult>> requestLearningReset)
+        Func<string?, string?, CancellationToken, Task<LearningResetResult>> requestLearningReset,
+        Func<string?, CancellationToken, Task<ParentLearningExportResult>>? exportLearningData = null)
     {
         ArgumentNullException.ThrowIfNull(startTraining);
         ArgumentNullException.ThrowIfNull(returnToComputer);
@@ -58,6 +60,7 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
         ArgumentNullException.ThrowIfNull(getLearningSettings);
         ArgumentNullException.ThrowIfNull(changeLearningSettings);
         ArgumentNullException.ThrowIfNull(requestLearningReset);
+        this.exportLearningData = exportLearningData ?? ((string? _, CancellationToken _) => Task.FromResult(ParentLearningExportResult.Failed("Learning history JSON export is unavailable.")));
 
         this.startTraining = startTraining;
         this.returnToComputer = returnToComputer;
@@ -576,6 +579,45 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
                         Pending: resetResult.Pending),
                     cancellationToken).ConfigureAwait(false);
                 break;
+            case { Method: "POST", Path: "/api/export" }:
+                LearningExportRequest? exportPayload;
+                try
+                {
+                    exportPayload = JsonSerializer.Deserialize<LearningExportRequest>(request.Body, JsonOptions);
+                }
+                catch (JsonException)
+                {
+                    await WriteJsonAsync(
+                        stream,
+                        HttpStatusCode.BadRequest,
+                        new ApiResult(false, "入力を読み取れませんでした。", isTrainingActive()),
+                        cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
+                var exportResult = await InvokeApiActionAsync(
+                    stream,
+                    token => exportLearningData(exportPayload?.CurrentPassword, token),
+                    "JSONエクスポートに失敗しました。",
+                    cancellationToken,
+                    shutdownToken).ConfigureAwait(false);
+                if (exportResult is null)
+                {
+                    break;
+                }
+
+                if (!exportResult.Success)
+                {
+                    await WriteJsonAsync(
+                        stream,
+                        HttpStatusCode.BadRequest,
+                        new ApiResult(false, exportResult.Message, isTrainingActive()),
+                        cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
+                await WriteJsonPayloadAsync(stream, HttpStatusCode.OK, exportResult.JsonPayload, cancellationToken).ConfigureAwait(false);
+                break;
             default:
                 await WriteJsonAsync(stream, HttpStatusCode.NotFound, new ApiResult(false, "Not found.", isTrainingActive()), cancellationToken).ConfigureAwait(false);
                 break;
@@ -736,9 +778,25 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
     private static Task WriteJsonAsync(NetworkStream stream, HttpStatusCode status, ApiResult result, CancellationToken cancellationToken) =>
         WriteResponseAsync(stream, status, "application/json; charset=utf-8", JsonSerializer.Serialize(result, JsonOptions), cancellationToken);
 
-    private static async Task WriteResponseAsync(NetworkStream stream, HttpStatusCode status, string contentType, string body, CancellationToken cancellationToken)
+    private static Task WriteJsonPayloadAsync(NetworkStream stream, HttpStatusCode status, string jsonPayload, CancellationToken cancellationToken) =>
+        WriteResponseAsync(
+            stream,
+            status,
+            "application/json; charset=utf-8",
+            jsonPayload,
+            cancellationToken,
+            "Content-Disposition: attachment; filename=kids-training-learning-history.json");
+
+    private static async Task WriteResponseAsync(
+        NetworkStream stream,
+        HttpStatusCode status,
+        string contentType,
+        string body,
+        CancellationToken cancellationToken,
+        string? extraHeaders = null)
     {
         var bodyBytes = Encoding.UTF8.GetBytes(body);
+        var additionalHeaders = string.IsNullOrWhiteSpace(extraHeaders) ? string.Empty : extraHeaders.TrimEnd('\r', '\n') + "\r\n";
         var header =
             $"HTTP/1.1 {(int)status} {status}\r\n" +
             $"Content-Type: {contentType}\r\n" +
@@ -746,6 +804,7 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
             "Cache-Control: no-store\r\n" +
             "Connection: close\r\n" +
             "X-Content-Type-Options: nosniff\r\n" +
+            additionalHeaders +
             "\r\n";
 
         var headerBytes = Encoding.ASCII.GetBytes(header);
@@ -764,6 +823,8 @@ internal sealed class ParentControlServer : IDisposable, IAsyncDisposable
         bool? PreferSchoolGrade);
 
     private sealed record LearningResetRequest(string? CurrentPassword, string? Mode);
+
+    private sealed record LearningExportRequest(string? CurrentPassword);
 
     private sealed record ApiResult(
         bool Ok,

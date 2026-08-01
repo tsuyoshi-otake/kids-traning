@@ -4,6 +4,7 @@ using KidsTraining.App.Application.ParentControl;
 using KidsTraining.App.Application.Updates;
 using KidsTraining.App.Domain.ParentControl;
 using KidsTraining.App.Domain.Updates;
+using KidsTraining.App.Infrastructure.Learning;
 using KidsTraining.App.Infrastructure.ParentControl;
 
 namespace KidsTraining.App.Presentation.WinForms;
@@ -27,6 +28,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly ParentPasswordService parentPasswordService;
     private readonly ParentLearningSettingsService parentLearningSettingsService;
     private readonly ParentLearningResetService parentLearningResetService;
+    private readonly JsonLearningHistoryStore learningHistoryStore = new();
 
     private readonly ParentControlServer? parentControlServer;
     private TrainingForm? trainingForm;
@@ -234,7 +236,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 ChangeParentPasswordFromParentControl,
                 parentLearningSettingsService.GetCurrentSettings,
                 ChangeLearningSettingsFromParentControl,
-                RequestLearningResetFromParentControl);
+                RequestLearningResetFromParentControl,
+                ExportLearningDataFromParentControl);
             server.Start();
             UpdateLogger.Info($"Parent control server started: {string.Join(", ", server.NetworkUrls)}");
             return server;
@@ -366,6 +369,16 @@ internal sealed class TrayApplicationContext : ApplicationContext
             };
         }
 
+        try
+        {
+            learningHistoryStore.Clear();
+        }
+        catch (Exception exception)
+        {
+            UpdateLogger.Error("Learning history could not be cleared after reset", exception);
+            return LearningResetResult.Failed("学習履歴をリセットできませんでした。");
+        }
+
         return result with
         {
             Message = result.Mode == LearningResetMode.HistoryOnly
@@ -373,6 +386,26 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 : "すべての学習データをリセットしました。",
             Pending = false
         };
+    }
+
+    private async Task<ParentLearningExportResult> ExportLearningDataFromParentControl(
+        string? currentPassword,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!ParentPin.TryCreate(currentPassword, out var current) || current != parentPasswordService.GetCurrentPin())
+        {
+            return ParentLearningExportResult.Failed("現在のパスワードが違います。");
+        }
+
+        var synchronized = await SynchronizeActiveTrainingAsync(
+            form => form.FlushLearningHistoryAsync()).ConfigureAwait(false);
+        if (!synchronized)
+        {
+            return ParentLearningExportResult.Failed("学習画面から最新の回答履歴を取得できませんでした。");
+        }
+
+        return ParentLearningExportResult.Succeeded(learningHistoryStore.ReadSnapshot());
     }
 
     private async Task<bool> SynchronizeActiveTrainingAsync(

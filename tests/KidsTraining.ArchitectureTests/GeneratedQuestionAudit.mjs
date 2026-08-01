@@ -573,7 +573,7 @@ for (const [standard, ime] of [['shi', 'si'], ['chi', 'ti'], ['tsu', 'tu'], ['fu
   }
 }
 
-// Exercise the real schema-v5 migration and lane selection code before auditing generators.
+// Exercise the real schema migration and lane selection code before auditing generators.
 // These checks protect the early-learning contract independently of the registered grade.
 app.state = {
   settings: { topics: Object.fromEntries(TOPICS.map((topic) => [topic, true])) },
@@ -586,21 +586,21 @@ const legacyProfiles = [
 ];
 const migratedOnce = app.migrateProfiles(legacyProfiles);
 const migratedTwice = app.migrateProfiles(migratedOnce);
-observe('schema-v5 migration is idempotent', legacyProfiles.length);
+observe('schema migration is idempotent', legacyProfiles.length);
 if (JSON.stringify(migratedOnce) !== JSON.stringify(migratedTwice)) {
-  violated('schema-v5 migration is idempotent', 'a second migration changed profile data', 'v4 -> v5 -> v5');
+  violated('schema migration is idempotent', 'a second migration changed profile data', 'legacy -> v6 -> v6');
 }
 for (let index = 0; index < legacyProfiles.length; index += 1) {
   const before = legacyProfiles[index];
   const after = migratedOnce[index];
-  if (after.learningSchema !== 5 || Object.keys(after.unitStats || {}).length !== UNITS.length) {
-    violated('schema-v5 migration is idempotent', `${before.name} did not receive one stat per unit`, before.name);
+  if (after.learningSchema !== 6 || Object.keys(after.unitStats || {}).length !== UNITS.length) {
+    violated('schema migration is idempotent', `${before.name} did not receive one stat per unit`, before.name);
   }
   if (after.stars !== before.stars || after.xp !== before.xp || !after.legacyTopicStats) {
-    violated('schema-v5 migration preserves evidence', `${before.name} lost stars, XP, or legacy evidence`, before.name);
+    violated('schema migration preserves evidence', `${before.name} lost stars, XP, or legacy evidence`, before.name);
   }
 }
-observe('schema-v5 migration preserves evidence', legacyProfiles.length);
+observe('schema migration preserves evidence', legacyProfiles.length);
 
 const beginnerAtGrade = (grade) => app.ensureLearningProfile({
   name: `grade-${grade}`,
@@ -650,6 +650,23 @@ if (JSON.stringify(preferenceRestoredFrontier) !== JSON.stringify(preferenceOffF
   violated('school-grade preference is optional and reversible', 'turning the preference off did not restore the original frontier', `${preferenceRestoredFrontier} vs ${preferenceOffFrontier}`);
 }
 app.state.settings = originalSettings;
+const supportProfile = beginnerAtGrade(1);
+const supportUnit = UNITS[0];
+supportProfile.unitStats[supportUnit.id] = { ...app.blankUnitStat(), level: 5, confidence: 0.85 };
+supportProfile.mastery[supportUnit.id] = 0.85;
+app.state.session = { supportTopics: {} };
+const supportQuestion = { unitId: supportUnit.id, topic: supportUnit.topicId, difficulty: 5, sessionRole: 'target', answer: 'x' };
+app.recordEvidence(supportProfile, supportQuestion, 'incorrect', 0, { userAnswer: 'wrong' });
+const supportStageAfterFirstBlock = app.sessionStage(supportProfile, app.state.session, supportUnit.id, 'target');
+app.recordEvidence(supportProfile, { ...supportQuestion, difficulty: 4 }, 'incorrect', 0, { userAnswer: 'wrong-again' });
+const supportStageAfterSecondBlock = app.sessionStage(supportProfile, app.state.session, supportUnit.id, 'target');
+app.recordEvidence(supportProfile, { ...supportQuestion, difficulty: 3 }, 'independent', 1, { userAnswer: 'x' });
+const supportStageAfterIndependent = app.sessionStage(supportProfile, app.state.session, supportUnit.id, 'target');
+observe('support ladder is bounded and clears after independent success', 3);
+if (supportStageAfterFirstBlock !== 4 || supportStageAfterSecondBlock !== 3 || supportStageAfterIndependent !== 5) {
+  violated('support ladder is bounded and clears after independent success', 'repeated blocks did not lower two stages or an independent success did not restore the target stage', `${supportStageAfterFirstBlock}/${supportStageAfterSecondBlock}/${supportStageAfterIndependent}`);
+}
+app.state.session = null;
 
 const mathLane = app.curriculumLaneIds().find((lane) => lane.some((id) => id.startsWith('math.')));
 const gradeOneBeginner = normalProfiles[0];

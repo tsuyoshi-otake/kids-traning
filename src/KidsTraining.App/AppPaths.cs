@@ -22,6 +22,9 @@ internal static class AppPaths
     public static string ParentSettingsPath =>
         Path.Combine(LocalAppDataRoot, "parent-settings.json");
 
+    public static string LearningHistoryPath =>
+        Path.Combine(LocalAppDataRoot, "learning-history.json");
+
     public static string LearningRuntimeCacheManifestPath =>
         Path.Combine(LocalAppDataRoot, "learning-runtime-cache.json");
 
