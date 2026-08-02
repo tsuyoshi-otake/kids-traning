@@ -500,7 +500,10 @@ internal static class Program
         Assert(html.Contains("curriculumLaneIds()", StringComparison.Ordinal) && !html.Contains("raw=g===1?g1", StringComparison.Ordinal), "school grade still caps curriculum lanes");
         Assert(html.Contains("topicLearningStage(p,k){return this.topicStat(p,k).retentionStartedAt?6", StringComparison.Ordinal), "the sixth retention stage is missing");
         Assert(html.Contains("retentionStep", StringComparison.Ordinal) && html.Contains("retentionStartedAt", StringComparison.Ordinal), "retention evidence is not persisted");
-        Assert(html.Contains("retentionReview=!!s.retentionStartedAt&&wasDue&&role==='review'&&difficulty===5", StringComparison.Ordinal), "only due difficulty-five review questions may confirm retention");
+        Assert(
+            html.Contains("terminalUnitStage(k)", StringComparison.Ordinal) &&
+            html.Contains("retentionReview=!!s.retentionStartedAt&&wasDue&&role==='review'&&difficulty===terminalStage", StringComparison.Ordinal),
+            "only due terminal-stage review questions may confirm retention");
         Assert(html.Contains("s.retentionStep=Math.min(3,s.retentionStep+1)", StringComparison.Ordinal), "three delayed retention confirmations are not required");
         Assert(html.Contains("else{s.retentionStep=0;s.reviewStep=0;s.nextReviewAt=now+intervals[0];}", StringComparison.Ordinal), "failed retention does not restart after one day");
         Assert(html.Contains("masteredAt", StringComparison.Ordinal) && html.Contains("topicReady", StringComparison.Ordinal), "achievement and readiness are not separate");
@@ -509,6 +512,22 @@ internal static class Program
         Assert(html.Contains("for(let round=0;round<3;round++)", StringComparison.Ordinal), "calibration does not repeat core skills three times");
         Assert(html.Contains("score=(!r||!r.attempts)?0.05", StringComparison.Ordinal), "untested skills are not initialized conservatively");
         Assert(html.Contains("q.sessionRole=role", StringComparison.Ordinal) && html.Contains("'review'", StringComparison.Ordinal) && html.Contains("'target'", StringComparison.Ordinal) && html.Contains("'mixed'", StringComparison.Ordinal) && html.Contains("'exit'", StringComparison.Ordinal), "session roles are incomplete");
+        Assert(
+            html.Contains("stagesByUnit=new Map()", StringComparison.Ordinal) &&
+            html.Contains("unitStages(k)", StringComparison.Ordinal) &&
+            html.Contains("canonicalUnitStage(k,stage)", StringComparison.Ordinal) &&
+            html.Contains("nextUnitStage(k,stage)", StringComparison.Ordinal),
+            "units do not expose stable available-stage selection");
+        Assert(
+            html.Contains("role=typeof q.sessionRole==='string'?q.sessionRole:''", StringComparison.Ordinal) &&
+            html.Contains("ordinaryRole=role==='target'||role==='mixed'||role==='exit'||role==='check'", StringComparison.Ordinal) &&
+            html.Contains("stageEvidenceEligible=!s.retentionStartedAt&&ordinaryRole&&difficulty===currentStage", StringComparison.Ordinal) &&
+            html.Contains("targetQuotaEligible=role==='target'||role==='exit'", StringComparison.Ordinal),
+            "ordinary stage evidence, support, and target quota eligibility are not separated");
+        Assert(
+            html.Contains("const nextStage=this.nextUnitStage(unit||id,currentStage)", StringComparison.Ordinal) &&
+            html.Contains("if(nextStage!==null)", StringComparison.Ordinal),
+            "stage promotion does not advance through the next available authored stage");
         Assert(
             html.Contains("rolePlan=[]", StringComparison.Ordinal) &&
             html.Contains("session.questions.push(this.generateSessionQuestion(p,session,rolePlan[0]))", StringComparison.Ordinal) &&
@@ -522,8 +541,9 @@ internal static class Program
             "session question deduplication is missing a bounded terminal fallback");
         Assert(
             html.Contains("Number(s.supportTopics[id])", StringComparison.Ordinal) &&
-            html.Contains("delete sess.supportTopics[id]", StringComparison.Ordinal) &&
-            html.Contains("else if(supportEligible)sess.supportTopics[id]=Math.max", StringComparison.Ordinal),
+            html.Contains("const supportTopics=sess.supportTopics||(sess.supportTopics={})", StringComparison.Ordinal) &&
+            html.Contains("if(outcome==='independent')delete supportTopics[id]", StringComparison.Ordinal) &&
+            html.Contains("else supportTopics[id]=Math.max", StringComparison.Ordinal),
             "assisted or incorrect outcomes do not adapt the next question difficulty");
         Assert(
             html.Contains("q.difficulty=stage;q.grade=unit.grade;q.unitGrade=unit.grade;q.unitId=unit.id", StringComparison.Ordinal),

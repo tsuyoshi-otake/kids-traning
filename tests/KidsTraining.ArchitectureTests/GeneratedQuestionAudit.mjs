@@ -668,6 +668,304 @@ if (supportStageAfterFirstBlock !== 4 || supportStageAfterSecondBlock !== 3 || s
 }
 app.state.session = null;
 
+// Progression is stateful, so exercise the generated runtime itself rather than asserting
+// markers in the C# source. The catalog intentionally includes both full and sparse banks.
+const bankUnits = UNITS.filter((unit) => unit.generatorKey === 'curriculum-bank');
+const sparseBank = bankUnits.find((unit) => app.unitStages(unit).join(',') === '1,3,5');
+const fullBank = bankUnits.find((unit) => app.unitStages(unit).join(',') === '1,2,3,4,5');
+observe('curriculum banks expose stable authored stage selections', sparseBank && fullBank ? 2 : 0);
+if (!sparseBank || !fullBank) {
+  violated(
+    'curriculum banks expose stable authored stage selections',
+    'the audit needs both a sparse 1/3/5 bank and a full 1/2/3/4/5 bank',
+    bankUnits.map((unit) => unit.id + ':' + app.unitStages(unit).join('/')).join(', '),
+  );
+}
+
+if (sparseBank && fullBank) {
+  const freshUnitProfile = (unit, level = 1) => {
+    const profile = beginnerAtGrade(unit.grade);
+    profile.unitStats[unit.id] = { ...app.blankUnitStat(), level, confidence: 0.85 };
+    profile.mastery[unit.id] = 0.85;
+    return profile;
+  };
+  const evidenceSession = () => ({ correct: 0, targetAsked: 0, targetIndependent: 0, supportTopics: {} });
+  const evidenceQuestion = (unit, difficulty, sessionRole) => ({
+    unitId: unit.id,
+    topic: unit.topicId,
+    difficulty,
+    sessionRole,
+    answer: 'audit',
+  });
+  const record = (profile, unit, difficulty, role, outcome = 'independent') =>
+    app.recordEvidence(profile, evidenceQuestion(unit, difficulty, role), outcome, outcome === 'independent' ? 1 : 0, { userAnswer: 'audit' });
+  const authoredAt = (unit, stage, question) =>
+    (unit.questions || []).some(
+      (item) => Number(item.stage) === stage && item.prompt === question.prompt && item.answer === question.answer,
+    );
+  const qualifyCurrentStage = (profile, unit, role = 'check') => {
+    const stage = app.topicStage(profile, unit.id);
+    const requirement = app.stageEvidenceRequired(stage);
+    for (let index = 0; index < requirement.attempts; index += 1) record(profile, unit, stage, role);
+    return stage;
+  };
+
+  const sparseGenerationProfile = freshUnitProfile(sparseBank);
+  const sparseRequests = [1, 2, 3, 4, 5];
+  const sparseExpected = [1, 1, 3, 3, 5];
+  observe('sparse curriculum-bank generation retains authored stages', sparseRequests.length);
+  for (let index = 0; index < sparseRequests.length; index += 1) {
+    const requested = sparseRequests[index];
+    const expected = sparseExpected[index];
+    const question = app.genFor(sparseBank.id, sparseGenerationProfile, requested);
+    if (question.difficulty !== expected || !authoredAt(sparseBank, expected, question)) {
+      violated(
+        'sparse curriculum-bank generation retains authored stages',
+        'request ' + requested + ' produced difficulty ' + question.difficulty + ' instead of authored stage ' + expected,
+        sparseBank.id + ': ' + JSON.stringify(question),
+      );
+    }
+  }
+
+  const supportGenerationProfile = freshUnitProfile(sparseBank, 3);
+  const supportGenerationSession = evidenceSession();
+  supportGenerationProfile.unitStats[sparseBank.id].supportDepth = 1;
+  const supportStage = app.sessionStage(supportGenerationProfile, supportGenerationSession, sparseBank.id, 'target');
+  const supportQuestionAtStage = app.genFor(sparseBank.id, supportGenerationProfile, supportStage);
+  supportGenerationProfile.unitStats[sparseBank.id].nextReviewAt = Date.now() - 1;
+  const reviewStage = app.sessionStage(supportGenerationProfile, supportGenerationSession, sparseBank.id, 'review');
+  const reviewQuestionAtStage = app.genFor(sparseBank.id, supportGenerationProfile, reviewStage);
+  observe('support and review generation use canonical authored stages', 2);
+  if (
+    supportStage !== 1 ||
+    supportQuestionAtStage.difficulty !== 1 ||
+    !authoredAt(sparseBank, 1, supportQuestionAtStage) ||
+    reviewStage !== 1 ||
+    reviewQuestionAtStage.difficulty !== 1 ||
+    !authoredAt(sparseBank, 1, reviewQuestionAtStage)
+  ) {
+    violated(
+      'support and review generation use canonical authored stages',
+      'support/review were ' + supportStage + '/' + reviewStage + ' with question difficulties ' + supportQuestionAtStage.difficulty + '/' + reviewQuestionAtStage.difficulty,
+      sparseBank.id,
+    );
+  }
+
+  const savedStageCases = [
+    { saved: 2, current: 1, next: 3 },
+    { saved: 4, current: 3, next: 5 },
+  ];
+  observe('saved sparse-bank levels canonicalize without migration', savedStageCases.length);
+  for (const stageCase of savedStageCases) {
+    const profile = freshUnitProfile(sparseBank, stageCase.saved);
+    const stat = profile.unitStats[sparseBank.id];
+    const beforeLevel = stat.level;
+    const beforeSchema = profile.learningSchema;
+    const question = app.genFor(sparseBank.id, profile);
+    app.state.session = evidenceSession();
+    const qualified = qualifyCurrentStage(profile, sparseBank);
+    if (
+      beforeSchema !== 6 ||
+      beforeLevel !== stageCase.saved ||
+      qualified !== stageCase.current ||
+      question.difficulty !== stageCase.current ||
+      stat.level !== stageCase.next
+    ) {
+      violated(
+        'saved sparse-bank levels canonicalize without migration',
+        'saved ' + stageCase.saved + ' became current ' + qualified + ', question ' + question.difficulty + ', stored ' + stat.level + ', schema ' + beforeSchema,
+        sparseBank.id,
+      );
+    }
+  }
+
+  const fullProgressProfile = freshUnitProfile(fullBank);
+  app.state.session = evidenceSession();
+  const fullProgression = [1, 2, 3, 4, 5].map(() => qualifyCurrentStage(fullProgressProfile, fullBank));
+  observe('full curriculum banks progress through every authored stage', fullProgression.length);
+  if (
+    fullProgression.join(',') !== '1,2,3,4,5' ||
+    !fullProgressProfile.unitStats[fullBank.id].retentionStartedAt
+  ) {
+    violated(
+      'full curriculum banks progress through every authored stage',
+      'progression ' + fullProgression.join(',') + ' retention=' + fullProgressProfile.unitStats[fullBank.id].retentionStartedAt,
+      fullBank.id,
+    );
+  }
+
+  const sparseProgressProfile = freshUnitProfile(sparseBank);
+  app.state.session = evidenceSession();
+  const sparseProgression = [1, 3, 5].map(() => qualifyCurrentStage(sparseProgressProfile, sparseBank));
+  const sparseProgressStat = sparseProgressProfile.unitStats[sparseBank.id];
+  observe('sparse curriculum banks progress only through authored stages', sparseProgression.length);
+  if (sparseProgression.join(',') !== '1,3,5' || !sparseProgressStat.retentionStartedAt) {
+    violated(
+      'sparse curriculum banks progress only through authored stages',
+      'progression ' + sparseProgression.join(',') + ' retention=' + sparseProgressStat.retentionStartedAt,
+      sparseBank.id,
+    );
+  }
+
+  const mixedEvidenceProfile = freshUnitProfile(sparseBank);
+  app.state.session = evidenceSession();
+  record(mixedEvidenceProfile, sparseBank, 1, 'target');
+  record(mixedEvidenceProfile, sparseBank, 1, 'mixed');
+  record(mixedEvidenceProfile, sparseBank, 1, 'check', 'assisted');
+  record(mixedEvidenceProfile, sparseBank, 1, 'exit');
+  const mixedEvidenceStat = mixedEvidenceProfile.unitStats[sparseBank.id];
+  const mixedEvidenceSession = app.state.session;
+  observe('aligned mixed questions supply evidence but not target quota', 4);
+  if (
+    mixedEvidenceStat.level !== 3 ||
+    mixedEvidenceSession.targetAsked !== 2 ||
+    mixedEvidenceSession.targetIndependent !== 2
+  ) {
+    violated(
+      'aligned mixed questions supply evidence but not target quota',
+      'level=' + mixedEvidenceStat.level + ', targetAsked=' + mixedEvidenceSession.targetAsked + ', targetIndependent=' + mixedEvidenceSession.targetIndependent,
+      sparseBank.id,
+    );
+  }
+
+  const finalIndependentProfile = freshUnitProfile(sparseBank);
+  app.state.session = evidenceSession();
+  record(finalIndependentProfile, sparseBank, 1, 'check');
+  record(finalIndependentProfile, sparseBank, 1, 'check');
+  record(finalIndependentProfile, sparseBank, 1, 'check');
+  record(finalIndependentProfile, sparseBank, 1, 'mixed', 'assisted');
+  const finalIndependentStat = finalIndependentProfile.unitStats[sparseBank.id];
+  observe('only an independent final item can promote a stage', 4);
+  if (
+    finalIndependentStat.level !== 1 ||
+    finalIndependentStat.evidenceWindow.join(',') !== '1,1,1,0' ||
+    app.stageEvidenceReady(finalIndependentStat, 1)
+  ) {
+    violated(
+      'only an independent final item can promote a stage',
+      'level=' + finalIndependentStat.level + ', evidence=' + finalIndependentStat.evidenceWindow.join(','),
+      sparseBank.id,
+    );
+  }
+
+  const terminalOutcomeProfile = freshUnitProfile(sparseBank);
+  app.state.session = evidenceSession();
+  record(terminalOutcomeProfile, sparseBank, 1, 'target');
+  record(terminalOutcomeProfile, sparseBank, 1, 'mixed', 'assisted');
+  record(terminalOutcomeProfile, sparseBank, 1, 'check', 'incorrect');
+  record(terminalOutcomeProfile, sparseBank, 1, 'exit', 'revealed');
+  const terminalOutcomeStat = terminalOutcomeProfile.unitStats[sparseBank.id];
+  const terminalOutcomeSession = app.state.session;
+  observe('non-independent terminal outcomes append zero evidence', 4);
+  if (
+    terminalOutcomeStat.level !== 1 ||
+    terminalOutcomeStat.stageAttempts !== 4 ||
+    terminalOutcomeStat.stageIndependent !== 1 ||
+    terminalOutcomeStat.evidenceWindow.join(',') !== '1,0,0,0' ||
+    terminalOutcomeSession.targetAsked !== 2 ||
+    terminalOutcomeSession.targetIndependent !== 1
+  ) {
+    violated(
+      'non-independent terminal outcomes append zero evidence',
+      'level=' + terminalOutcomeStat.level + ', attempts=' + terminalOutcomeStat.stageAttempts + ', independent=' + terminalOutcomeStat.stageIndependent + ', evidence=' + terminalOutcomeStat.evidenceWindow.join(',') + ', quota=' + terminalOutcomeSession.targetAsked + '/' + terminalOutcomeSession.targetIndependent,
+      sparseBank.id,
+    );
+  }
+
+  for (const invalidRole of [undefined, 'unexpected']) {
+    const profile = freshUnitProfile(sparseBank, 3);
+    const stat = profile.unitStats[sparseBank.id];
+    stat.supportDepth = 1;
+    stat.consecutiveBlocks = 1;
+    app.state.session = evidenceSession();
+    app.state.session.supportTopics[sparseBank.id] = 1;
+    record(profile, sparseBank, 3, invalidRole, 'incorrect');
+    record(profile, sparseBank, 3, invalidRole);
+    observe('missing and unknown roles fail closed for evidence support and quota', 2);
+    if (
+      stat.stageAttempts !== 0 ||
+      stat.evidenceWindow.length !== 0 ||
+      stat.supportDepth !== 1 ||
+      stat.consecutiveBlocks !== 1 ||
+      app.state.session.targetAsked !== 0 ||
+      app.state.session.targetIndependent !== 0 ||
+      app.state.session.supportTopics[sparseBank.id] !== 1
+    ) {
+      violated(
+        'missing and unknown roles fail closed for evidence support and quota',
+        String(invalidRole) + ' changed evidence=' + stat.evidenceWindow.join(',') + ' support=' + stat.supportDepth + '/' + stat.consecutiveBlocks + ' quota=' + app.state.session.targetAsked + '/' + app.state.session.targetIndependent,
+        sparseBank.id,
+      );
+    }
+  }
+
+  const reviewEvidenceProfile = freshUnitProfile(sparseBank, 3);
+  const reviewEvidenceStat = reviewEvidenceProfile.unitStats[sparseBank.id];
+  reviewEvidenceStat.supportDepth = 1;
+  reviewEvidenceStat.consecutiveBlocks = 1;
+  app.state.session = evidenceSession();
+  app.state.session.supportTopics[sparseBank.id] = 1;
+  record(reviewEvidenceProfile, sparseBank, 3, 'review');
+  observe('review never mutates ordinary evidence or support', 1);
+  if (
+    reviewEvidenceStat.stageAttempts !== 0 ||
+    reviewEvidenceStat.evidenceWindow.length !== 0 ||
+    reviewEvidenceStat.supportDepth !== 1 ||
+    reviewEvidenceStat.consecutiveBlocks !== 1 ||
+    app.state.session.targetAsked !== 0 ||
+    app.state.session.supportTopics[sparseBank.id] !== 1
+  ) {
+    violated(
+      'review never mutates ordinary evidence or support',
+      'evidence=' + reviewEvidenceStat.evidenceWindow.join(',') + ' support=' + reviewEvidenceStat.supportDepth + '/' + reviewEvidenceStat.consecutiveBlocks + ' quota=' + app.state.session.targetAsked,
+      sparseBank.id,
+    );
+  }
+
+  const bridgeProfile = freshUnitProfile(sparseBank, 3);
+  const bridgeStat = bridgeProfile.unitStats[sparseBank.id];
+  bridgeStat.supportDepth = 1;
+  app.state.session = evidenceSession();
+  app.state.session.supportTopics[sparseBank.id] = 1;
+  record(bridgeProfile, sparseBank, 1, 'target');
+  const bridgeAfterIndependent = bridgeStat.supportDepth;
+  record(bridgeProfile, sparseBank, 1, 'target', 'incorrect');
+  const bridgeAfterFailure = bridgeStat.supportDepth;
+  record(bridgeProfile, sparseBank, 1, 'unexpected', 'incorrect');
+  observe('lower-stage bridges stay outside current-stage evidence', 3);
+  if (
+    bridgeStat.stageAttempts !== 0 ||
+    bridgeStat.evidenceWindow.length !== 0 ||
+    bridgeAfterIndependent !== 0 ||
+    bridgeAfterFailure !== 1 ||
+    bridgeStat.supportDepth !== 1 ||
+    app.state.session.supportTopics[sparseBank.id] !== 1
+  ) {
+    violated(
+      'lower-stage bridges stay outside current-stage evidence',
+      'evidence=' + bridgeStat.evidenceWindow.join(',') + ' support=' + bridgeAfterIndependent + '/' + bridgeAfterFailure + '/' + bridgeStat.supportDepth,
+      sparseBank.id,
+    );
+  }
+
+  sparseProgressStat.nextReviewAt = Date.now() - 1;
+  app.state.session = evidenceSession();
+  record(sparseProgressProfile, sparseBank, 5, 'review');
+  observe('retention review remains separate from ordinary stage evidence', 1);
+  if (
+    sparseProgressStat.retentionStep !== 1 ||
+    sparseProgressStat.stageAttempts !== 0 ||
+    sparseProgressStat.evidenceWindow.length !== 0
+  ) {
+    violated(
+      'retention review remains separate from ordinary stage evidence',
+      'retention=' + sparseProgressStat.retentionStep + ', stageAttempts=' + sparseProgressStat.stageAttempts + ', evidence=' + sparseProgressStat.evidenceWindow.join(','),
+      sparseBank.id,
+    );
+  }
+}
+app.state.session = null;
+
 const mathLane = app.curriculumLaneIds().find((lane) => lane.some((id) => id.startsWith('math.')));
 const gradeOneBeginner = normalProfiles[0];
 const gradeSixBeginner = normalProfiles[2];
