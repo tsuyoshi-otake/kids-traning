@@ -75,8 +75,8 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(
             markup,
-            "'kind','mode','category'];",
-            "'kind','mode','category','subtype','pictureKind','pictureId','pictureLabel'];",
+            "'kind','mode','category','op','a','b','multiplicationFactKey','memoryAssessment','writtenArithmetic'];",
+            "'kind','mode','category','op','a','b','multiplicationFactKey','memoryAssessment','writtenArithmetic','subtype','pictureKind','pictureId','pictureLabel'];",
             StringComparison.Ordinal);
 
         return markup;

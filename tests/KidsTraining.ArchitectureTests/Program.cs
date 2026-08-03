@@ -500,7 +500,7 @@ internal static class Program
         var html = new LearningPageBuilder().Build(template, appDefinition, "Progression Test", ParentPin.Default);
 
         Assert(html.Contains("migrateProfiles(profiles)", StringComparison.Ordinal), "legacy profile migration is missing");
-        Assert(html.Contains("p.learningSchema=6", StringComparison.Ordinal) && html.Contains("unitStats", StringComparison.Ordinal) && html.Contains("stageAttempts", StringComparison.Ordinal), "unit-based schema-v6 migration is missing");
+        Assert(html.Contains("p.learningSchema=7", StringComparison.Ordinal) && html.Contains("unitStats", StringComparison.Ordinal) && html.Contains("stageAttempts", StringComparison.Ordinal) && html.Contains("multiplicationFacts", StringComparison.Ordinal), "unit-based schema-v7 migration is missing");
         Assert(html.Contains("if(wasV5)", StringComparison.Ordinal) && html.Contains("legacyTopicStats", StringComparison.Ordinal), "schema migration is not idempotent or does not retain legacy evidence");
         Assert(html.Contains("curriculumLaneIds()", StringComparison.Ordinal) && !html.Contains("raw=g===1?g1", StringComparison.Ordinal), "school grade still caps curriculum lanes");
         Assert(html.Contains("topicLearningStage(p,k){return this.topicStat(p,k).retentionStartedAt?6", StringComparison.Ordinal), "the sixth retention stage is missing");
@@ -643,7 +643,7 @@ internal static class Program
         Assert(html.Contains("pickWeekday(stage)", StringComparison.Ordinal) && html.Contains("subtype:'weekday'", StringComparison.Ordinal) && html.Contains("月曜日", StringComparison.Ordinal) && html.Contains("日曜日", StringComparison.Ordinal), "weekday names, order, or calendar offsets are missing");
         Assert(html.Contains("subtype:'number-sequence'", StringComparison.Ordinal) && html.Contains("subtype:'number-compose'", StringComparison.Ordinal), "number sequence or composition variants are missing");
         Assert(html.Contains("subtype:'missing-add'", StringComparison.Ordinal) && html.Contains("subtype:'missing-sub'", StringComparison.Ordinal), "missing-number addition or subtraction variants are missing");
-        Assert(html.Contains("const a=this.rand(12,89),b=this.rand(11,39)", StringComparison.Ordinal) && html.Contains("const a=this.rand(1234,7899)", StringComparison.Ordinal), "advanced grade 3 written arithmetic is missing");
+        Assert(html.Contains("const gradeTwo=[", StringComparison.Ordinal) && html.Contains("const gradeThree=[", StringComparison.Ordinal) && html.Contains("writtenArithmetic=true", StringComparison.Ordinal), "grade-specific written arithmetic progression is missing");
         Assert(html.Contains("pickMoney(p)", StringComparison.Ordinal) && html.Contains("pickGroups(p)", StringComparison.Ordinal), "grade 1 money or equal-group foundations are missing");
         Assert(html.Contains("subtype:'counter'", StringComparison.Ordinal) && html.Contains("subtype:'greeting'", StringComparison.Ordinal) && html.Contains("subtype:'feeling-reason'", StringComparison.Ordinal), "counter, greeting, or feeling-reason language variants are missing");
         const string grade1Kanji = "一右雨円王音下火花貝学気九休玉金空月犬見五口校左三山子四糸字耳七車手十出女小上森人水正生青夕石赤千川先早草足村大男竹中虫町天田土二日入年白八百文木本名目立力林六";
@@ -702,7 +702,7 @@ internal static class Program
             html.Contains("1人ぶんの こすう", StringComparison.Ordinal) &&
             html.Contains("わけられる 人数", StringComparison.Ordinal),
             "division concepts are incomplete");
-        Assert(html.Contains("difficulty:5", StringComparison.Ordinal) && html.Contains("コンパス", StringComparison.Ordinal), "staged grade 3 written arithmetic or circle work is missing");
+        Assert(html.Contains("writtenArithmetic=true", StringComparison.Ordinal) && html.Contains("コンパス", StringComparison.Ordinal), "staged grade 3 written arithmetic or circle work is missing");
         Assert(html.Contains("q.isMoney", StringComparison.Ordinal) && html.Contains("q.isGroups", StringComparison.Ordinal) && html.Contains("q.isTape", StringComparison.Ordinal), "new visual scaffolding is missing");
         Assert(html.Contains("requestLearningReset('history')", StringComparison.Ordinal) && html.Contains("this.state.resetPin!==this.parentPin()", StringComparison.Ordinal), "learning reset bypasses PIN confirmation");
         Assert(html.Contains("stars:mode==='full'?0:(Number(current.stars)||0)", StringComparison.Ordinal) && html.Contains("xp:mode==='full'?0:(Number(current.xp)||0)", StringComparison.Ordinal), "history-only and full reset reward semantics are not separated");

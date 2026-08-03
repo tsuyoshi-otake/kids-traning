@@ -44,7 +44,7 @@ internal static partial class LearningMarkupPatcher
     const match=raw.match(/^(\d+(?:\.\d+)?)([+\-−×÷])(\d+(?:\.\d+)?)$/);
     if(!match)return null;
     const op=match[2]==='−'?'-':match[2],fixed=new Set(['864÷24','3.6×4','2.4×0.5','3.6÷0.9']);
-    const advancedHissan=!!q&&q.topic==='hissan'&&Number(q.difficulty)>=5;
+    const advancedHissan=!!q&&q.topic==='hissan'&&(q.writtenArithmetic||Number(q.difficulty)>=5);
     const advancedDivision=!!q&&q.topic==='div'&&Number(q.difficulty)>=5&&op==='÷';
     if(!fixed.has(raw)&&!advancedHissan&&!advancedDivision)return null;
     return{raw:raw,left:match[1],op:op,right:match[3]};

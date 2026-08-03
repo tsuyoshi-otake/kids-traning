@@ -588,12 +588,12 @@ const migratedOnce = app.migrateProfiles(legacyProfiles);
 const migratedTwice = app.migrateProfiles(migratedOnce);
 observe('schema migration is idempotent', legacyProfiles.length);
 if (JSON.stringify(migratedOnce) !== JSON.stringify(migratedTwice)) {
-  violated('schema migration is idempotent', 'a second migration changed profile data', 'legacy -> v6 -> v6');
+  violated('schema migration is idempotent', 'a second migration changed profile data', 'legacy -> v7 -> v7');
 }
 for (let index = 0; index < legacyProfiles.length; index += 1) {
   const before = legacyProfiles[index];
   const after = migratedOnce[index];
-  if (after.learningSchema !== 6 || Object.keys(after.unitStats || {}).length !== UNITS.length) {
+  if (after.learningSchema !== 7 || Object.keys(after.unitStats || {}).length !== UNITS.length) {
     violated('schema migration is idempotent', `${before.name} did not receive one stat per unit`, before.name);
   }
   if (after.stars !== before.stars || after.xp !== before.xp || !after.legacyTopicStats) {
@@ -614,13 +614,17 @@ const revisionSourceStat = {
   level: 5,
   evidenceWindow: [1, 0, 1],
   recentQuestionFingerprints: ['oldest', 'newest'],
+  multiplicationFacts: {
+    '7x8': { attempts: 3, independent: 2, errors: 1, strength: 1, lastAttemptAt: 1500, lastOutcome: 'independent' },
+    invalid: { attempts: 99, strength: 2 },
+  },
 };
 const revisionProfile = app.migrateProfiles([{
   name: 'revision-change',
   grade: revisionUnit.grade,
   stars: 123,
   xp: 456,
-  learningSchema: 6,
+  learningSchema: 7,
   learningCatalogRevision: 'stale-catalog-revision',
   mastery: { [revisionUnit.id]: 0.91 },
   skillStats: {},
@@ -639,7 +643,9 @@ if (
   revisionStat.nextReviewAt !== 2000 ||
   revisionStat.level !== 5 ||
   revisionStat.evidenceWindow.join(',') !== '1,0,1' ||
-  revisionStat.recentQuestionFingerprints.join(',') !== 'oldest,newest'
+  revisionStat.recentQuestionFingerprints.join(',') !== 'oldest,newest' ||
+  revisionStat.multiplicationFacts['7x8']?.strength !== 1 ||
+  Object.hasOwn(revisionStat.multiplicationFacts, 'invalid')
 ) {
   violated(
     'catalog revision migration preserves unit progression and recent-question state',
@@ -657,6 +663,118 @@ const beginnerAtGrade = (grade) => app.ensureLearningProfile({
   skillStats: {},
   cleared: {},
 });
+
+const multiplicationUnit = UNITS.find((unit) => unit.topicId === 'mul' && unit.grade === 2);
+observe('multiplication memory curriculum covers every ordered fact', 81);
+if (!multiplicationUnit) {
+  violated('multiplication memory curriculum covers every ordered fact', 'grade 2 multiplication unit is missing', 'catalog');
+} else {
+  const expectedStageTables = [[2, 5], [3, 4], [6, 7], [8, 9, 1]];
+  const allFacts = new Set(app.multiplicationStageFactKeys(5));
+  if (allFacts.size !== 81) {
+    violated('multiplication memory curriculum covers every ordered fact', `expected 81 facts, received ${allFacts.size}`, 'stage 5');
+  }
+  for (let stage = 1; stage <= 4; stage += 1) {
+    const keys = app.multiplicationStageFactKeys(stage);
+    const expected = expectedStageTables[stage - 1];
+    if (keys.length !== expected.length * 9 || keys.some((key) => !expected.includes(Number(key.split('x')[0])))) {
+      violated('multiplication memory curriculum covers every ordered fact', `stage ${stage} has the wrong tables`, keys.join(','));
+    }
+  }
+
+  const multiplicationProfile = beginnerAtGrade(2);
+  const multiplicationStat = multiplicationProfile.unitStats[multiplicationUnit.id];
+  const firstStageFacts = app.multiplicationStageFactKeys(1);
+  const factQuestion = (key, difficulty, outcome = 'independent') => {
+    const [a, b] = key.split('x').map(Number);
+    app.recordEvidence(multiplicationProfile, {
+      topic: 'mul', unitId: multiplicationUnit.id, difficulty, sessionRole: 'check',
+      mode: 'num', answer: String(a * b), multiplicationFactKey: key, memoryAssessment: true,
+    }, outcome, outcome === 'independent' ? 1 : 0, { userAnswer: String(a * b) });
+  };
+  for (const key of firstStageFacts.slice(0, -1)) factQuestion(key, 1);
+  observe('multiplication stages require fact coverage', firstStageFacts.length);
+  if (multiplicationStat.level !== 1) {
+    violated('multiplication stages require fact coverage', 'stage advanced before every target fact was recalled', String(multiplicationStat.level));
+  }
+  factQuestion(firstStageFacts.at(-1), 1);
+  if (multiplicationStat.level !== 2) {
+    violated('multiplication stages require fact coverage', 'stage did not advance after evidence and full coverage', String(multiplicationStat.level));
+  }
+
+  factQuestion('3x7', 2);
+  factQuestion('3x7', 2, 'assisted');
+  if (multiplicationStat.multiplicationFacts['3x7']?.strength !== 0) {
+    violated('missed multiplication facts return to practice', 'an assisted answer did not reset fact strength', JSON.stringify(multiplicationStat.multiplicationFacts['3x7']));
+  }
+  let weakFactCount = 0;
+  for (let sample = 0; sample < 120; sample += 1) {
+    const question = app.genFor(multiplicationUnit.id, multiplicationProfile, 2);
+    if (question.mode !== 'num' || !question.memoryAssessment || !question.multiplicationFactKey) {
+      violated('multiplication recall uses unaided numeric input', 'a stage recall question was not a numeric memory assessment', JSON.stringify(question));
+      break;
+    }
+    if (question.multiplicationFactKey === '3x7') weakFactCount += 1;
+  }
+  observe('missed multiplication facts return to practice', 120);
+  observe('multiplication recall uses unaided numeric input', 120);
+  if (weakFactCount < 20) {
+    violated('missed multiplication facts return to practice', `weak fact appeared only ${weakFactCount}/120 times`, '3x7');
+  }
+}
+
+const carryCount = (left, right) => {
+  let count = 0;
+  let incoming = 0;
+  while (left || right || incoming) {
+    const total = left % 10 + right % 10 + incoming;
+    if (total >= 10) count += 1;
+    incoming = total >= 10 ? 1 : 0;
+    left = Math.floor(left / 10);
+    right = Math.floor(right / 10);
+  }
+  return count;
+};
+const borrowCount = (left, right) => {
+  let count = 0;
+  let borrow = 0;
+  while (left || right) {
+    const top = left % 10 - borrow;
+    const bottom = right % 10;
+    borrow = top < bottom ? 1 : 0;
+    if (borrow) count += 1;
+    left = Math.floor(left / 10);
+    right = Math.floor(right / 10);
+  }
+  return count;
+};
+const writtenUnits = [2, 3].map((grade) => UNITS.find((unit) => unit.topicId === 'hissan' && unit.grade === grade));
+observe('written arithmetic expands by grade and stage', 10);
+for (const unit of writtenUnits) {
+  if (!unit) {
+    violated('written arithmetic expands by grade and stage', 'a grade 2 or 3 written-arithmetic unit is missing', 'catalog');
+    continue;
+  }
+  const profile = beginnerAtGrade(unit.grade);
+  for (let stage = 1; stage <= 5; stage += 1) {
+    for (let sample = 0; sample < 80; sample += 1) {
+      const q = app.genFor(unit.id, profile, stage);
+      let valid = q.writtenArithmetic === true && q.difficulty === stage;
+      if (unit.grade === 2 && stage === 1) valid &&= q.a >= 10 && q.a < 100 && q.b >= 10 && q.b < 100 && (q.op === '＋' ? carryCount(q.a, q.b) === 0 : borrowCount(q.a, q.b) === 0);
+      if (unit.grade === 2 && stage === 2) valid &&= q.op === '＋' && carryCount(q.a, q.b) >= 1;
+      if (unit.grade === 2 && stage === 3) valid &&= q.op === '−' && borrowCount(q.a, q.b) >= 1;
+      if (unit.grade === 2 && stage >= 4) valid &&= q.a >= 100 && q.b >= 100 && (stage < 5 || (q.op === '＋' ? carryCount(q.a, q.b) >= 2 : borrowCount(q.a, q.b) >= 2));
+      if (unit.grade === 3 && stage === 1) valid &&= q.a >= 100 && q.b >= 100 && (q.op === '＋' || q.op === '−');
+      if (unit.grade === 3 && stage === 2) valid &&= q.op === 'mul' && q.a >= 10 && q.a < 100 && q.b < 10;
+      if (unit.grade === 3 && stage === 3) valid &&= q.op === 'mul' && q.a >= 100 && q.b < 10;
+      if (unit.grade === 3 && stage === 4) valid &&= q.op === 'mul' && q.a >= 10 && q.a < 100 && q.b >= 10 && q.b < 100;
+      if (!valid) {
+        violated('written arithmetic expands by grade and stage', `grade ${unit.grade} stage ${stage} generated the wrong shape`, JSON.stringify(q));
+        break;
+      }
+    }
+  }
+}
 const originalSettings = app.state.settings;
 app.state.settings = { ...app.defaultSettings(), preferSchoolGrade: false };
 const normalProfiles = [1, 3, 6].map((grade) => beginnerAtGrade(grade));
@@ -811,7 +929,7 @@ if (sparseBank && fullBank) {
     app.state.session = evidenceSession();
     const qualified = qualifyCurrentStage(profile, sparseBank);
     if (
-      beforeSchema !== 6 ||
+      beforeSchema !== 7 ||
       beforeLevel !== stageCase.saved ||
       qualified !== stageCase.current ||
       question.difficulty !== stageCase.current ||
