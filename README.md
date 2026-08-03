@@ -86,7 +86,7 @@ Curriculum scope, stable unit IDs, assessment modes, and official references are
 Build new releases with a version that matches the release tag:
 
 ```powershell
-rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.30.0
+rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.30.1
 ```
 
 Publish a GitHub Release such as `v1.20.0` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
@@ -125,6 +125,7 @@ Tracking issues:
 - Centered feedback layout and drawn hanamaru/batsu marks: https://github.com/tsuyoshi-otake/kids-traning/issues/44
 - Visible session pass conditions and a way out of the retry loop: https://github.com/tsuyoshi-otake/kids-traning/issues/43
 - Sixth-stage delayed retention: https://github.com/tsuyoshi-otake/kids-traning/issues/46
+- Retention completion and repeated reasoning questions: https://github.com/tsuyoshi-otake/kids-traning/issues/57
 - Bounded mastery recovery and parent learning-history JSON export: https://github.com/tsuyoshi-otake/kids-traning/issues/55
 - Camera-based attention monitoring removal: https://github.com/tsuyoshi-otake/kids-traning/issues/50
 - Grade 1-6 mastery-linked curriculum and school-grade display attribute: https://github.com/tsuyoshi-otake/kids-traning/issues/48

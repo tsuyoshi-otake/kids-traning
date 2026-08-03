@@ -602,6 +602,52 @@ for (let index = 0; index < legacyProfiles.length; index += 1) {
 }
 observe('schema migration preserves evidence', legacyProfiles.length);
 
+const revisionUnit = UNITS.find((unit) => unit.generatorKey === 'curriculum-bank') || UNITS[0];
+const revisionSourceStat = {
+  ...app.blankUnitStat(),
+  attempts: 77,
+  independent: 61,
+  confidence: 0.91,
+  retentionStep: 2,
+  retentionStartedAt: 1000,
+  nextReviewAt: 2000,
+  level: 5,
+  evidenceWindow: [1, 0, 1],
+  recentQuestionFingerprints: ['oldest', 'newest'],
+};
+const revisionProfile = app.migrateProfiles([{
+  name: 'revision-change',
+  grade: revisionUnit.grade,
+  stars: 123,
+  xp: 456,
+  learningSchema: 6,
+  learningCatalogRevision: 'stale-catalog-revision',
+  mastery: { [revisionUnit.id]: 0.91 },
+  skillStats: {},
+  unitStats: { [revisionUnit.id]: revisionSourceStat },
+  cleared: {},
+}])[0];
+const revisionStat = revisionProfile.unitStats[revisionUnit.id];
+observe('catalog revision migration preserves unit progression and recent-question state', 1);
+if (
+  revisionProfile.stars !== 123 ||
+  revisionProfile.xp !== 456 ||
+  revisionStat.attempts !== 77 ||
+  revisionStat.independent !== 61 ||
+  revisionStat.retentionStep !== 2 ||
+  revisionStat.retentionStartedAt !== 1000 ||
+  revisionStat.nextReviewAt !== 2000 ||
+  revisionStat.level !== 5 ||
+  revisionStat.evidenceWindow.join(',') !== '1,0,1' ||
+  revisionStat.recentQuestionFingerprints.join(',') !== 'oldest,newest'
+) {
+  violated(
+    'catalog revision migration preserves unit progression and recent-question state',
+    'a catalog update changed saved progression or bounded recent-question state',
+    JSON.stringify(revisionStat),
+  );
+}
+
 const beginnerAtGrade = (grade) => app.ensureLearningProfile({
   name: `grade-${grade}`,
   grade,
@@ -963,6 +1009,21 @@ if (sparseBank && fullBank) {
       sparseBank.id,
     );
   }
+
+  const retainedStepBeforeOrdinaryQuestion = sparseProgressStat.retentionStep;
+  const retainedReviewBeforeOrdinaryQuestion = sparseProgressStat.nextReviewAt;
+  record(sparseProgressProfile, sparseBank, 5, 'mixed', 'assisted');
+  observe('only a scheduled due review can mutate retention progress', 1);
+  if (
+    sparseProgressStat.retentionStep !== retainedStepBeforeOrdinaryQuestion ||
+    sparseProgressStat.nextReviewAt !== retainedReviewBeforeOrdinaryQuestion
+  ) {
+    violated(
+      'only a scheduled due review can mutate retention progress',
+      'an ordinary assisted question reset retention progress or its schedule',
+      'retention=' + sparseProgressStat.retentionStep + ', next=' + sparseProgressStat.nextReviewAt,
+    );
+  }
 }
 app.state.session = null;
 
@@ -1029,6 +1090,144 @@ if (app.activeCurriculumGrade(disabledProfile) !== 2) {
   violated('disabled units do not block grade completion', `disabling ${disabledTopic} still blocked grade 1`, app.activeCurriculumGrade(disabledProfile));
 }
 app.state.settings = originalSettings;
+
+let prerequisitePair = null;
+for (const lane of app.curriculumLaneIds()) {
+  for (let index = 1; index < lane.length; index += 1) {
+    const prerequisite = app.curriculumUnit(lane[index - 1]);
+    const dependent = app.curriculumUnit(lane[index]);
+    if (prerequisite.grade === 1 && dependent.grade === 1) {
+      prerequisitePair = { lane, index, prerequisite, dependent };
+      break;
+    }
+  }
+  if (prerequisitePair) break;
+}
+observe('retention completion advances the frontier without hijacking review selection', prerequisitePair ? 2 : 0);
+if (!prerequisitePair) {
+  violated(
+    'retention completion advances the frontier without hijacking review selection',
+    'the audit could not find adjacent grade-one prerequisite units',
+    app.curriculumLaneIds().map((lane) => lane.join('>')).join(' | '),
+  );
+} else {
+  const { lane, index, prerequisite, dependent } = prerequisitePair;
+  const reviewProfile = beginnerAtGrade(1);
+  const reviewDependentStat = reviewProfile.unitStats[dependent.id];
+  reviewDependentStat.attempts = 2;
+  reviewDependentStat.confidence = 0.2;
+  reviewDependentStat.nextReviewAt = Date.now() - 1;
+  const reviewSession = {
+    activeTargetTopic: dependent.id,
+    targetTopics: [dependent.id],
+    reviewTopics: [dependent.id],
+    supportTopics: {},
+    questionCounts: {},
+    lastQuestionKey: '',
+  };
+  const selectedReview = app.sessionTopic(reviewProfile, reviewSession, 'review');
+  if (selectedReview !== dependent.id || reviewSession.reviewTopics.length !== 0) {
+    violated(
+      'retention completion advances the frontier without hijacking review selection',
+      'a due review slot was substituted with a prerequisite or was not consumed',
+      selectedReview + ' / remaining=' + reviewSession.reviewTopics.join(','),
+    );
+  }
+
+  const frontierProfile = beginnerAtGrade(1);
+  for (let priorIndex = 0; priorIndex < index; priorIndex += 1) {
+    const priorStat = frontierProfile.unitStats[lane[priorIndex]];
+    priorStat.level = 5;
+    priorStat.retentionStartedAt = 1000 + priorIndex;
+    priorStat.retentionStep = 0;
+    priorStat.nextReviewAt = Date.now() + 86400000;
+  }
+  const frontierDependentStat = frontierProfile.unitStats[dependent.id];
+  frontierDependentStat.attempts = 2;
+  frontierDependentStat.confidence = 0.2;
+  const remediation = app.remediationTopics(frontierProfile, dependent.id);
+  const frontier = app.frontierTopics(frontierProfile);
+  if (
+    !app.topicComplete(frontierProfile, prerequisite.id) ||
+    remediation.includes(prerequisite.id) ||
+    !frontier.includes(dependent.id)
+  ) {
+    violated(
+      'retention completion advances the frontier without hijacking review selection',
+      'a prerequisite in retention still blocked or replaced its dependent frontier unit',
+      'remediation=' + remediation.join(',') + ' frontier=' + frontier.join(','),
+    );
+  }
+}
+
+const thinkingGradeOne = UNITS.find((unit) => unit.topicId === 'thinking' && unit.grade === 1);
+observe('reasoning questions rotate across sessions and stay balanced at the 30-question limit', thinkingGradeOne ? 36 : 0);
+if (!thinkingGradeOne) {
+  violated(
+    'reasoning questions rotate across sessions and stay balanced at the 30-question limit',
+    'the grade-one reasoning unit is missing',
+    'thinking grade 1',
+  );
+} else {
+  const reasoningSession = () => ({
+    questions: [],
+    rolePlan: [],
+    idx: 0,
+    correct: 0,
+    activeTargetTopic: thinkingGradeOne.id,
+    targetTopics: [thinkingGradeOne.id],
+    targetAsked: 0,
+    targetIndependent: 0,
+    reviewTopics: [],
+    supportTopics: {},
+    questionCounts: {},
+    lastQuestionKey: '',
+    attempt: 1,
+    startStars: 0,
+    startXp: 0,
+  });
+
+  const crossSessionProfile = beginnerAtGrade(1);
+  const crossSessionPrompts = [];
+  for (let index = 0; index < 6; index += 1) {
+    crossSessionPrompts.push(app.generateSessionQuestion(crossSessionProfile, reasoningSession(), 'target').prompt);
+  }
+  const recycledPrompt = app.generateSessionQuestion(crossSessionProfile, reasoningSession(), 'target').prompt;
+  const recentFingerprints = crossSessionProfile.unitStats[thinkingGradeOne.id].recentQuestionFingerprints;
+  if (
+    new Set(crossSessionPrompts).size !== 6 ||
+    recycledPrompt !== crossSessionPrompts[0] ||
+    recentFingerprints.length !== 6
+  ) {
+    violated(
+      'reasoning questions rotate across sessions and stay balanced at the 30-question limit',
+      'cross-session selection repeated early or did not recycle the oldest exhausted candidate',
+      JSON.stringify({ crossSessionPrompts, recycledPrompt, recentFingerprints }),
+    );
+  }
+
+  const maxSessionProfile = beginnerAtGrade(1);
+  const maxSession = reasoningSession();
+  const maxSessionPrompts = [];
+  for (let index = 0; index < 30; index += 1) {
+    maxSessionPrompts.push(app.generateSessionQuestion(maxSessionProfile, maxSession, 'target').prompt);
+  }
+  const promptCounts = new Map();
+  for (const prompt of maxSessionPrompts) promptCounts.set(prompt, (promptCounts.get(prompt) || 0) + 1);
+  const adjacentDuplicate = maxSessionPrompts.some((prompt, index) => index > 0 && prompt === maxSessionPrompts[index - 1]);
+  const counts = [...promptCounts.values()];
+  if (
+    promptCounts.size !== 6 ||
+    adjacentDuplicate ||
+    Math.max(...counts) - Math.min(...counts) > 1
+  ) {
+    violated(
+      'reasoning questions rotate across sessions and stay balanced at the 30-question limit',
+      'the bounded fallback repeated immediately or distributed an exhausted bank unevenly',
+      JSON.stringify({ maxSessionPrompts, counts }),
+    );
+  }
+}
 
 for (const unit of UNITS) {
   const topic = unit.topicId;

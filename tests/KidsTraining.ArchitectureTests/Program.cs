@@ -354,8 +354,13 @@ internal static class Program
             thinkingUnits.All(static unit => unit.SubjectId == "thinking" && unit.GeneratorKey == "curriculum-bank" && unit.Questions.Count > 0),
             "the grade 1-3 reasoning practice category is incomplete");
         Assert(
-            thinkingUnits.All(static unit => Enumerable.Range(1, 5).All(stage => unit.Questions.Any(question => question.Stage == stage))),
-            "the reasoning practice category does not cover all five difficulty stages");
+            thinkingUnits.All(static unit => Enumerable.Range(1, 5).All(stage =>
+            {
+                var stageQuestions = unit.Questions.Where(question => question.Stage == stage).ToArray();
+                return stageQuestions.Length >= 6 &&
+                       stageQuestions.Select(static question => question.Prompt).Distinct(StringComparer.Ordinal).Count() == stageQuestions.Length;
+            })),
+            "the reasoning practice category does not provide six distinct prompts at every difficulty stage");
         Assert(
             Enumerable.Range(1, 9).All(grade => units.Any(unit => unit.Grade == grade)),
             "one or more grades from elementary 1 through junior-high 3 have no curriculum units");
@@ -535,10 +540,13 @@ internal static class Program
             "learning questions are not generated lazily from the latest evidence");
         Assert(
             html.Contains("questionIdentity(q)", StringComparison.Ordinal) &&
+            html.Contains("questionFingerprint(key)", StringComparison.Ordinal) &&
             html.Contains("for(let attempt=0;attempt<24;attempt++)", StringComparison.Ordinal) &&
             html.Contains("questionCounts[key]", StringComparison.Ordinal) &&
+            html.Contains("recentQuestionFingerprints", StringComparison.Ordinal) &&
+            html.Contains("for(const item of bankItems)", StringComparison.Ordinal) &&
             html.Contains("if(!best)throw new Error('Unable to generate a learning question')", StringComparison.Ordinal),
-            "session question deduplication is missing a bounded terminal fallback");
+            "session and cross-session question deduplication is missing a bounded terminal fallback");
         Assert(
             html.Contains("Number(s.supportTopics[id])", StringComparison.Ordinal) &&
             html.Contains("const supportTopics=sess.supportTopics||(sess.supportTopics={})", StringComparison.Ordinal) &&
@@ -592,15 +600,19 @@ internal static class Program
         Assert(html.Contains("preferSchoolGradeLabel", StringComparison.Ordinal), "the protected parent UI does not expose the school-grade preference state");
         Assert(html.Contains("prerequisites", StringComparison.Ordinal) && html.Contains("directPrerequisites(p,k)", StringComparison.Ordinal) && html.Contains("(unit.prerequisites||[])", StringComparison.Ordinal), "the curriculum prerequisite graph is missing from generated markup");
         Assert(html.Contains("s.attempts>0&&(Number(s.confidence)<.5||this.topicDue(p,k))", StringComparison.Ordinal), "unattempted upper topics are incorrectly treated as remediation triggers");
-        Assert(html.Contains("visiting.has(topic)", StringComparison.Ordinal) && html.Contains("emitted.has(topic)", StringComparison.Ordinal) && html.Contains("filter(req=>!this.topicReady(p,req))", StringComparison.Ordinal), "prerequisite remediation is not cycle-safe, deduplicated, and readiness-aware");
+        Assert(html.Contains("visiting.has(topic)", StringComparison.Ordinal) && html.Contains("emitted.has(topic)", StringComparison.Ordinal) && html.Contains("filter(req=>!this.topicComplete(p,req))", StringComparison.Ordinal), "prerequisite remediation is not cycle-safe, deduplicated, and retention-completion-aware");
         Assert(html.Contains("for(const id of base)for(const req of this.remediationTopics(p,id))", StringComparison.Ordinal) && html.Contains("return remedial.length?remedial:(out.length?out:allowed)", StringComparison.Ordinal), "allowed topics or curriculum frontier do not prioritize remediation");
-        Assert(html.Contains("candidates=remedial.length?remedial:[id]", StringComparison.Ordinal) && html.Contains("if(!ids.length)throw new Error('No enabled curriculum units')", StringComparison.Ordinal), "weighted selection does not fall back explicitly after prerequisite remediation");
+        Assert(html.Contains("candidates=remedial.length?remedial:[id]", StringComparison.Ordinal) && html.Contains("return this.weightedPickExact(p,ids)", StringComparison.Ordinal), "weighted selection does not fall back explicitly after prerequisite remediation");
         Assert(html.Contains("configured[unit.topicId]!==false", StringComparison.Ordinal), "new curriculum topics are disabled for migrated settings");
         Assert(
             html.Contains("reviewCount=due.length?Math.min(due.length", StringComparison.Ordinal) &&
             html.Contains("const due=s.reviewTopics.filter(k=>this.topicDue(p,k))", StringComparison.Ordinal) &&
+            html.Contains("const topic=this.weightedPickExact(p,due)", StringComparison.Ordinal) &&
             html.Contains("s.reviewTopics.splice(index,1)", StringComparison.Ordinal),
-            "fresh sessions can start with unscheduled random review questions");
+            "review slots can select an unscheduled or substituted curriculum unit");
+        Assert(
+            !html.Contains("else if(difficulty===terminalStage&&outcome!=='independent')", StringComparison.Ordinal),
+            "an ordinary or substituted question can still reset retention outside its scheduled review");
         Assert(
             html.Contains("practice=allowed.filter(k=>!this.topicComplete(p,k)||this.topicDue(p,k))", StringComparison.Ordinal),
             "retention topics can reappear as ordinary mixed practice before review is due");
@@ -1038,9 +1050,10 @@ internal static class Program
             "question generation still clones full progress maps or uses superlinear ordered-set work");
         Assert(
             html.Contains("const previous=this._progressionScope,scope={profile:p,values:new Map()}", StringComparison.Ordinal) &&
-            html.Contains("if(deterministic)break", StringComparison.Ordinal) &&
+            html.Contains("bankItems=unit.generatorKey==='curriculum-bank'?this.curriculumBankPool(unit,stage):null", StringComparison.Ordinal) &&
+            html.Contains("for(const item of bankItems)", StringComparison.Ordinal) &&
             html.Contains("finally{this._progressionScope=previous;}", StringComparison.Ordinal),
-            "question generation does not reuse one progression scope or bound deterministic duplicates");
+            "question generation does not reuse one progression scope or enumerate authored duplicates with bounded work");
         Assert(
             html.Contains("componentDidUpdate(prevProps,prevState)", StringComparison.Ordinal) &&
             html.Contains("this.scheduleProfilesSave(prevState)", StringComparison.Ordinal) &&
