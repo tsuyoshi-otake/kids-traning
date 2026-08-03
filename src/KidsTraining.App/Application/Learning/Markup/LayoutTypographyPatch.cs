@@ -67,13 +67,49 @@ internal static partial class LearningMarkupPatcher
             "<div class=\"kt-choice\" onclick=\"{{ c.onClick }}\" style=\"{{ c.style }}\">{{ c.text }}</div>",
             StringComparison.Ordinal);
 
+        markup = ReplaceRequired(
+            markup,
+            "<div style=\"flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; margin-top:10px;\">",
+            "<div class=\"kt-choice-stage\" style=\"flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; margin-top:10px;\">",
+            StringComparison.Ordinal);
+
+        markup = ReplaceRequired(
+            markup,
+            "<div role=\"img\" aria-label=\"時計。{{ clockAskLabel }}\" style=\"position:relative;",
+            "<div class=\"kt-clock-visual\"><div class=\"kt-clock-face\" role=\"img\" aria-label=\"時計。{{ clockAskLabel }}\" style=\"position:relative;",
+            StringComparison.Ordinal);
+
+        markup = ReplaceRequired(
+            markup,
+            "<div style=\"font-size:16px; color:#7a6db5; font-weight:700; margin-bottom:12px;\">{{ clockAskLabel }}</div>",
+            "<div class=\"kt-clock-label\" style=\"font-size:16px; color:#7a6db5; font-weight:700; margin-bottom:12px;\">{{ clockAskLabel }}</div></div>",
+            StringComparison.Ordinal);
+
+        markup = ReplaceRequired(
+            markup,
+            "<div style=\"font-size:20px; color:#9a8662;\">こたえを えらんでね</div>",
+            "<div class=\"kt-choice-instruction\" style=\"font-size:20px; color:#9a8662;\">こたえを えらんでね</div>",
+            StringComparison.Ordinal);
+
+        markup = ReplaceRequired(
+            markup,
+            "<div style=\"display:flex; flex-direction:column; gap:10px; align-items:flex-start; margin:8px auto 10px; width:100%; max-width:720px; min-width:0; box-sizing:border-box; overflow-x:auto; overscroll-behavior-inline:contain; padding:0 2px;\">",
+            "<div class=\"kt-measure-visual\" style=\"display:flex; flex-direction:column; gap:10px; align-items:flex-start; margin:8px auto 10px; width:100%; max-width:720px; min-width:0; box-sizing:border-box; overflow-x:auto; overscroll-behavior-inline:contain; padding:0 2px;\">",
+            StringComparison.Ordinal);
+
+        markup = ReplaceRequired(
+            markup,
+            "<div role=\"img\" aria-label=\"{{ mrow.ariaLabel }}\" style=\"display:flex; align-items:center; gap:10px; width:max-content; max-width:none;\">",
+            "<div class=\"kt-measure-row\" role=\"img\" aria-label=\"{{ mrow.ariaLabel }}\" style=\"display:flex; align-items:center; gap:10px; width:max-content; max-width:none;\">",
+            StringComparison.Ordinal);
+
         markup = markup.Replace(
             "style=\"display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px; width:660px; max-width:90%;\"",
-            "class=\"kt-choice-grid\" style=\"display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; width:880px; max-width:92%;\"",
+            "class=\"kt-choice-grid\" style=\"display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; width:1120px; max-width:100%;\"",
             StringComparison.Ordinal);
         markup = markup.Replace(
             "style=\"display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; width:660px; max-width:90%;\"",
-            "class=\"kt-choice-grid\" style=\"display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; width:880px; max-width:92%;\"",
+            "class=\"kt-choice-grid\" style=\"display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; width:1120px; max-width:100%;\"",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -131,6 +167,7 @@ internal static partial class LearningMarkupPatcher
     --kt-paper: #fffdf8;
     --kt-border: #e7d6b6;
     --kt-feedback-measure: min(760px, 92vw);
+    --kt-choice-max: 1120px;
   }
 
   body {
@@ -189,11 +226,18 @@ internal static partial class LearningMarkupPatcher
   }
 
   .kt-choice-grid {
-    width: min(880px, 92vw) !important;
-    max-width: min(880px, 92vw) !important;
+    width: min(var(--kt-choice-max), 100%) !important;
+    max-width: none !important;
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-rows: minmax(80px, auto);
     gap: var(--kt-space-4) !important;
     margin-top: var(--kt-space-6) !important;
+  }
+
+  .kt-choice-stage {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
   }
 
   .kt-choice,
@@ -202,17 +246,17 @@ internal static partial class LearningMarkupPatcher
     width: 100%;
     min-width: 0;
     max-width: 100%;
-    min-height: 96px !important;
+    min-height: 80px !important;
     padding: var(--kt-space-3) var(--kt-space-4) !important;
     font-size: clamp(21px, 1.8vw, 26px) !important;
     line-height: 1.5 !important;
     text-align: center;
     white-space: normal !important;
-    overflow-wrap: anywhere;
-    word-break: break-all;
-    line-break: anywhere;
-    text-wrap: balance;
-    overflow: hidden;
+    overflow-wrap: break-word;
+    word-break: normal;
+    line-break: strict;
+    text-wrap: pretty;
+    overflow: visible;
   }
 
   .kt-choice ruby,
@@ -541,6 +585,82 @@ internal static partial class LearningMarkupPatcher
     }
   }
 
+  @media (min-width: 1000px) and (max-height: 820px) {
+    [data-screen-label]:has(.kt-choice-stage) {
+      padding: var(--kt-space-4) var(--kt-space-8) var(--kt-space-6) !important;
+    }
+
+    .kt-choice-stage {
+      justify-content: flex-start !important;
+      margin-top: var(--kt-space-1) !important;
+    }
+
+    .kt-choice-stage:has(.kt-clock-face) {
+      display: grid !important;
+      grid-template-columns: 240px minmax(0, 1fr);
+      grid-template-rows: auto auto minmax(0, auto) auto;
+      column-gap: var(--kt-space-6);
+      align-content: center;
+      align-items: center;
+    }
+
+    .kt-choice-stage:has(.kt-clock-face) > .kt-clock-visual {
+      grid-column: 1;
+      grid-row: 1 / 5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+    }
+
+    .kt-choice-stage:has(.kt-clock-face) .kt-clock-face {
+      width: 216px !important;
+      height: 216px !important;
+      margin: 0 auto !important;
+    }
+
+    .kt-choice-stage:has(.kt-clock-face) .kt-clock-label {
+      margin: var(--kt-space-2) 0 0 !important;
+      text-align: center;
+    }
+
+    .kt-choice-stage:has(.kt-clock-face) > .kt-question-prompt {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
+    .kt-choice-stage:has(.kt-clock-face) > .kt-choice-instruction {
+      grid-column: 2;
+      grid-row: 2;
+    }
+
+    .kt-choice-stage:has(.kt-clock-face) > .kt-choice-grid {
+      grid-column: 2;
+      grid-row: 3 / 5;
+      width: 100% !important;
+      margin-top: var(--kt-space-3) !important;
+    }
+
+    .kt-measure-visual:has(.kt-measure-row:nth-child(3)) {
+      display: grid !important;
+      grid-template-columns: repeat(2, max-content) !important;
+      justify-content: center;
+      gap: var(--kt-space-2) var(--kt-space-4) !important;
+      max-width: 1000px !important;
+      margin: var(--kt-space-1) auto var(--kt-space-2) !important;
+      overflow-x: visible !important;
+    }
+
+    .kt-measure-visual:has(.kt-measure-row:nth-child(3)) > .kt-measure-row {
+      max-width: 100% !important;
+    }
+
+    .kt-choice-grid {
+      margin-top: var(--kt-space-3) !important;
+    }
+  }
+
   @media (max-height: 900px) {
     .kt-feedback-screen {
       padding: var(--kt-space-4) var(--kt-space-6) !important;
@@ -683,7 +803,7 @@ internal static partial class LearningMarkupPatcher
     }
   }
 
-  @media (max-width: 720px) {
+  @media (max-width: 900px) {
     .kt-choice-grid {
       grid-template-columns: 1fr !important;
     }

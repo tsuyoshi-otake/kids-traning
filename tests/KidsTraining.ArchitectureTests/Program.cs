@@ -867,24 +867,30 @@ internal static class Program
             html.Contains("""class="kt-feedback-next""", StringComparison.Ordinal) &&
             html.Contains("min-height: 100dvh !important", StringComparison.Ordinal) &&
             html.Contains("justify-content: safe center !important", StringComparison.Ordinal) &&
-            !html.Contains("justify-content: flex-start !important", StringComparison.Ordinal) &&
             html.Contains("@media (max-height: 900px)", StringComparison.Ordinal) &&
             html.Contains("@media (max-height: 760px)", StringComparison.Ordinal) &&
-            html.Contains("@media (max-width: 720px)", StringComparison.Ordinal) &&
+            html.Contains("@media (min-width: 1000px) and (max-height: 820px)", StringComparison.Ordinal) &&
+            html.Contains("@media (max-width: 900px)", StringComparison.Ordinal) &&
             html.Contains("button:focus-visible", StringComparison.Ordinal) &&
             html.Contains("select:focus-visible", StringComparison.Ordinal) &&
             html.Contains("@media (prefers-reduced-motion: reduce)", StringComparison.Ordinal),
             "responsive typography, focus, or reduced-motion markup is missing");
         Assert(
             html.Contains("grid-template-columns: repeat(2, minmax(0, 1fr)) !important", StringComparison.Ordinal) &&
-            html.Contains("max-width: min(880px, 92vw) !important", StringComparison.Ordinal) &&
+            html.Contains("--kt-choice-max: 1120px", StringComparison.Ordinal) &&
+            html.Contains("width: min(var(--kt-choice-max), 100%) !important", StringComparison.Ordinal) &&
+            html.Contains("grid-auto-rows: minmax(80px, auto)", StringComparison.Ordinal) &&
+            html.Contains("class=\"kt-choice-stage\"", StringComparison.Ordinal) &&
+            html.Contains("class=\"kt-clock-visual\"", StringComparison.Ordinal) &&
+            html.Contains("class=\"kt-clock-face\"", StringComparison.Ordinal) &&
+            html.Contains("class=\"kt-measure-visual\"", StringComparison.Ordinal) &&
             html.Contains(".kt-choice-button", StringComparison.Ordinal) &&
             html.Contains("font-size: clamp(21px, 1.8vw, 26px) !important", StringComparison.Ordinal) &&
-            html.Contains("overflow-wrap: anywhere", StringComparison.Ordinal) &&
-            html.Contains("word-break: break-all", StringComparison.Ordinal) &&
-            html.Contains("line-break: anywhere", StringComparison.Ordinal) &&
-            html.Contains("text-wrap: balance", StringComparison.Ordinal) &&
-            html.Contains("overflow: hidden", StringComparison.Ordinal),
+            html.Contains("overflow-wrap: break-word", StringComparison.Ordinal) &&
+            html.Contains("word-break: normal", StringComparison.Ordinal) &&
+            html.Contains("line-break: strict", StringComparison.Ordinal) &&
+            html.Contains("text-wrap: pretty", StringComparison.Ordinal) &&
+            html.Contains("overflow: visible", StringComparison.Ordinal),
             "long choice text can overflow or widen the choice grid");
         Assert(
             html.Contains("[data-screen-label]", StringComparison.Ordinal) &&
