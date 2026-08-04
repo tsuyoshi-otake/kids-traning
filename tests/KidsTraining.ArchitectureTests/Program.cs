@@ -189,7 +189,7 @@ internal static class Program
             html.Contains("withRichText(source)", StringComparison.Ordinal) &&
             html.Contains("withRichInline(source)", StringComparison.Ordinal) &&
             html.Contains("questionRich(q,field,fallback)", StringComparison.Ordinal) &&
-            html.Contains("questionChoiceRich(q,index,fallback)", StringComparison.Ordinal) &&
+            html.Contains("questionChoiceRich(q,index,fallback,skipFurigana)", StringComparison.Ordinal) &&
             html.Contains("className:'kt-math kt-rich-math'", StringComparison.Ordinal),
             "safe Markdown and TeX display helpers are not present in the generated learning runtime");
         Assert(
@@ -842,8 +842,12 @@ internal static class Program
             html.Contains("calibKokuPre:this.withFurigana(calibKokuPre), calibKokuWord:calibKokuWord, calibKokuPost:this.withFurigana(calibKokuPost)", StringComparison.Ordinal),
             "kanji-reading targets expose their answer through furigana");
         Assert(
-            html.Contains("(q.topic==='kokugo'&&q.subtype==='kanji-choice')?c:this.withFurigana(c)", StringComparison.Ordinal) &&
-            html.Contains("(cq.topic==='kokugo'&&cq.subtype==='kanji-choice')?c:this.withFurigana(c)", StringComparison.Ordinal),
+            html.Contains("kanjiTargetChoices(q){return !!q&&q.topic==='kokugo'&&(q.subtype==='kanji-choice'||q.subtype==='kanji-picture');}", StringComparison.Ordinal) &&
+            html.Contains("const skipFurigana=this.kanjiTargetChoices(q)", StringComparison.Ordinal) &&
+            html.Contains("this.questionChoiceRich(q,index,c,skipFurigana)", StringComparison.Ordinal) &&
+            html.Contains("const skipFurigana=this.kanjiTargetChoices(cq)", StringComparison.Ordinal) &&
+            html.Contains("this.questionChoiceRich(cq,index,c,skipFurigana)", StringComparison.Ordinal) &&
+            html.Contains("this.withFurigana(fallback,skipFurigana)", StringComparison.Ordinal),
             "kanji-selection choices expose their readings through furigana");
         Assert(html.Contains("interrogative=before.endsWith('なん')", StringComparison.Ordinal), "interrogative counter readings are missing");
         Assert(

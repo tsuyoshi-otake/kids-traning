@@ -1347,6 +1347,10 @@ if (!thinkingGradeOne) {
   }
 }
 
+// The drills that ask the child to produce a kanji are rendered further down, so keep one
+// real generated sample of each instead of hand-writing a question the app never emits.
+const kanjiTargetSamples = new Map();
+
 for (const unit of UNITS) {
   const topic = unit.topicId;
   const grade = unit.grade;
@@ -1534,6 +1538,10 @@ for (const unit of UNITS) {
           }
         }
 
+        if (topic === 'kokugo' && (question.subtype === 'kanji-choice' || question.subtype === 'kanji-picture')) {
+          if (!kanjiTargetSamples.has(question.subtype)) kanjiTargetSamples.set(question.subtype, question);
+        }
+
         if (topic === 'kokugo' && question.subtype === 'kanji-choice') {
           observe('kanji choices have exactly one right reading');
           const askedReading = String(question.word);
@@ -1632,6 +1640,60 @@ if (upperGradePictureSeen) {
     'a grade-4 profile received a grade-1-3 SVG picture question',
     'grade4',
   );
+}
+
+// A drill that asks the child to write a reading as a kanji answers itself when the tiles
+// carry that reading as furigana, and the same is true of the picture drill. Asserting on
+// the source text of the exclusion is what let the leak ship, so render the real view model
+// through the real choice pipeline and require the tiles to come out bare.
+const RUBY_CHECK = 'kanji-target choices are rendered without furigana';
+const rubyReadingsIn = (value) => notationNodes(value)
+  .filter((node) => node && node.type === 'rt')
+  .map((node) => (node.children || []).map(String).join(''));
+
+// A pristine instance: the audit above rewrote app.state for the migration checks, and the
+// view model is only meaningful on the state shape the constructor establishes.
+const renderApp = new app.constructor();
+renderApp.props = renderApp.props || {};
+
+for (const subtype of ['kanji-choice', 'kanji-picture']) {
+  const question = kanjiTargetSamples.get(subtype);
+  observe(RUBY_CHECK, question ? 1 : 0);
+  if (!question) {
+    violated(RUBY_CHECK, `the sweep never generated a ${subtype} question, so the tiles were never checked`, subtype);
+    continue;
+  }
+  // Control: the answer kanji must be annotatable, otherwise bare tiles prove nothing.
+  if (!rubyReadingsIn(renderApp.withFurigana(String(question.answer))).length) {
+    violated(RUBY_CHECK, `${question.answer} carries no furigana even when asked for, so the check cannot detect a leak`, subtype);
+    continue;
+  }
+  let choices;
+  try {
+    renderApp.state.screen = 'quiz';
+    renderApp.state.profile = renderApp.ensureLearningProfile(profileFor(question.grade || 1));
+    renderApp.state.session = { questions: [question], idx: 0, total: 1, correct: 0 };
+    renderApp.state.lastResult = null;
+    const view = renderApp.renderVals();
+    choices = (view.choices || []).map((choice) => choice && choice.text);
+  } catch (error) {
+    violated(RUBY_CHECK, `rendering a ${subtype} question threw ${error && error.message}`, String(error && error.stack));
+    continue;
+  }
+  if (choices.length !== (question.choices || []).length) {
+    violated(RUBY_CHECK, `the ${subtype} view model rendered ${choices.length} tiles for ${(question.choices || []).length} choices`, JSON.stringify(question.choices));
+    continue;
+  }
+  for (let index = 0; index < choices.length; index += 1) {
+    const readings = rubyReadingsIn(choices[index]);
+    if (readings.length) {
+      violated(
+        RUBY_CHECK,
+        `the ${subtype} tile ${question.choices[index]} is annotated with ${readings.join('/')}, which is the answer the child is asked for`,
+        `${question.prompt} -> ${question.answer} choices=${JSON.stringify(question.choices)}`,
+      );
+    }
+  }
 }
 
 // --- aggregate checks -------------------------------------------------------------------
