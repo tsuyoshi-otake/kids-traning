@@ -126,6 +126,18 @@ assertFurigana('担当', 'たんとう');
 assertFurigana('学校', 'がっこう');
 assertFurigana('記録', 'きろく');
 
+for (const [weekday, reading] of [
+  ['月曜日', 'げつようび'],
+  ['火曜日', 'かようび'],
+  ['水曜日', 'すいようび'],
+  ['木曜日', 'もくようび'],
+  ['金曜日', 'きんようび'],
+  ['土曜日', 'どようび'],
+  ['日曜日', 'にちようび'],
+]) {
+  assertFurigana(weekday, reading);
+}
+
 // The production formatter returns React nodes, so inspect the whole stub tree rather than
 // relying on a string snapshot. This protects the semantic class, accessible label, and
 // visible glyph independently.
