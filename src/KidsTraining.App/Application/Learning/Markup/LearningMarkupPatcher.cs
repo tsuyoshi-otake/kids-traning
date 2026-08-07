@@ -230,6 +230,7 @@ internal static partial class LearningMarkupPatcher
         markup = PatchSessionPassGate(markup);
         markup = PatchLearningCheckpoint(markup);
         markup = PatchKanjiPictureQuestions(markup);
+        markup = PatchDrillMode(markup);
 
         return markup;
     }

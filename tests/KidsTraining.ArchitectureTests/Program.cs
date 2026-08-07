@@ -32,6 +32,7 @@ internal static class Program
         Run("Learning evidence separates outcomes and readiness", TestLearningEvidence);
         Run("Review schedule uses bounded spaced intervals", TestReviewSchedule);
         Run("Learning markup contains evidence-based progression", () => TestEducationalProgressionMarkup(repositoryRoot));
+        Run("Arithmetic drill mode is selectable from the start screen", () => TestDrillModeMarkup(repositoryRoot));
         Run("Learning hot paths retain bounded-work performance contracts", () => TestPerformanceContracts(repositoryRoot));
         Run("Generated learning algorithms keep bounded operation counts", () => TestAlgorithmPerformanceAudit(repositoryRoot));
         Run("Generated questions satisfy curriculum invariants", () => TestGeneratedQuestionAudit(repositoryRoot));
@@ -52,7 +53,7 @@ internal static class Program
 
         if (Failures.Count == 0)
         {
-            Console.WriteLine("Architecture tests passed: 23");
+            Console.WriteLine("Architecture tests passed: 24");
             return 0;
         }
 
@@ -491,6 +492,69 @@ internal static class Program
             evidence = evidence.Record(LearningOutcome.IndependentCorrect, now);
             Assert(evidence.NextReviewAt == now.AddDays(days), $"review interval was not {days} days");
             now = evidence.NextReviewAt.GetValueOrDefault();
+        }
+    }
+
+    private static void TestDrillModeMarkup(string repositoryRoot)
+    {
+        var (template, appDefinition) = ReadLearningSource(repositoryRoot);
+        var html = new LearningPageBuilder().Build(template, appDefinition, "Drill Test", ParentPin.Default);
+
+        // The courses are offered as hero cards next to "いまの にがて", sharing that card design.
+        var heroRowAt = html.IndexOf("<div class=\"kt-hero-row\">", StringComparison.Ordinal);
+        var weakCardAt = html.IndexOf("いまの にがて", StringComparison.Ordinal);
+        var entryAt = html.IndexOf("class=\"kt-hero-card kt-drill-card\"", StringComparison.Ordinal);
+        var heroRowEndAt = html.IndexOf("<!-- start button -->", StringComparison.Ordinal);
+        Assert(
+            heroRowAt >= 0 && weakCardAt > heroRowAt && entryAt > weakCardAt && heroRowEndAt > entryAt,
+            "the drill courses are not offered beside the weakness card inside the start screen card row");
+        Assert(
+            html.Contains("<sc-for list=\"{{ drillCards }}\" as=\"d\" hint-placeholder-count=\"4\">", StringComparison.Ordinal) &&
+            html.Contains("onStart:()=>this.startDrill(c.id,false)", StringComparison.Ordinal),
+            "the start screen does not list every drill course as its own selectable card");
+        Assert(
+            html.Contains("<div class=\"kt-drill-card-body\" role=\"button\" tabindex=\"0\"", StringComparison.Ordinal),
+            "the drill course card is not keyboard reachable");
+        Assert(
+            html.Contains("<sc-if value=\"{{ isDrill }}\" hint-placeholder-val=\"{{ false }}\">", StringComparison.Ordinal) &&
+            html.Contains("isDrill:sc==='drill'", StringComparison.Ordinal),
+            "the drill runs inside the session screens instead of a separate screen");
+        Assert(
+            html.Contains("title:'たしざん・ひきざん'", StringComparison.Ordinal) &&
+            html.Contains("title:'かけざん（九九）'", StringComparison.Ordinal) &&
+            html.Contains("{id:'k1',grade:1", StringComparison.Ordinal) &&
+            html.Contains("{id:'k2',grade:2", StringComparison.Ordinal),
+            "the arithmetic and kanji courses are not all defined for grade 1 and grade 2");
+
+        // A reading cannot be typed on the keypad, so the kanji courses answer by choosing, and
+        // the drill screen has to offer that choice instead of the pad.
+        Assert(
+            html.Contains("this.kanjiCurriculumEntries().filter(e=>e.g===grade)", StringComparison.Ordinal) &&
+            html.Contains("drillChoose(value){this.drillAnswerWith(value);}", StringComparison.Ordinal),
+            "the kanji courses do not read their questions from the shared kanji curriculum");
+        Assert(
+            html.Contains("<sc-if value=\"{{ drillView.showPick }}\" hint-placeholder-val=\"{{ false }}\">", StringComparison.Ordinal) &&
+            html.Contains("<div class=\"kt-drill-pick-btn\" role=\"button\" tabindex=\"0\"", StringComparison.Ordinal),
+            "the drill screen does not offer the reading choices as keyboard reachable buttons");
+        Assert(
+            html.Contains("drillStorageKey(){return 'kt_drill_v1';}", StringComparison.Ordinal) &&
+            html.Contains("writeDrillProgress(map)", StringComparison.Ordinal),
+            "drill progress is not persisted under its own storage key");
+        Assert(
+            html.Contains("this._drillKeyHandler", StringComparison.Ordinal) &&
+            html.Contains("this.drillSubmit();};document.addEventListener('keydown',this._drillKeyHandler);", StringComparison.Ordinal),
+            "the drill screen does not accept physical keyboard input");
+
+        // Drilling is deliberate extra practice, so it must never write curriculum evidence.
+        var drillScriptAt = html.IndexOf("drillStorageKey(){", StringComparison.Ordinal);
+        var drillScriptEnd = html.IndexOf("  renderVals(){", StringComparison.Ordinal);
+        Assert(drillScriptAt >= 0 && drillScriptEnd > drillScriptAt, "the drill methods are not installed before the view model");
+        var drillScript = html[drillScriptAt..drillScriptEnd];
+        foreach (var forbidden in new[] { "mastery", "recordOutcome", "unitStats", "topicStat", ".xp", ".stars" })
+        {
+            Assert(
+                !drillScript.Contains(forbidden, StringComparison.Ordinal),
+                $"the drill touches curriculum evidence through {forbidden}");
         }
     }
 

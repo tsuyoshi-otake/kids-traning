@@ -216,7 +216,14 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("optional-school-grade-preference", "cfg&&cfg.preferSchoolGrade"),
         ("host-parent-pin", "host.parentPin"),
         ("host-pending-reset", "host.pendingLearningReset"),
-        ("unlock-message", "kidsTraining.unlock")
+        ("unlock-message", "kidsTraining.unlock"),
+        ("arithmetic-drill-courses", "buildDrillBank(id)"),
+        ("arithmetic-drill-storage", "kt_drill_v1"),
+        ("arithmetic-drill-screen", "isDrill:sc==='drill'"),
+        ("arithmetic-drill-entry", "class=\"kt-hero-card kt-drill-card\""),
+        ("arithmetic-drill-keyboard", "this._drillKeyHandler"),
+        ("kanji-drill-courses", "drillKanjiEntries(grade)"),
+        ("kanji-drill-choices", "class=\"kt-drill-pick-btn\"")
     ];
 
     private static readonly (string Code, string Marker)[] ForbiddenMarkers =

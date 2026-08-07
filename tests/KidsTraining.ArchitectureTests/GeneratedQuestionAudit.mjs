@@ -1708,6 +1708,244 @@ for (const subtype of ['kanji-choice', 'kanji-picture']) {
   }
 }
 
+// --- arithmetic drill courses (issue #62) ------------------------------------------------
+
+// The drill is a fixed course, so every question can be checked instead of sampled. Each
+// prompt is solved from its own text: an answer that disagrees with the arithmetic in the
+// prompt would teach the child a wrong fact, which no amount of sampling may miss.
+const DRILL_OPERATORS = { '＋': (x, y) => x + y, '−': (x, y) => x - y, '×': (x, y) => x * y };
+const solveDrillPrompt = (text) => {
+  const parts = String(text).split(' ');
+  const apply = DRILL_OPERATORS[parts[1]];
+  if (!apply) return undefined;
+  if (parts.length === 3) {
+    if (parts[0] === '□' || parts[2] === '□') return undefined;
+    return apply(Number(parts[0]), Number(parts[2]));
+  }
+  if (parts.length !== 5 || parts[3] !== '＝') return undefined;
+  const blankLeft = parts[0] === '□';
+  const blankRight = parts[2] === '□';
+  if (blankLeft === blankRight) return undefined;
+  const expected = Number(parts[4]);
+  for (let candidate = 0; candidate <= 100; candidate += 1) {
+    const left = blankLeft ? candidate : Number(parts[0]);
+    const right = blankRight ? candidate : Number(parts[2]);
+    if (apply(left, right) === expected) return candidate;
+  }
+  return undefined;
+};
+
+// The drill persists progress through localStorage, which Node does not have. The stub is a
+// storage sink only; every rule about what is stored still comes from the generated app.
+const drillStorage = new Map();
+globalThis.localStorage = {
+  getItem: (key) => (drillStorage.has(key) ? drillStorage.get(key) : null),
+  setItem: (key, value) => drillStorage.set(key, String(value)),
+  removeItem: (key) => drillStorage.delete(key),
+};
+
+const DRILL_COURSE_CHECK = 'the drill courses are fixed, complete, and self-consistent';
+const DRILL_EMPHASIS_CHECK = 'the grade-1 drill emphasizes complements of ten and subtraction from ten';
+const DRILL_FACT_CHECK = 'the grade-2 drill covers every ordered multiplication fact';
+const DRILL_KANJI_CHECK = 'the kanji drills cover their grade and offer one right reading among four';
+const DRILL_FLOW_CHECK = 'a drill run advances, requeues a revealed question, and resumes where it stopped';
+
+const drillCourses = app.drillCourses();
+observe(DRILL_COURSE_CHECK, drillCourses.length);
+if (drillCourses.length !== 4) {
+  violated(DRILL_COURSE_CHECK, `expected an arithmetic and a kanji course for grade 1 and grade 2, found ${drillCourses.length}`, JSON.stringify(drillCourses.map((c) => c.id)));
+}
+const DRILL_FIRST_PROMPT = { g1: '1 ＋ 1', g2: '2 × 1' };
+for (const course of drillCourses) {
+  const bank = app.drillBank(course.id);
+  if (bank.length !== course.total) {
+    violated(DRILL_COURSE_CHECK, `${course.id} advertises ${course.total} questions but builds ${bank.length}`, course.title);
+  }
+  const expectedFirst = DRILL_FIRST_PROMPT[course.id];
+  if (expectedFirst && (!bank[0] || bank[0].text !== expectedFirst)) {
+    violated(DRILL_COURSE_CHECK, `${course.id} does not start at ${expectedFirst}`, bank[0] ? bank[0].text : '(empty)');
+  }
+  bank.forEach((question, index) => {
+    if (question.no !== index + 1) {
+      violated(DRILL_COURSE_CHECK, `${course.id} question numbering breaks at index ${index}`, JSON.stringify(question));
+    }
+    if (!question.sec || !question.hint) {
+      violated(DRILL_COURSE_CHECK, `${course.id} question ${question.no} has no section or no hint`, JSON.stringify(question));
+    }
+    // A reading is chosen, not calculated, so the arithmetic solver only judges keypad questions.
+    if (question.kind === 'pick') return;
+    const solved = solveDrillPrompt(question.text);
+    if (solved === undefined) {
+      violated(DRILL_COURSE_CHECK, `${course.id} question ${question.no} is not a readable prompt`, question.text);
+      return;
+    }
+    if (solved !== question.ans) {
+      violated(DRILL_COURSE_CHECK, `${course.id} question ${question.no} answers ${question.ans} but ${question.text} is ${solved}`, question.text);
+    }
+    if (!Number.isInteger(question.ans) || question.ans < 0) {
+      violated(DRILL_COURSE_CHECK, `${course.id} question ${question.no} does not answer with a whole number`, JSON.stringify(question));
+    }
+  });
+}
+
+// Complements of ten and subtraction from ten are the facts the course exists to drill, so
+// each of the nine pairs has to appear more than once and in a missing-number form as well.
+const gradeOneBank = app.drillBank('g1');
+observe(DRILL_EMPHASIS_CHECK, 9);
+for (let addend = 1; addend <= 9; addend += 1) {
+  const complements = gradeOneBank.filter((q) => q.text === `${addend} ＋ ${10 - addend}`).length;
+  const complementBlanks = gradeOneBank.filter((q) => q.text.includes('＝ 10') && q.ans === 10 - addend).length;
+  const fromTen = gradeOneBank.filter((q) => q.text === `10 − ${addend}`).length;
+  const fromTenBlanks = gradeOneBank.filter((q) => q.text === `10 − □ ＝ ${10 - addend}`).length;
+  if (complements < 2) {
+    violated(DRILL_EMPHASIS_CHECK, `${addend} ＋ ${10 - addend} is drilled only ${complements} time(s)`, 'complement of ten');
+  }
+  if (complementBlanks < 1) {
+    violated(DRILL_EMPHASIS_CHECK, `no missing-number question asks for ${10 - addend} as a complement of ten`, 'complement of ten');
+  }
+  if (fromTen < 2) {
+    violated(DRILL_EMPHASIS_CHECK, `10 − ${addend} is drilled only ${fromTen} time(s)`, 'subtraction from ten');
+  }
+  if (fromTenBlanks < 1) {
+    violated(DRILL_EMPHASIS_CHECK, `10 − □ ＝ ${10 - addend} is never asked`, 'subtraction from ten');
+  }
+}
+
+const gradeTwoBank = app.drillBank('g2');
+const drilledFacts = new Set();
+for (const question of gradeTwoBank) {
+  const match = /^(\d) × (\d)$/.exec(question.text);
+  if (match) drilledFacts.add(`${match[1]}x${match[2]}`);
+}
+observe(DRILL_FACT_CHECK, drilledFacts.size);
+for (let left = 1; left <= 9; left += 1) {
+  for (let right = 1; right <= 9; right += 1) {
+    if (!drilledFacts.has(`${left}x${right}`)) {
+      violated(DRILL_FACT_CHECK, `${left} × ${right} is never drilled`, 'multiplication fact coverage');
+    }
+  }
+}
+
+// The kanji courses are only worth drilling if they ask about every kanji of the grade and
+// if exactly one of the four offered readings is right: a repeated reading would mark a
+// correct child wrong, and a missing kanji would leave a hole in the year's reading.
+const KANJI_DRILL_GRADES = { k1: 1, k2: 2 };
+observe(DRILL_KANJI_CHECK, Object.keys(KANJI_DRILL_GRADES).length);
+for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
+  const bank = app.drillBank(courseId);
+  const gradeEntries = curriculum.filter((entry) => entry.g === grade);
+  const readingOf = new Map(gradeEntries.map((entry) => [entry.word, entry.r]));
+  const asked = new Set();
+  for (const question of bank) {
+    if (question.kind !== 'pick') {
+      violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} is not answered by choosing a reading`, JSON.stringify(question));
+      continue;
+    }
+    const expected = readingOf.get(question.text);
+    if (expected === undefined) {
+      violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} asks about ${question.text}, which is not a grade-${grade} kanji`, question.text);
+      continue;
+    }
+    asked.add(question.text);
+    if (question.ans !== expected) {
+      violated(DRILL_KANJI_CHECK, `${courseId} reads ${question.text} as ${question.ans} instead of ${expected}`, question.text);
+    }
+    const choices = question.choices || [];
+    if (choices.length !== 4 || new Set(choices).size !== 4) {
+      violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} offers ${JSON.stringify(choices)}`, question.text);
+      continue;
+    }
+    if (!choices.includes(expected)) {
+      violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} never offers the right reading ${expected}`, JSON.stringify(choices));
+    }
+  }
+  if (asked.size !== gradeEntries.length) {
+    const missing = gradeEntries.filter((entry) => !asked.has(entry.word)).map((entry) => entry.k);
+    violated(DRILL_KANJI_CHECK, `${courseId} drills ${asked.size} of the ${gradeEntries.length} grade-${grade} kanji`, missing.join(''));
+  }
+}
+
+// Drive a whole run the way the child does, so advancing, the two-mistake reveal, the
+// requeue, and resuming after quitting are proven rather than assumed.
+observe(DRILL_FLOW_CHECK, 4);
+drillStorage.clear();
+app.state.screen = 'start';
+app.startDrill('g1', true);
+let drillAsked = 0;
+while (!app.state.drill.done && drillAsked <= gradeOneBank.length) {
+  drillAsked += 1;
+  app.setState({ input: String(app.drillQuestion().ans) });
+  app.drillSubmit();
+}
+if (drillAsked !== gradeOneBank.length || app.state.drill.perfect !== gradeOneBank.length) {
+  violated(DRILL_FLOW_CHECK, `a clean run asked ${drillAsked} questions and scored ${app.state.drill.perfect} of ${gradeOneBank.length}`, 'clean run');
+}
+if (JSON.parse(drillStorage.get('kt_drill_v1')).g1.runs !== 1) {
+  violated(DRILL_FLOW_CHECK, 'finishing the course did not record exactly one completed run', drillStorage.get('kt_drill_v1'));
+}
+
+app.startDrill('g1', true);
+const revealedQuestion = app.drillQuestion();
+app.setState({ input: String(revealedQuestion.ans + 1) });
+app.drillSubmit();
+if (app.state.drill.mark !== 'wrong' || app.state.drill.hint !== revealedQuestion.hint) {
+  violated(DRILL_FLOW_CHECK, 'the first mistake did not offer the hint and a retry', JSON.stringify(app.state.drill));
+}
+app.setState({ input: String(revealedQuestion.ans + 2) });
+app.drillSubmit();
+if (!app.state.drill.revealed) {
+  violated(DRILL_FLOW_CHECK, 'the second mistake did not reveal the answer', JSON.stringify(app.state.drill));
+}
+app.drillNext();
+let requeueAsked = 0;
+let lastPrompt = '';
+while (!app.state.drill.done && requeueAsked <= gradeOneBank.length) {
+  requeueAsked += 1;
+  lastPrompt = app.drillQuestion().text;
+  app.setState({ input: String(app.drillQuestion().ans) });
+  app.drillSubmit();
+}
+if (lastPrompt !== revealedQuestion.text) {
+  violated(DRILL_FLOW_CHECK, `a revealed question was not asked again at the end (last prompt was ${lastPrompt})`, revealedQuestion.text);
+}
+if (app.state.drill.perfect !== gradeOneBank.length - 1) {
+  violated(DRILL_FLOW_CHECK, `a requeued question inflated the first-try score to ${app.state.drill.perfect}`, 'requeued run');
+}
+
+app.startDrill('g2', true);
+for (let step = 0; step < 7; step += 1) {
+  app.setState({ input: String(app.drillQuestion().ans) });
+  app.drillSubmit();
+}
+app.exitDrill();
+if (app.state.screen !== 'start' || app.state.drill !== null) {
+  violated(DRILL_FLOW_CHECK, 'quitting the drill did not return to the start screen', JSON.stringify(app.state.screen));
+}
+app.startDrill('g2', false);
+if (app.state.drill.idx !== 7 || app.drillQuestion().text !== gradeTwoBank[7].text) {
+  violated(DRILL_FLOW_CHECK, `resuming restarted at ${app.state.drill.idx} instead of 7`, JSON.stringify(app.state.drill));
+}
+// The kanji course answers by choosing, so the same run has to work without the keypad.
+app.startDrill('k1', true);
+const kanjiQuestion = app.drillQuestion();
+app.drillChoose(kanjiQuestion.choices.find((choice) => choice !== kanjiQuestion.ans));
+if (app.state.drill.mark !== 'wrong' || app.state.drill.idx !== 0) {
+  violated(DRILL_FLOW_CHECK, 'a wrong reading did not keep the kanji question on screen', JSON.stringify(app.state.drill));
+}
+app.drillChoose(kanjiQuestion.ans);
+if (app.state.drill.idx !== 1 || app.state.drill.perfect !== 0) {
+  violated(DRILL_FLOW_CHECK, 'choosing the right reading did not advance without crediting a first-try answer', JSON.stringify(app.state.drill));
+}
+app.drillChoose(app.drillQuestion().ans);
+if (app.state.drill.idx !== 2 || app.state.drill.perfect !== 1) {
+  violated(DRILL_FLOW_CHECK, 'a clean kanji answer was not credited', JSON.stringify(app.state.drill));
+}
+
+if ([...drillStorage.keys()].join(',') !== 'kt_drill_v1') {
+  violated(DRILL_FLOW_CHECK, `the drill wrote outside its own storage key: ${[...drillStorage.keys()].join(',')}`, 'storage isolation');
+}
+app.exitDrill();
+
 // --- aggregate checks -------------------------------------------------------------------
 
 const missingKana = [...GOJUON].filter((kana) => !romajiKanaSeen.has(kana));
