@@ -117,8 +117,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   drillCourses(){return [
     {id:'g1',grade:1,total:200,badge:'1年生',title:'たしざん・ひきざん',sub:'1＋1から じゅんばんに 200もん',color:'#ff8a3d',edge:'#e07d2a',shade:'#fff3e6'},
     {id:'g2',grade:2,total:200,badge:'2年生',title:'かけざん（九九）',sub:'2のだんから じゅんばんに 200もん',color:'#4a9bf0',edge:'#2f7ccd',shade:'#eaf3ff'},
-    {id:'k1',grade:1,total:200,badge:'1年生',title:'かんじの よみ',sub:'1年生の 漢字 80字を よむ 200もん',color:'#5fbf7a',edge:'#3f9a5b',shade:'#eaf7ee'},
-    {id:'k2',grade:2,total:200,badge:'2年生',title:'かんじの よみ',sub:'2年生の 漢字 160字を よむ 200もん',color:'#b07ae0',edge:'#8d55c4',shade:'#f4ecff'}
+    {id:'k1',grade:1,total:200,badge:'1年生',title:'かんじの 音読み・訓読み',sub:'1年生の 漢字 80字を 音読み・訓読みで 200もん',color:'#5fbf7a',edge:'#3f9a5b',shade:'#eaf7ee'},
+    {id:'k2',grade:2,total:200,badge:'2年生',title:'かんじの 音読み・訓読み',sub:'2年生の 漢字 160字を 音読み・訓読みで 200もん',color:'#b07ae0',edge:'#8d55c4',shade:'#f4ecff'}
   ];}
   drillCourse(id){const list=this.drillCourses();for(let i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
   drillDefaultRecord(){return {idx:0,perfect:0,mistakes:0,runs:0,best:0};}
@@ -141,27 +141,29 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   }
   drillBank(id){if(!this._drillBanks)this._drillBanks={};if(!this._drillBanks[id])this._drillBanks[id]=this.buildDrillBank(id);return this._drillBanks[id];}
   drillKanjiEntries(grade){if(!this._drillKanji)this._drillKanji={};if(!this._drillKanji[grade])this._drillKanji[grade]=this.kanjiCurriculumEntries().filter(e=>e.g===grade);return this._drillKanji[grade];}
+  buildKanjiDrillBank(id){
+    const grade=id==='k1'?1:2,entries=this.drillKanjiEntries(grade),list=[],targets=[];
+    entries.forEach(e=>{if(e.on)targets.push({e:e,type:'on',reading:e.on,word:e.k});if(e.kun)targets.push({e:e,type:'kun',reading:e.kun,word:e.kunWord||e.k});});
+    const uniqueReadings=Array.from(new Set(targets.map(target=>target.reading)));
+    const targetFor=(e,preferred)=>{const type=preferred==='on'&&e.on?'on':preferred==='kun'&&e.kun?'kun':e.on?'on':'kun';return{e:e,type:type,reading:type==='on'?e.on:e.kun,word:type==='on'?e.k:e.kunWord||e.k};};
+    const ask=(sec,target,index)=>{
+      const opts=[target.reading],base=targets.findIndex(candidate=>candidate.e===target.e&&candidate.type===target.type);
+      [13,29,47].forEach(step=>{let j=(base+step)%targets.length,guard=0;while(guard<targets.length&&opts.indexOf(targets[j].reading)>=0){j=(j+1)%targets.length;guard++;}if(guard<targets.length)opts.push(targets[j].reading);});
+      for(let i=0;i<uniqueReadings.length&&opts.length<4;i++)if(opts.indexOf(uniqueReadings[i])<0)opts.push(uniqueReadings[i]);
+      const order=opts.slice(1);order.splice(index%4,0,target.reading);const label=target.type==='on'?'\u97f3\u8aad\u307f':'\u8a13\u8aad\u307f';
+      list.push({no:list.length+1,sec:sec,text:target.word,ans:target.reading,hint:label+'だよ。さいしょの もじは 「'+Array.from(target.reading)[0]+'」だよ。',kind:'pick',choices:order,kanji:target.e.k,readingType:target.type});
+    };
+    const A='\u3042\u305f\u3089\u3057\u3044 \u304b\u3093\u3058',B='\u97f3\u8aad\u307f\u30fb\u8a13\u8aad\u307f \u3075\u304f\u3057\u3085\u3046',C='\u3057\u3042\u3052\u306e \u30df\u30c3\u30af\u30b9';
+    const primary=entries.map((entry,index)=>targetFor(entry,index%2===0?'on':'kun'));
+    const alternate=entries.map((entry,index)=>targetFor(entry,index%2===0?'kun':'on'));
+    for(let i=0;i<primary.length;i++)ask(A,primary[i],i);
+    const extra=200-list.length;
+    for(let i=0;i<extra;i++)ask(i<Math.min(extra,entries.length)?B:C,alternate[(i*(grade===1?7:13)+1)%alternate.length],entries.length+i);
+    return list;
+  }
   buildDrillBank(id){
+    if(id==='k1'||id==='k2')return this.buildKanjiDrillBank(id);
     const list=[],add=(sec,text,ans,hint,choices)=>{list.push({no:list.length+1,sec:sec,text:text,ans:ans,hint:hint,kind:choices?'pick':'num',choices:choices||null});};
-    if(id==='k1'||id==='k2'){
-      // A reading has no keypad, so the kanji course asks the child to choose. The three
-      // distractors are readings of other kanji of the same grade, taken at fixed strides so
-      // the course is the same every run, and skipped when they repeat a reading already on
-      // screen: two identical choices would make a right answer look wrong.
-      const grade=id==='k1'?1:2,entries=this.drillKanjiEntries(grade),n=entries.length,readings=entries.map(e=>e.r);
-      const ask=(sec,at)=>{
-        const e=entries[at],opts=[e.r];
-        [13,29,47].forEach(step=>{let j=(at+step)%n,guard=0;while(guard<n&&opts.indexOf(readings[j])>=0){j=(j+1)%n;guard++;}opts.push(readings[j]);});
-        const order=opts.slice(1);order.splice(at%4,0,e.r);
-        add(sec,e.word,e.r,'さいしょの もじは 「'+Array.from(e.r)[0]+'」だよ。',order);
-      };
-      const A='あたらしい かんじ',B='ふくしゅう',C='しあげの ミックス';
-      for(let i=0;i<n;i++)ask(A,i);
-      if(grade===1)for(let i=0;i<n;i++)ask(B,(i*7)%n);
-      const stride=grade===1?3:7,mix=200-list.length;
-      for(let i=0;i<mix;i++)ask(C,(i*stride+1)%n);
-      return list;
-    }
     if(id==='g2'){
       const A='九九を おぼえる',B='むずかしい だんの ふくしゅう',C='ひっくりかえしても おなじ',D='□に はいる かず',E='しあげの ミックス';
       [2,5,3,4,6,7,8,9,1].forEach(a=>{for(let b=1;b<=9;b++)add(A,a+' × '+b,a*b,a+'のだんを 1から となえて みよう。');});
@@ -202,6 +204,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   }
   drillAnswerLine(q){if(q.kind==='pick')return q.text+' → '+q.ans;return q.text.indexOf('□')>=0?q.text.replace('□',String(q.ans)):q.text+' ＝ '+q.ans;}
   drillMatches(q,value){const raw=String(value==null?'':value);if(!raw.length)return false;return q.kind==='pick'?raw===String(q.ans):Number(raw)===Number(q.ans);}
+  drillReadingLabel(q){return q&&q.readingType==='on'?'\u97f3\u8aad\u307f':'\u8a13\u8aad\u307f';}
+  drillPrompt(q){return q&&q.readingType?q.text+' ['+this.drillReadingLabel(q)+']':(q?q.text:'');}
   drillQuestionAt(d,index){
     if(!d)return null;const bank=this.drillBank(d.id),again=Array.isArray(d.again)?d.again:[];
     if(index<bank.length)return bank[index]||null;
@@ -300,7 +304,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         countText:inMain?(seen+' / '+total):('なおし '+(d.idx-total+1)+' / '+dAgain.length),
         headStyle:'background:'+(course.color||'#ff8a3d')+';',
         barStyle:'width:'+Math.round(this.clamp(seen/(total||1),0,1)*100)+'%; background:'+(course.color||'#ff8a3d')+';',
-        prompt:dq?dq.text:'', ansBox:S.input||'?',
+        prompt:dq?this.drillPrompt(dq):'', ansBox:S.input||'?',
         ansStyle:d.mark?'border-color:#e08a7a; color:#b23b23;':'',
         showAns:!dPick, showAsk:dPick, showPad:!dPick, showPick:dPick, picks:drillPicks,
         showHint:d.mark==='wrong', hint:d.hint||'',

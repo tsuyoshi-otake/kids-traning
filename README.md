@@ -35,6 +35,8 @@ rtk dotnet run --project tests\KidsTraining.ArchitectureTests\KidsTraining.Archi
 
 ## Runtime Behavior
 
+The fixed grade-1 and grade-2 kanji drills keep their 200-question courses, and each question labels whether it asks for an 音読み or a 訓読み. The four choices contain exactly one correct reading, using the same canonical MEXT kanji bank as the rest of the Japanese curriculum.
+
 Curriculum scope, stable unit IDs, assessment modes, and official references are listed in [the elementary grade 1 through junior-high grade 3 curriculum alignment](docs/curriculum-alignment.md).
 
 - The app builds `assets\kids-training.runtime.html` from the source template and learning app definition, then maps the local assets to the constrained virtual HTTPS host `learning.kidstraining.local` in WebView2 while keeping all learning content local.

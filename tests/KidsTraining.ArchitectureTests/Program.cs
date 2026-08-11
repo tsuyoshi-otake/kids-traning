@@ -720,8 +720,14 @@ internal static class Program
         Assert(html.Contains("const kanjiGrade1='" + grade1Kanji + "';", StringComparison.Ordinal), "grade 1 canonical kanji allocation differs from the official set");
         Assert(html.Contains("const kanjiGrade2='" + grade2Kanji + "';", StringComparison.Ordinal), "grade 2 canonical kanji allocation differs from the official set");
         Assert(html.Contains("const kanjiGrade3='" + grade3Kanji + "';", StringComparison.Ordinal), "grade 3 canonical kanji allocation differs from the official set");
-        Assert(html.Contains("return kanji.map((k,index)=>{const r=readings[index],tail=okuri.get(k)||''", StringComparison.Ordinal), "canonical kanji are not converted into independently selectable question targets");
+        Assert(html.Contains("return kanji.map((k,index)=>{const r=readings[index],on=onReadings[index],kun=kunReadings[index]", StringComparison.Ordinal), "canonical kanji are not converted into independently selectable question targets");
         Assert(html.Contains("word:k+tail", StringComparison.Ordinal), "kanji targets are not written with their okurigana");
+        Assert(
+            html.Contains("const drillOnGrade1='", StringComparison.Ordinal) &&
+            html.Contains("const drillKunGrade1='", StringComparison.Ordinal) &&
+            html.Contains("drillReadingLabel(q)", StringComparison.Ordinal) &&
+            html.Contains("readingType:target.type", StringComparison.Ordinal),
+            "kanji on-yomi and kun-yomi data is not connected to the fixed drill");
         Assert(html.Contains("const L=this.kanjiCurriculumEntries().concat([", StringComparison.Ordinal), "canonical kanji are not included in the Japanese question pool");
         Assert(html.Split("{g:1,t:'", StringSplitOptions.None).Length - 1 + html.Split("{g:2,t:'", StringSplitOptions.None).Length - 1 + html.Split("{g:3,t:'", StringSplitOptions.None).Length - 1 >= 32, "reading passages were not doubled");
         Assert(html.Contains("pickOrder(p)", StringComparison.Ordinal) && html.Contains("（ ）の なかを さきに", StringComparison.Ordinal), "parentheses or inequalities are missing");

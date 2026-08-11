@@ -1747,7 +1747,7 @@ globalThis.localStorage = {
 const DRILL_COURSE_CHECK = 'the drill courses are fixed, complete, and self-consistent';
 const DRILL_EMPHASIS_CHECK = 'the grade-1 drill emphasizes complements of ten and subtraction from ten';
 const DRILL_FACT_CHECK = 'the grade-2 drill covers every ordered multiplication fact';
-const DRILL_KANJI_CHECK = 'the kanji drills cover their grade and offer one right reading among four';
+const DRILL_KANJI_CHECK = 'the kanji drills cover their grade and distinguish on-yomi from kun-yomi';
 const DRILL_FLOW_CHECK = 'a drill run advances, requeues a revealed question, and resumes where it stopped';
 
 const drillCourses = app.drillCourses();
@@ -1834,21 +1834,36 @@ observe(DRILL_KANJI_CHECK, Object.keys(KANJI_DRILL_GRADES).length);
 for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
   const bank = app.drillBank(courseId);
   const gradeEntries = curriculum.filter((entry) => entry.g === grade);
-  const readingOf = new Map(gradeEntries.map((entry) => [entry.word, entry.r]));
+  const readingOf = new Map(gradeEntries.map((entry) => [entry.k, entry]));
   const asked = new Set();
+  const readingTypes = new Set();
   for (const question of bank) {
     if (question.kind !== 'pick') {
       violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} is not answered by choosing a reading`, JSON.stringify(question));
       continue;
     }
-    const expected = readingOf.get(question.text);
-    if (expected === undefined) {
-      violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} asks about ${question.text}, which is not a grade-${grade} kanji`, question.text);
+    const entry = readingOf.get(question.kanji);
+    if (!entry) {
+      violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} asks about ${question.kanji}, which is not a grade-${grade} kanji`, question.text);
       continue;
     }
-    asked.add(question.text);
+    if (question.readingType !== 'on' && question.readingType !== 'kun') {
+      violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} does not identify on-yomi or kun-yomi`, JSON.stringify(question));
+      continue;
+    }
+    const expected = question.readingType === 'on' ? entry.on : entry.kun;
+    const expectedText = question.readingType === 'on' ? entry.k : entry.kunWord;
+    if (!expected) {
+      violated(DRILL_KANJI_CHECK, `${courseId} asks for a missing ${question.readingType} reading of ${entry.k}`, JSON.stringify(question));
+      continue;
+    }
+    asked.add(entry.k);
+    readingTypes.add(question.readingType);
     if (question.ans !== expected) {
-      violated(DRILL_KANJI_CHECK, `${courseId} reads ${question.text} as ${question.ans} instead of ${expected}`, question.text);
+      violated(DRILL_KANJI_CHECK, `${courseId} reads ${entry.k} as ${question.ans} instead of ${expected}`, question.text);
+    }
+    if (question.text !== expectedText) {
+      violated(DRILL_KANJI_CHECK, `${courseId} uses ${question.text} for ${question.readingType} of ${entry.k}; expected ${expectedText}`, question.text);
     }
     const choices = question.choices || [];
     if (choices.length !== 4 || new Set(choices).size !== 4) {
@@ -1860,8 +1875,11 @@ for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
     }
   }
   if (asked.size !== gradeEntries.length) {
-    const missing = gradeEntries.filter((entry) => !asked.has(entry.word)).map((entry) => entry.k);
+    const missing = gradeEntries.filter((entry) => !asked.has(entry.k)).map((entry) => entry.k);
     violated(DRILL_KANJI_CHECK, `${courseId} drills ${asked.size} of the ${gradeEntries.length} grade-${grade} kanji`, missing.join(''));
+  }
+  if (readingTypes.size !== 2) {
+    violated(DRILL_KANJI_CHECK, `${courseId} does not include both on-yomi and kun-yomi questions`, JSON.stringify([...readingTypes]));
   }
 }
 
