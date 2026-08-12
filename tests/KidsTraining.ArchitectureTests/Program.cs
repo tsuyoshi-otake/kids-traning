@@ -510,7 +510,7 @@ internal static class Program
             "the drill courses are not offered beside the weakness card inside the start screen card row");
         Assert(
             html.Contains("<sc-for list=\"{{ drillCards }}\" as=\"d\" hint-placeholder-count=\"4\">", StringComparison.Ordinal) &&
-            html.Contains("onStart:()=>this.startDrill(c.id,false)", StringComparison.Ordinal),
+            html.Contains("onStart:()=>this.selectDrillCourse(c.id)", StringComparison.Ordinal),
             "the start screen does not list every drill course as its own selectable card");
         Assert(
             html.Contains("<div class=\"kt-drill-card-body\" role=\"button\" tabindex=\"0\"", StringComparison.Ordinal),
@@ -519,6 +519,14 @@ internal static class Program
             html.Contains("<sc-if value=\"{{ isDrill }}\" hint-placeholder-val=\"{{ false }}\">", StringComparison.Ordinal) &&
             html.Contains("isDrill:sc==='drill'", StringComparison.Ordinal),
             "the drill runs inside the session screens instead of a separate screen");
+        Assert(
+            html.Contains("<sc-if value=\"{{ isDrillMode }}\" hint-placeholder-val=\"{{ false }}\">", StringComparison.Ordinal) &&
+            html.Contains("isDrillMode:sc==='drill-mode'", StringComparison.Ordinal) &&
+            html.Contains("aria-label=\"{{ drillModeView.firstAria }}\"", StringComparison.Ordinal) &&
+            html.Contains("aria-label=\"{{ drillModeView.secondAria }}\"", StringComparison.Ordinal) &&
+            html.Contains("firstAria:kanjiMode?'1ばん、読みを選ぶ':'1ばん、数字を入力'", StringComparison.Ordinal) &&
+            html.Contains("secondAria:kanjiMode?'2ばん、漢字を選ぶ':'2ばん、2つから選ぶ'", StringComparison.Ordinal),
+            "the arithmetic and kanji drills do not offer keyboard-reachable answer-mode choices before starting");
         Assert(
             html.Contains("title:'たしざん・ひきざん'", StringComparison.Ordinal) &&
             html.Contains("title:'かけざん（九九）'", StringComparison.Ordinal) &&
@@ -542,8 +550,20 @@ internal static class Program
             "drill progress is not persisted under its own storage key");
         Assert(
             html.Contains("this._drillKeyHandler", StringComparison.Ordinal) &&
+            html.Contains("kanji?'reading':'input'", StringComparison.Ordinal) &&
+            html.Contains("kanji?'writing':'choice'", StringComparison.Ordinal) &&
             html.Contains("this.drillSubmit();};document.addEventListener('keydown',this._drillKeyHandler);", StringComparison.Ordinal),
             "the drill screen does not accept physical keyboard input");
+        Assert(
+            html.Contains("drillNumericChoices(d,q)", StringComparison.Ordinal) &&
+            html.Contains("return Number(q.no)%2===0?[answer,distractor]:[distractor,answer]", StringComparison.Ordinal) &&
+            html.Contains("d.answerMode==='choice'?this.drillNumericChoices(d,q):[]", StringComparison.Ordinal),
+            "the arithmetic drill does not build deterministic two-choice answers with alternating correct positions");
+        Assert(
+            html.Contains("drillKanjiWritingChoices(d,q)", StringComparison.Ordinal) &&
+            html.Contains("d.answerMode!=='writing'", StringComparison.Ordinal) &&
+            html.Contains("ただしい かんじを えらんでね", StringComparison.Ordinal),
+            "the kanji drill does not reverse readings into four-choice spelling questions");
 
         // Drilling is deliberate extra practice, so it must never write curriculum evidence.
         var drillScriptAt = html.IndexOf("drillStorageKey(){", StringComparison.Ordinal);

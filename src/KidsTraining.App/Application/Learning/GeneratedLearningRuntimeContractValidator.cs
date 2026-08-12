@@ -28,6 +28,7 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("multiplication-generator", "pickMul(p)"),
         ("japanese-generator", "pickKokugo(p)"),
         ("kanji-curriculum", "kanjiCurriculumEntries()"),
+        ("kanji-drill-writing-mode", "drillKanjiWritingChoices(d,q)"),
         ("kanji-grade-2-complete", "const kanjiGrade2='引羽雲園遠何科夏家歌画回会海絵外角楽活間丸岩顔汽記帰弓牛魚京強教近兄形計元言原戸古午後語工公広交光考行高黄合谷国黒今才細作算止市矢姉思紙寺自時室社弱首秋週春書少場色食心新親図数西声星晴切雪船線前組走多太体台地池知茶昼長鳥朝直通弟店点電刀冬当東答頭同道読内南肉馬売買麦半番父風分聞米歩母方北毎妹万明鳴毛門夜野友用曜来里理話';"),
         ("kanji-grade-3-complete", "const kanjiGrade3='悪安暗医委意育員院飲運泳駅央横屋温化荷界階寒感漢館岸起期客究急級宮球去橋業曲局銀区苦具君係軽血決研県庫湖向幸港号根祭皿仕死使始指歯詩次事持式実写者主守取酒受州拾終習集住重宿所暑助昭消商章勝乗植申身神真深進世整昔全相送想息速族他打対待代第題炭短談着注柱丁帳調追定庭笛鉄転都度投豆島湯登等動童農波配倍箱畑発反坂板皮悲美鼻筆氷表秒病品負部服福物平返勉放味命面問役薬由油有遊予羊洋葉陽様落流旅両緑礼列練路和開';"),
         ("character-generator", "pickMoji(p)"),
@@ -222,6 +223,8 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("arithmetic-drill-screen", "isDrill:sc==='drill'"),
         ("arithmetic-drill-entry", "class=\"kt-hero-card kt-drill-card\""),
         ("arithmetic-drill-keyboard", "this._drillKeyHandler"),
+        ("arithmetic-drill-answer-mode", "isDrillMode:sc==='drill-mode'"),
+        ("arithmetic-drill-two-choice", "drillNumericChoices(d,q)"),
         ("kanji-drill-courses", "drillKanjiEntries(grade)"),
         ("kanji-drill-choices", "class=\"kt-drill-pick-btn\"")
     ];

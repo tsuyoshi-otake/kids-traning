@@ -1708,7 +1708,7 @@ for (const subtype of ['kanji-choice', 'kanji-picture']) {
   }
 }
 
-// --- arithmetic drill courses (issue #62) ------------------------------------------------
+// --- arithmetic drill courses (issues #62 and #64) ----------------------------------------
 
 // The drill is a fixed course, so every question can be checked instead of sampled. Each
 // prompt is solved from its own text: an answer that disagrees with the arithmetic in the
@@ -1747,7 +1747,9 @@ globalThis.localStorage = {
 const DRILL_COURSE_CHECK = 'the drill courses are fixed, complete, and self-consistent';
 const DRILL_EMPHASIS_CHECK = 'the grade-1 drill emphasizes complements of ten and subtraction from ten';
 const DRILL_FACT_CHECK = 'the grade-2 drill covers every ordered multiplication fact';
+const DRILL_CHOICE_CHECK = 'every arithmetic drill question offers one plausible wrong answer and one right answer';
 const DRILL_KANJI_CHECK = 'the kanji drills cover their grade and distinguish on-yomi from kun-yomi';
+const DRILL_KANJI_WRITING_CHECK = 'every kanji writing question offers one right spelling and three same-grade distractors with different readings';
 const DRILL_FLOW_CHECK = 'a drill run advances, requeues a revealed question, and resumes where it stopped';
 
 const drillCourses = app.drillCourses();
@@ -1786,6 +1788,42 @@ for (const course of drillCourses) {
       violated(DRILL_COURSE_CHECK, `${course.id} question ${question.no} does not answer with a whole number`, JSON.stringify(question));
     }
   });
+}
+
+// The optional recognition mode must be safe across the entire fixed bank, not only a sample.
+// Correct positions alternate deterministically so children cannot learn a side bias.
+observe(DRILL_CHOICE_CHECK, 400);
+for (const courseId of ['g1', 'g2']) {
+  const bank = app.drillBank(courseId);
+  const correctPositions = [0, 0];
+  for (const question of bank) {
+    const choices = app.drillNumericChoices({ id: courseId, answerMode: 'choice' }, question);
+    if (choices.length !== 2 || new Set(choices).size !== 2 || !choices.includes(question.ans)) {
+      violated(DRILL_CHOICE_CHECK, `${courseId} question ${question.no} offers ${JSON.stringify(choices)}`, JSON.stringify(question));
+      continue;
+    }
+    const correctAt = choices.indexOf(question.ans);
+    correctPositions[correctAt] += 1;
+    const wrong = choices[1 - correctAt];
+    if (!Number.isInteger(wrong) || wrong < 0) {
+      violated(DRILL_CHOICE_CHECK, `${courseId} question ${question.no} has an invalid distractor ${wrong}`, question.text);
+      continue;
+    }
+    const fact = /^(\d+) × (\d+)$/.exec(question.text);
+    if (!fact && Math.abs(wrong - question.ans) !== 1) {
+      violated(DRILL_CHOICE_CHECK, `${courseId} question ${question.no} does not use an adjacent-number distractor ${wrong}`, question.text);
+    }
+    if (fact) {
+      const left = Number(fact[1]);
+      const wrongFactor = wrong / left;
+      if (!Number.isInteger(wrongFactor) || wrongFactor < 1 || wrongFactor > 9 || Math.abs(wrongFactor - Number(fact[2])) !== 1) {
+        violated(DRILL_CHOICE_CHECK, `${courseId} question ${question.no} does not use an adjacent table fact as distractor`, JSON.stringify(choices));
+      }
+    }
+  }
+  if (correctPositions[0] !== bank.length / 2 || correctPositions[1] !== bank.length / 2) {
+    violated(DRILL_CHOICE_CHECK, `${courseId} correct positions are ${correctPositions.join(' / ')}`, 'expected an even split');
+  }
 }
 
 // Complements of ten and subtraction from ten are the facts the course exists to drill, so
@@ -1883,11 +1921,55 @@ for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
   }
 }
 
+// Writing mode reverses each prompt: the reading is shown and the child chooses the canonical
+// spelling (including okurigana). Distractors stay inside the same grade and never share the
+// target reading, so an alternative valid spelling cannot create an ambiguous question.
+observe(DRILL_KANJI_WRITING_CHECK, 400);
+for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
+  const bank = app.drillBank(courseId);
+  const gradeSpellings = new Set();
+  curriculum.filter((entry) => entry.g === grade).forEach((entry) => {
+    if (entry.on) gradeSpellings.add(entry.k);
+    if (entry.kun) gradeSpellings.add(entry.kunWord);
+  });
+  const correctPositions = [0, 0, 0, 0];
+  for (const question of bank) {
+    const drill = { id: courseId, answerMode: 'writing' };
+    const presented = app.drillPresentedQuestion(drill, question);
+    const choices = app.drillChoices(drill, presented);
+    if (presented.text !== question.ans || presented.ans !== question.text) {
+      violated(DRILL_KANJI_WRITING_CHECK, `${courseId} question ${question.no} was not reversed for writing`, JSON.stringify(presented));
+      continue;
+    }
+    if (choices.length !== 4 || new Set(choices).size !== 4 || choices.filter((choice) => choice === question.text).length !== 1) {
+      violated(DRILL_KANJI_WRITING_CHECK, `${courseId} question ${question.no} offers ${JSON.stringify(choices)}`, JSON.stringify(question));
+      continue;
+    }
+    correctPositions[choices.indexOf(question.text)] += 1;
+    for (const distractor of choices.filter((choice) => choice !== question.text)) {
+      if (!gradeSpellings.has(distractor)) {
+        violated(DRILL_KANJI_WRITING_CHECK, `${courseId} question ${question.no} uses an out-of-grade spelling ${distractor}`, JSON.stringify(choices));
+      }
+      const distractorQuestions = bank.filter((candidate) => candidate.text === distractor);
+      if (distractorQuestions.some((candidate) => candidate.ans === question.ans)) {
+        violated(DRILL_KANJI_WRITING_CHECK, `${courseId} question ${question.no} uses same-reading distractor ${distractor}`, question.ans);
+      }
+    }
+  }
+  if (correctPositions.some((count) => count !== bank.length / 4)) {
+    violated(DRILL_KANJI_WRITING_CHECK, `${courseId} correct positions are ${correctPositions.join(' / ')}`, 'expected an even four-way split');
+  }
+}
+
 // Drive a whole run the way the child does, so advancing, the two-mistake reveal, the
 // requeue, and resuming after quitting are proven rather than assumed.
 observe(DRILL_FLOW_CHECK, 4);
 drillStorage.clear();
 app.state.screen = 'start';
+app.selectDrillCourse('g1');
+if (app.state.screen !== 'drill-mode' || app.state.drillCourseChoice !== 'g1') {
+  violated(DRILL_FLOW_CHECK, 'selecting an arithmetic course did not ask how to answer', JSON.stringify(app.state));
+}
 app.startDrill('g1', true);
 let drillAsked = 0;
 while (!app.state.drill.done && drillAsked <= gradeOneBank.length) {
@@ -1939,12 +2021,32 @@ app.exitDrill();
 if (app.state.screen !== 'start' || app.state.drill !== null) {
   violated(DRILL_FLOW_CHECK, 'quitting the drill did not return to the start screen', JSON.stringify(app.state.screen));
 }
-app.startDrill('g2', false);
-if (app.state.drill.idx !== 7 || app.drillQuestion().text !== gradeTwoBank[7].text) {
+app.startDrill('g2', false, 'choice');
+if (app.state.drill.idx !== 7 || app.state.drill.answerMode !== 'choice' || app.drillQuestion().text !== gradeTwoBank[7].text) {
   violated(DRILL_FLOW_CHECK, `resuming restarted at ${app.state.drill.idx} instead of 7`, JSON.stringify(app.state.drill));
 }
-// The kanji course answers by choosing, so the same run has to work without the keypad.
-app.startDrill('k1', true);
+// Arithmetic choice answers use the same miss/retry/scoring flow as keypad answers.
+app.startDrill('g1', true, 'choice');
+const arithmeticChoiceQuestion = app.drillQuestion();
+const arithmeticChoices = app.drillChoices(app.state.drill, arithmeticChoiceQuestion);
+app.drillChoose(arithmeticChoices.find((choice) => choice !== arithmeticChoiceQuestion.ans));
+if (app.state.drill.mark !== 'wrong' || app.state.drill.idx !== 0) {
+  violated(DRILL_FLOW_CHECK, 'a wrong arithmetic choice did not keep the question on screen', JSON.stringify(app.state.drill));
+}
+app.drillChoose(arithmeticChoiceQuestion.ans);
+if (app.state.drill.idx !== 1 || app.state.drill.perfect !== 0) {
+  violated(DRILL_FLOW_CHECK, 'the corrected arithmetic choice did not advance without first-try credit', JSON.stringify(app.state.drill));
+}
+app.drillChoose(app.drillQuestion().ans);
+if (app.state.drill.idx !== 2 || app.state.drill.perfect !== 1) {
+  violated(DRILL_FLOW_CHECK, 'a clean arithmetic choice was not credited', JSON.stringify(app.state.drill));
+}
+// Both kanji modes answer by choosing, so the same run has to work without the keypad.
+app.selectDrillCourse('k1');
+if (app.state.screen !== 'drill-mode' || app.state.drillCourseChoice !== 'k1') {
+  violated(DRILL_FLOW_CHECK, 'selecting a kanji course did not ask which answer direction to use', JSON.stringify(app.state));
+}
+app.startDrill('k1', true, 'reading');
 const kanjiQuestion = app.drillQuestion();
 app.drillChoose(kanjiQuestion.choices.find((choice) => choice !== kanjiQuestion.ans));
 if (app.state.drill.mark !== 'wrong' || app.state.drill.idx !== 0) {
@@ -1957,6 +2059,19 @@ if (app.state.drill.idx !== 1 || app.state.drill.perfect !== 0) {
 app.drillChoose(app.drillQuestion().ans);
 if (app.state.drill.idx !== 2 || app.state.drill.perfect !== 1) {
   violated(DRILL_FLOW_CHECK, 'a clean kanji answer was not credited', JSON.stringify(app.state.drill));
+}
+
+app.startDrill('k1', true, 'writing');
+const writingBaseQuestion = app.drillQuestion();
+const writingQuestion = app.drillPresentedQuestion(app.state.drill, writingBaseQuestion);
+const writingChoices = app.drillChoices(app.state.drill, writingQuestion);
+app.drillChoose(writingChoices.find((choice) => choice !== writingQuestion.ans));
+if (app.state.drill.mark !== 'wrong' || app.state.drill.idx !== 0) {
+  violated(DRILL_FLOW_CHECK, 'a wrong kanji spelling did not keep the question on screen', JSON.stringify(app.state.drill));
+}
+app.drillChoose(writingQuestion.ans);
+if (app.state.drill.idx !== 1 || app.state.drill.perfect !== 0) {
+  violated(DRILL_FLOW_CHECK, 'choosing the right kanji spelling did not advance without first-try credit', JSON.stringify(app.state.drill));
 }
 
 if ([...drillStorage.keys()].join(',') !== 'kt_drill_v1') {

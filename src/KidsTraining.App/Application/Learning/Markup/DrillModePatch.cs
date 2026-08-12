@@ -1,7 +1,7 @@
 namespace KidsTraining.App.Application.Learning.Markup;
 
 /// <summary>
-/// Adds the fixed arithmetic drill mode (とっくんモード) selected from the start screen (issue #62).
+/// Adds the fixed arithmetic drill mode (とっくんモード) selected from the start screen (issues #62 and #64).
 ///
 /// The adaptive session decides what a learner sees next, which is right for daily study but wrong
 /// for the number facts that have to become automatic. The drill is therefore a separate screen with
@@ -19,7 +19,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "    muted:false, speakingEnglish:'', setupName:''",
-            "    drill:null, drillAsk:'',\n    muted:false, speakingEnglish:'', setupName:''",
+            "    drill:null, drillAsk:'', drillCourseChoice:'',\n    muted:false, speakingEnglish:'', setupName:''",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -52,6 +52,7 @@ internal static partial class LearningMarkupPatcher
             markup,
             "      profiles:profiles, goCalib:()=>this.goCalib(),",
             "      profiles:profiles, goCalib:()=>this.goCalib(),\n" +
+            "      isDrillMode:sc==='drill-mode', drillModeView:drillModeView,\n" +
             "      isDrill:sc==='drill', drillCards:drillCards, drillView:drillView,",
             StringComparison.Ordinal);
 
@@ -91,7 +92,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "  <!-- ============ QUIZ ============ -->",
-            BuildDrillScreenTemplate() + "\n\n  <!-- ============ QUIZ ============ -->",
+            BuildDrillModeScreenTemplate() + "\n\n" + BuildDrillScreenTemplate() + "\n\n  <!-- ============ QUIZ ============ -->",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -106,7 +107,7 @@ internal static partial class LearningMarkupPatcher
     private static string BuildDrillKeyHandlerScript()
     {
         return """
-this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlKey||e.altKey||e.metaKey||this.state.screen!=='drill')return;const d=this.state.drill;if(!d||d.done)return;const roleButton=!!(e.target&&e.target.getAttribute&&e.target.getAttribute('role')==='button');if(roleButton&&(e.key==='Enter'||e.key===' '))return;if(d.revealed){if(e.key==='Enter'||e.key===' '){e.preventDefault();this.drillNext();}return;}const dq=this.drillQuestionAt(d,d.idx);if(dq&&dq.kind==='pick'){if(/^[1-4]$/.test(e.key)){e.preventDefault();const choice=(dq.choices||[])[Number(e.key)-1];if(choice)this.drillChoose(choice);}return;}if(/^[0-9]$/.test(e.key)){e.preventDefault();this.press(e.key);return;}if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();this.del();return;}if(e.key!=='Enter'||!this.state.input)return;e.preventDefault();this.drillSubmit();};document.addEventListener('keydown',this._drillKeyHandler);
+this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlKey||e.altKey||e.metaKey)return;const sc=this.state.screen;if(sc==='drill-mode'){const id=String(this.state.drillCourseChoice||'');if(e.key==='Escape'){e.preventDefault();this.cancelDrillMode();return;}if((e.key==='1'||e.key==='2')&&id){e.preventDefault();const kanji=id==='k1'||id==='k2',mode=e.key==='1'?(kanji?'reading':'input'):(kanji?'writing':'choice');this.startDrill(id,false,mode);}return;}if(sc!=='drill')return;const d=this.state.drill;if(!d||d.done)return;const roleButton=!!(e.target&&e.target.getAttribute&&(e.target.getAttribute('role')==='button'||e.target.tagName==='BUTTON'));if(roleButton&&(e.key==='Enter'||e.key===' '))return;if(d.revealed){if(e.key==='Enter'||e.key===' '){e.preventDefault();this.drillNext();}return;}const base=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,base),choices=this.drillChoices(d,dq);if(choices.length){const choiceIndex=Number(e.key)-1;if(choiceIndex>=0&&choiceIndex<choices.length){e.preventDefault();this.drillChoose(choices[choiceIndex]);}return;}if(/^[0-9]$/.test(e.key)){e.preventDefault();this.press(e.key);return;}if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();this.del();return;}if(e.key!=='Enter'||!this.state.input)return;e.preventDefault();this.drillSubmit();};document.addEventListener('keydown',this._drillKeyHandler);
 """.TrimEnd('\r', '\n');
     }
 
@@ -213,15 +214,39 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     return extra<again.length?(bank[again[extra]]||null):null;
   }
   drillQuestion(){const d=this.state.drill;return d?this.drillQuestionAt(d,d.idx):null;}
-  startDrill(id,restart){
+  selectDrillCourse(id){const course=this.drillCourse(id);if(!course)return;this.sfx('select');this.setState({screen:'drill-mode',drillCourseChoice:id});}
+  cancelDrillMode(){this.sfx('tap');this.setState({screen:'start',drillCourseChoice:''});}
+  drillNumericChoices(d,q){
+    if(!d||!q||q.kind!=='num')return [];
+    const answer=Number(q.ans);if(!Number.isFinite(answer))return [];
+    let distractor=null;
+    if(d.id==='g2'&&String(q.text).indexOf('□')<0){const match=/^(\d+) × (\d+)$/.exec(String(q.text));if(match){const left=Number(match[1]),right=Number(match[2]),near=right<9?right+1:right-1;distractor=left*near;}}
+    if(!Number.isFinite(distractor)||distractor===answer||distractor<0){distractor=Number(q.no)%2===0&&answer>0?answer-1:answer+1;}
+    return Number(q.no)%2===0?[answer,distractor]:[distractor,answer];
+  }
+  drillKanjiWritingChoices(d,q){
+    if(!d||!q||(d.id!=='k1'&&d.id!=='k2'))return [];
+    const bank=this.drillBank(d.id),answer=String(q.text),reading=String(q.ans),opts=[],base=Math.max(0,Number(q.no)-1),add=candidate=>{const spelling=candidate?String(candidate.text):'';if(spelling&&spelling!==answer&&String(candidate.ans)!==reading&&opts.indexOf(spelling)<0&&!bank.some(row=>String(row.text)===spelling&&String(row.ans)===reading))opts.push(spelling);};
+    [13,29,47].forEach(step=>{let i=(base+step)%bank.length,guard=0;while(guard<bank.length&&opts.length<3){add(bank[i]);i=(i+1)%bank.length;guard++;}});
+    for(let i=0;i<bank.length&&opts.length<3;i++)add(bank[i]);
+    const order=opts.slice(0,3);order.splice(base%4,0,answer);return order;
+  }
+  drillPresentedQuestion(d,q){
+    if(!d||!q||d.answerMode!=='writing')return q;
+    const label=this.drillReadingLabel(q),answer=String(q.text);
+    return Object.assign({},q,{text:String(q.ans),ans:answer,choices:this.drillKanjiWritingChoices(d,q),hint:label+'だよ。おなじ がくねんで ならう かんじから えらぼう。'});
+  }
+  drillChoices(d,q){if(!d||!q)return [];if(q.kind==='pick')return Array.isArray(q.choices)?q.choices:[];return d.answerMode==='choice'?this.drillNumericChoices(d,q):[];}
+  startDrill(id,restart,answerMode){
     const course=this.drillCourse(id);if(!course)return;
     const progress=this.readDrillProgress(),saved=progress[id]||this.drillDefaultRecord(),bank=this.drillBank(id);
     let idx=restart?0:this.clamp(saved.idx,0,bank.length);
     if(idx>=bank.length)idx=0;
     const fresh=restart||idx===0;
+    const mode=id==='g1'||id==='g2'?(answerMode==='choice'?'choice':'input'):(answerMode==='writing'?'writing':'reading');
     if(fresh){progress[id]={idx:0,perfect:0,mistakes:0,runs:saved.runs,best:saved.best};this.writeDrillProgress(progress);}
     this.sfx('select');
-    this.setState({screen:'drill',drillAsk:'',input:'',drill:{id:id,idx:idx,miss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:false,last:null}});
+    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,answerMode:mode,idx:idx,miss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:false,last:null}});
   }
   drillAdvance(patch){
     const d=this.state.drill;if(!d)return;
@@ -238,7 +263,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   drillChoose(value){this.drillAnswerWith(value);}
   drillAnswerWith(value){
     const d=this.state.drill;if(!d||d.done||d.revealed)return;
-    const q=this.drillQuestion();if(!q)return;
+    const q=this.drillPresentedQuestion(d,this.drillQuestion());if(!q)return;
     const raw=String(value==null?'':value);if(!raw.length)return;
     if(this.drillMatches(q,raw)){
       const clean=d.miss===0,firstPass=d.idx<this.drillBank(d.id).length;
@@ -252,11 +277,11 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   }
   drillNext(){
     const d=this.state.drill;if(!d||!d.revealed)return;
-    const q=this.drillQuestion(),bank=this.drillBank(d.id),again=Array.isArray(d.again)?d.again.slice():[];
+    const q=this.drillPresentedQuestion(d,this.drillQuestion()),bank=this.drillBank(d.id),again=Array.isArray(d.again)?d.again.slice():[];
     if(d.idx<bank.length&&again.indexOf(d.idx)<0)again.push(d.idx);
     this.drillAdvance({again:again,streak:0,last:{ok:false,text:q?this.drillAnswerLine(q):''}});
   }
-  exitDrill(){const d=this.state.drill;this.saveDrillProgress(d,false);this.sfx('tap');this.setState({screen:'start',drill:null,drillAsk:'',input:''});}
+  exitDrill(){const d=this.state.drill;this.saveDrillProgress(d,false);this.sfx('tap');this.setState({screen:'start',drill:null,drillAsk:'',drillCourseChoice:'',input:''});}
   askDrillReset(id){this.sfx('tap');this.setState({drillAsk:this.state.drillAsk===id?'':id});}
   confirmDrillReset(id){
     const progress=this.readDrillProgress(),prev=progress[id]||this.drillDefaultRecord();
@@ -269,7 +294,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     private static string BuildDrillViewScript()
     {
         return """
-    let drillCards=[],drillView=null;
+    let drillCards=[],drillModeView=null,drillView=null;
     if(sc==='start'){
       const drillProgress=this.readDrillProgress(),drillAsk=String(S.drillAsk||'');
       drillCards=this.drillCourses().map(c=>{
@@ -284,21 +309,31 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
           resetStyle:asking?'background:#ffe0da; border-color:#e08a7a; color:#b23b23;':'',
           ariaLabel:c.badge+'の とっくんモード、'+c.title+'。'+c.sub+'。'+c.total+'もん中 '+row.idx+'もん',
           resetAria:asking?c.title+'の しんちょくを 0にもどす':c.title+'を さいしょから',
-          onStart:()=>this.startDrill(c.id,false),
+          onStart:()=>this.selectDrillCourse(c.id),
           onReset:()=>{if(this.state.drillAsk===c.id)this.confirmDrillReset(c.id);else this.askDrillReset(c.id);}
         };
       });
     }
+    if(sc==='drill-mode'){
+      const modeCourse=this.drillCourse(String(S.drillCourseChoice||''))||{};
+      const kanjiMode=modeCourse.id==='k1'||modeCourse.id==='k2';
+      drillModeView={
+        badge:modeCourse.badge||'',title:modeCourse.title||'',headStyle:'background:'+(modeCourse.color||'#ff8a3d')+';',
+        firstAria:kanjiMode?'1ばん、読みを選ぶ':'1ばん、数字を入力',firstSymbol:kanjiMode?'漢 → かん':'123',firstName:kanjiMode?'よみを えらぶ':'すうじを 入力',firstHelp:kanjiMode?'かんじの よみかたを 4つから':'じぶんで こたえを いれる',
+        secondAria:kanjiMode?'2ばん、漢字を選ぶ':'2ばん、2つから選ぶ',secondSymbol:kanjiMode?'かん → 漢':'A / B',secondName:kanjiMode?'かんじを えらぶ':'2つから えらぶ',secondHelp:kanjiMode?'ただしい かきかたを 4つから':'ただしい こたえを えらぶ',
+        onFirst:()=>this.startDrill(modeCourse.id,false,kanjiMode?'reading':'input'),onSecond:()=>this.startDrill(modeCourse.id,false,kanjiMode?'writing':'choice'),onBack:()=>this.cancelDrillMode()
+      };
+    }
     if(sc==='drill'&&S.drill){
-      const d=S.drill,course=this.drillCourse(d.id)||{},total=this.drillBank(d.id).length,dq=this.drillQuestionAt(d,d.idx);
+      const d=S.drill,course=this.drillCourse(d.id)||{},total=this.drillBank(d.id).length,baseQuestion=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,baseQuestion);
       const dAgain=Array.isArray(d.again)?d.again:[],seen=Math.min(d.idx,total),inMain=d.idx<total;
       const dLast=d.last&&typeof d.last==='object'?d.last:null;
       const drillPad=['1','2','3','4','5','6','7','8','9'].map(n=>({label:n,ariaLabel:n,style:keyTile,onClick:()=>this.press(n)}));
       drillPad.push({label:'けす',ariaLabel:'ひとつ けす',style:keyClear,onClick:()=>this.del()});
       drillPad.push({label:'0',ariaLabel:'0',style:keyTile,onClick:()=>this.press('0')});
       drillPad.push({label:'OK',ariaLabel:'こたえる',style:keyOk,onClick:()=>this.drillSubmit()});
-      const dPick=!!(dq&&dq.kind==='pick');
-      const drillPicks=dPick?(dq.choices||[]).map((choice,i)=>({no:String(i+1),label:choice,ariaLabel:(i+1)+'ばん、'+choice,onClick:()=>this.drillChoose(choice)})):[];
+      const dChoices=this.drillChoices(d,dq),dPick=dChoices.length>0,dKanji=!!(dq&&dq.kind==='pick'),dWriting=d.answerMode==='writing';
+      const drillPicks=dChoices.map((choice,i)=>({no:String(i+1),label:String(choice),ariaLabel:(i+1)+'ばん、'+choice,onClick:()=>this.drillChoose(choice)}));
       drillView={
         badge:course.badge||'', title:course.title||'', section:dq?dq.sec:'',
         countText:inMain?(seen+' / '+total):('なおし '+(d.idx-total+1)+' / '+dAgain.length),
@@ -306,7 +341,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         barStyle:'width:'+Math.round(this.clamp(seen/(total||1),0,1)*100)+'%; background:'+(course.color||'#ff8a3d')+';',
         prompt:dq?this.drillPrompt(dq):'', ansBox:S.input||'?',
         ansStyle:d.mark?'border-color:#e08a7a; color:#b23b23;':'',
-        showAns:!dPick, showAsk:dPick, showPad:!dPick, showPick:dPick, picks:drillPicks,
+        showAns:!dPick, showAsk:dPick, askText:dWriting?'ただしい かんじを えらんでね':(dKanji?'よみかたを えらんでね':'こたえを 2つから えらんでね'),
+        showPad:!dPick, showPick:dPick, pickAria:dWriting?'かんじの えらびもんだい':(dKanji?'よみかたの えらびもんだい':'こたえの 2たくもんだい'), picks:drillPicks,
         showHint:d.mark==='wrong', hint:d.hint||'',
         showAnswer:!!d.revealed, answerText:dq?this.drillAnswerLine(dq):'',
         showLast:!!dLast&&!d.mark, lastText:dLast?dLast.text:'',
@@ -316,7 +352,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         playing:!d.done, finished:!!d.done,
         clearBody:d.perfect+' / '+total+'もんを 1かいめで せいかい',
         pad:drillPad,
-        onNext:()=>this.drillNext(), onExit:()=>this.exitDrill(), onRestart:()=>this.startDrill(d.id,true)
+        onNext:()=>this.drillNext(), onExit:()=>this.exitDrill(), onRestart:()=>this.startDrill(d.id,true,d.answerMode)
       };
     }
 """.TrimEnd('\r', '\n');
@@ -347,6 +383,38 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
 """.TrimEnd('\r', '\n');
     }
 
+    private static string BuildDrillModeScreenTemplate()
+    {
+        return """
+  <!-- ============ DRILL ANSWER MODE ============ -->
+  <sc-if value="{{ isDrillMode }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="こたえかた" class="kt-drill-mode-screen">
+      <button type="button" class="kt-drill-mode-back" aria-label="とっくんの いちらんに もどる" onclick="{{ drillModeView.onBack }}">← もどる</button>
+      <div class="kt-drill-mode-panel">
+        <span class="kt-drill-badge" style="{{ drillModeView.headStyle }}">{{ drillModeView.badge }}</span>
+        <div class="kt-drill-mode-title">{{ drillModeView.title }}</div>
+        <div class="kt-drill-mode-question">こたえかたを えらんでね</div>
+        <div class="kt-drill-mode-options" aria-label="こたえかた">
+          <button type="button" class="kt-drill-mode-option" aria-label="{{ drillModeView.firstAria }}" onclick="{{ drillModeView.onFirst }}">
+            <span class="kt-drill-mode-number">1</span>
+            <span class="kt-drill-mode-symbol">{{ drillModeView.firstSymbol }}</span>
+            <span class="kt-drill-mode-name">{{ drillModeView.firstName }}</span>
+            <span class="kt-drill-mode-help">{{ drillModeView.firstHelp }}</span>
+          </button>
+          <button type="button" class="kt-drill-mode-option" aria-label="{{ drillModeView.secondAria }}" onclick="{{ drillModeView.onSecond }}">
+            <span class="kt-drill-mode-number">2</span>
+            <span class="kt-drill-mode-symbol">{{ drillModeView.secondSymbol }}</span>
+            <span class="kt-drill-mode-name">{{ drillModeView.secondName }}</span>
+            <span class="kt-drill-mode-help">{{ drillModeView.secondHelp }}</span>
+          </button>
+        </div>
+        <div class="kt-drill-mode-key-help">キーボードの 1・2 でも えらべるよ</div>
+      </div>
+    </div>
+  </sc-if>
+""".TrimEnd('\r', '\n');
+    }
+
     private static string BuildDrillScreenTemplate()
     {
         return """
@@ -371,7 +439,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
               <div class="kt-drill-ans" style="{{ drillView.ansStyle }}">{{ drillView.ansBox }}</div>
             </sc-if>
             <sc-if value="{{ drillView.showAsk }}" hint-placeholder-val="{{ false }}">
-              <div class="kt-drill-ask">よみかたを えらんでね</div>
+              <div class="kt-drill-ask">{{ drillView.askText }}</div>
             </sc-if>
             <sc-if value="{{ drillView.showHint }}" hint-placeholder-val="{{ false }}">
               <div class="kt-drill-note is-hint" role="status">💡 {{ drillView.hint }}</div>
@@ -396,7 +464,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
               </div>
             </sc-if>
             <sc-if value="{{ drillView.showPick }}" hint-placeholder-val="{{ false }}">
-              <div class="kt-drill-pick" aria-label="よみかたの えらびもんだい">
+              <div class="kt-drill-pick" aria-label="{{ drillView.pickAria }}">
                 <sc-for list="{{ drillView.picks }}" as="p" hint-placeholder-count="4">
                   <div class="kt-drill-pick-btn" role="button" tabindex="0" aria-label="{{ p.ariaLabel }}" onclick="{{ p.onClick }}"><span class="kt-drill-pick-no">{{ p.no }}</span><span>{{ p.label }}</span></div>
                 </sc-for>
@@ -441,6 +509,18 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-bar > span{display:block;height:100%;border-radius:8px;}
   .kt-drill-badge{flex:none;color:#fff;border-radius:14px;padding:2px 10px;font-size:14px;font-weight:900;}
   .kt-drill-reset{flex:none;background:#fff;border:2px solid #ecd9b9;border-radius:12px;padding:0 8px;font-size:12px;font-weight:700;color:#9a8662;cursor:pointer;}
+  .kt-drill-mode-screen{min-height:100vh;padding:22px 44px 30px;display:flex;flex-direction:column;gap:18px;}
+  .kt-drill-mode-back{align-self:flex-start;min-height:44px;background:#fff;border:3px solid #f0e2c8;border-radius:20px;padding:6px 16px;font-family:inherit;font-size:16px;font-weight:700;color:#6b5e45;cursor:pointer;}
+  .kt-drill-mode-panel{flex:1;max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;}
+  .kt-drill-mode-title{font-size:26px;font-weight:900;color:#3a3326;}
+  .kt-drill-mode-question{font-size:38px;font-weight:900;color:#3a3326;line-height:1.2;}
+  .kt-drill-mode-options{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:8px;}
+  .kt-drill-mode-option{position:relative;min-height:220px;background:#fff;border:4px solid #f0e2c8;border-radius:26px;padding:22px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font:inherit;color:#3a3326;box-shadow:0 6px 0 #ecd9b9;cursor:pointer;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease,transform .2s ease;}
+  .kt-drill-mode-number{position:absolute;top:14px;left:14px;min-width:38px;height:38px;border-radius:12px;background:#fff3e0;color:#8a6940;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;}
+  .kt-drill-mode-symbol{font-size:44px;font-weight:900;letter-spacing:2px;color:#ff7b2e;}
+  .kt-drill-mode-name{font-size:27px;font-weight:900;}
+  .kt-drill-mode-help{font-size:16px;font-weight:700;color:#6b5e45;}
+  .kt-drill-mode-key-help{font-size:15px;font-weight:700;color:#7b6a4d;}
   .kt-drill-screen{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:12px;padding:22px 44px 30px;}
   .kt-drill-head{display:flex;align-items:center;gap:14px;}
   .kt-drill-quit{flex:none;background:#fff;border:3px solid #f0e2c8;border-radius:20px;padding:6px 14px;font-size:16px;font-weight:700;color:#6b5e45;cursor:pointer;}
@@ -471,6 +551,11 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-finish-title{font-size:44px;font-weight:900;}
   .kt-drill-finish-body{font-size:24px;font-weight:700;color:#6b5e45;}
   .kt-drill-finish-row{display:flex;gap:16px;margin-top:8px;}
+  .kt-drill-mode-option:hover,.kt-drill-pick-btn:hover{border-color:#ffb170;background:#fffaf4;transform:translateY(-2px);box-shadow:0 8px 0 #ecd9b9;}
+  .kt-drill-mode-option:active,.kt-drill-pick-btn:active{transform:translateY(3px);box-shadow:0 2px 0 #dcc49c;}
+  .kt-drill-mode-back:hover,.kt-drill-quit:hover,.kt-drill-back:hover,.kt-drill-reset:hover{background:#fff8ee;border-color:#d9bd8c;}
+  .kt-drill-mode-back:active,.kt-drill-quit:active,.kt-drill-back:active,.kt-drill-reset:active{transform:translateY(2px);}
+  .kt-drill-mode-option:focus-visible,.kt-drill-mode-back:focus-visible,.kt-drill-card-body:focus-visible,.kt-drill-reset:focus-visible,.kt-drill-quit:focus-visible,.kt-drill-pick-btn:focus-visible,.kt-drill-next:focus-visible,.kt-drill-back:focus-visible,.kt-drill-pad [role="button"]:focus-visible{outline:4px solid #2f7ccd;outline-offset:3px;}
 
   @media (max-width: 1100px) {
     .kt-hero-card{flex:1 1 44%;}
@@ -490,6 +575,10 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     .kt-drill-pick-btn{font-size:26px;padding:6px 14px;}
     .kt-drill-finish-mark{font-size:72px;}
     .kt-drill-finish-title{font-size:36px;}
+    .kt-drill-mode-screen{padding-top:16px;padding-bottom:20px;}
+    .kt-drill-mode-panel{gap:9px;}
+    .kt-drill-mode-option{min-height:170px;padding:14px;}
+    .kt-drill-mode-symbol{font-size:36px;}
   }
 
   @media (max-width: 800px) {
@@ -498,6 +587,14 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     .kt-drill-body{flex-direction:column;}
     .kt-drill-side{width:100%;}
     .kt-drill-pad{grid-template-columns:repeat(6,minmax(0,1fr));}
+    .kt-drill-mode-screen{padding:18px 20px 24px;}
+    .kt-drill-mode-question{font-size:30px;}
+    .kt-drill-mode-options{grid-template-columns:minmax(0,1fr);gap:14px;}
+    .kt-drill-mode-option{min-height:150px;}
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .kt-drill-mode-option{transition:none;}
   }
 </style>
 """.TrimEnd('\r', '\n');
