@@ -1749,6 +1749,7 @@ const DRILL_EMPHASIS_CHECK = 'the grade-1 drill emphasizes complements of ten an
 const DRILL_FACT_CHECK = 'the grade-2 drill covers every ordered multiplication fact';
 const DRILL_CHOICE_CHECK = 'every arithmetic drill question offers one plausible wrong answer and one right answer';
 const DRILL_KANJI_CHECK = 'the kanji drills cover their grade and distinguish on-yomi from kun-yomi';
+const DRILL_KANJI_WORD_CHECK = 'kanji word questions use only characters learned by the course grade';
 const DRILL_KANJI_WRITING_CHECK = 'every kanji writing question offers one right spelling and three same-grade distractors with different readings';
 const DRILL_FLOW_CHECK = 'a drill run advances, requeues a revealed question, and resumes where it stopped';
 
@@ -1791,16 +1792,29 @@ for (const course of drillCourses) {
 }
 
 // The optional recognition mode must be safe across the entire fixed bank, not only a sample.
-// Correct positions alternate deterministically so children cannot learn a side bias.
+// A session keeps its shuffled layout stable while avoiding a learnable question-number pattern.
 observe(DRILL_CHOICE_CHECK, 400);
 for (const courseId of ['g1', 'g2']) {
   const bank = app.drillBank(courseId);
+  const choiceOrder = app.drillChoiceOrder(bank.length, courseId === 'g1' ? 123456789 : 987654321);
+  const secondOrder = app.drillChoiceOrder(bank.length, courseId === 'g1' ? 987654321 : 123456789);
+  if (choiceOrder.length !== bank.length || choiceOrder.every((position, index) => position === index % 2) || choiceOrder.every((position, index) => position === 1 - (index % 2))) {
+    violated(DRILL_CHOICE_CHECK, `${courseId} uses a predictable alternating answer layout`, JSON.stringify(choiceOrder));
+  }
+  if (choiceOrder.every((position, index) => position === secondOrder[index])) {
+    violated(DRILL_CHOICE_CHECK, `${courseId} answer layout does not change with the session seed`, JSON.stringify(choiceOrder));
+  }
+  const drill = { id: courseId, answerMode: 'choice', choiceOrder };
   const correctPositions = [0, 0];
   for (const question of bank) {
-    const choices = app.drillNumericChoices({ id: courseId, answerMode: 'choice' }, question);
+    const choices = app.drillNumericChoices(drill, question);
+    const repeatedChoices = app.drillNumericChoices(drill, question);
     if (choices.length !== 2 || new Set(choices).size !== 2 || !choices.includes(question.ans)) {
       violated(DRILL_CHOICE_CHECK, `${courseId} question ${question.no} offers ${JSON.stringify(choices)}`, JSON.stringify(question));
       continue;
+    }
+    if (JSON.stringify(choices) !== JSON.stringify(repeatedChoices)) {
+      violated(DRILL_CHOICE_CHECK, `${courseId} question ${question.no} changes position during the same session`, JSON.stringify([choices, repeatedChoices]));
     }
     const correctAt = choices.indexOf(question.ans);
     correctPositions[correctAt] += 1;
@@ -1864,20 +1878,50 @@ for (let left = 1; left <= 9; left += 1) {
   }
 }
 
-// The kanji courses are only worth drilling if they ask about every kanji of the grade and
-// if exactly one of the four offered readings is right: a repeated reading would mark a
-// correct child wrong, and a missing kanji would leave a hole in the year's reading.
+// The kanji courses still introduce every character in their own grade, then apply those
+// characters in real words. Grade 1 may use only grade-1 kanji; grade 2 is cumulative and
+// may combine grade-1 and grade-2 kanji, but never a later-grade character.
 const KANJI_DRILL_GRADES = { k1: 1, k2: 2 };
+const gradeByKanji = new Map(curriculum.map((entry) => [entry.k, entry.g]));
 observe(DRILL_KANJI_CHECK, Object.keys(KANJI_DRILL_GRADES).length);
+observe(DRILL_KANJI_WORD_CHECK, 160);
 for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
   const bank = app.drillBank(courseId);
   const gradeEntries = curriculum.filter((entry) => entry.g === grade);
   const readingOf = new Map(gradeEntries.map((entry) => [entry.k, entry]));
   const asked = new Set();
+  const askedWords = new Set();
   const readingTypes = new Set();
   for (const question of bank) {
     if (question.kind !== 'pick') {
       violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} is not answered by choosing a reading`, JSON.stringify(question));
+      continue;
+    }
+    const choices = question.choices || [];
+    if (choices.length !== 4 || new Set(choices).size !== 4 || choices.filter((choice) => choice === question.ans).length !== 1) {
+      violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} offers ${JSON.stringify(choices)}`, question.text);
+      continue;
+    }
+    if (question.readingType === 'word') {
+      readingTypes.add('word');
+      askedWords.add(question.text);
+      const expectedWord = app.drillKanjiWords(grade).find((entry) => entry.word === question.text);
+      if (!question.kanjiWord || !expectedWord || expectedWord.reading !== question.ans) {
+        violated(DRILL_KANJI_WORD_CHECK, `${courseId} question ${question.no} is not a canonical word-reading pair`, JSON.stringify(question));
+      }
+      const wordKanji = Array.from(question.text).filter((character) => /\p{Script=Han}/u.test(character));
+      if (wordKanji.length < 2) {
+        violated(DRILL_KANJI_WORD_CHECK, `${courseId} question ${question.no} does not combine at least two kanji`, question.text);
+      }
+      for (const character of wordKanji) {
+        const learnedGrade = gradeByKanji.get(character);
+        if (!learnedGrade || learnedGrade > grade) {
+          violated(DRILL_KANJI_WORD_CHECK, `${courseId} question ${question.no} uses ${character} from grade ${learnedGrade || 'outside the curriculum'}`, question.text);
+        }
+      }
+      if (grade === 2 && !wordKanji.some((character) => gradeByKanji.get(character) === 2)) {
+        violated(DRILL_KANJI_WORD_CHECK, `${courseId} question ${question.no} does not apply a grade-2 kanji`, question.text);
+      }
       continue;
     }
     const entry = readingOf.get(question.kanji);
@@ -1903,11 +1947,6 @@ for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
     if (question.text !== expectedText) {
       violated(DRILL_KANJI_CHECK, `${courseId} uses ${question.text} for ${question.readingType} of ${entry.k}; expected ${expectedText}`, question.text);
     }
-    const choices = question.choices || [];
-    if (choices.length !== 4 || new Set(choices).size !== 4) {
-      violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} offers ${JSON.stringify(choices)}`, question.text);
-      continue;
-    }
     if (!choices.includes(expected)) {
       violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} never offers the right reading ${expected}`, JSON.stringify(choices));
     }
@@ -1916,8 +1955,14 @@ for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
     const missing = gradeEntries.filter((entry) => !asked.has(entry.k)).map((entry) => entry.k);
     violated(DRILL_KANJI_CHECK, `${courseId} drills ${asked.size} of the ${gradeEntries.length} grade-${grade} kanji`, missing.join(''));
   }
-  if (readingTypes.size !== 2) {
-    violated(DRILL_KANJI_CHECK, `${courseId} does not include both on-yomi and kun-yomi questions`, JSON.stringify([...readingTypes]));
+  if (!readingTypes.has('on') || !readingTypes.has('kun') || !readingTypes.has('word')) {
+    violated(DRILL_KANJI_CHECK, `${courseId} does not include on-yomi, kun-yomi, and word questions`, JSON.stringify([...readingTypes]));
+  }
+  const expectedWords = app.drillKanjiWords(grade);
+  const expectedWordQuestions = 200 - gradeEntries.length;
+  const wordQuestions = bank.filter((question) => question.readingType === 'word');
+  if (wordQuestions.length !== expectedWordQuestions || askedWords.size !== expectedWords.length) {
+    violated(DRILL_KANJI_WORD_CHECK, `${courseId} has ${wordQuestions.length} word questions using ${askedWords.size} unique words`, `expected ${expectedWordQuestions} questions using ${expectedWords.length} words`);
   }
 }
 
@@ -1927,11 +1972,7 @@ for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
 observe(DRILL_KANJI_WRITING_CHECK, 400);
 for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
   const bank = app.drillBank(courseId);
-  const gradeSpellings = new Set();
-  curriculum.filter((entry) => entry.g === grade).forEach((entry) => {
-    if (entry.on) gradeSpellings.add(entry.k);
-    if (entry.kun) gradeSpellings.add(entry.kunWord);
-  });
+  const gradeSpellings = new Set(bank.map((question) => question.text));
   const correctPositions = [0, 0, 0, 0];
   for (const question of bank) {
     const drill = { id: courseId, answerMode: 'writing' };

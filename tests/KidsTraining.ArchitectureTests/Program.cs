@@ -556,14 +556,22 @@ internal static class Program
             "the drill screen does not accept physical keyboard input");
         Assert(
             html.Contains("drillNumericChoices(d,q)", StringComparison.Ordinal) &&
-            html.Contains("return Number(q.no)%2===0?[answer,distractor]:[distractor,answer]", StringComparison.Ordinal) &&
+            html.Contains("drillChoiceOrder(total,seed)", StringComparison.Ordinal) &&
+            html.Contains("choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder", StringComparison.Ordinal) &&
+            html.Contains("this.drillChoicePosition(d,q)===0?[answer,distractor]:[distractor,answer]", StringComparison.Ordinal) &&
             html.Contains("d.answerMode==='choice'?this.drillNumericChoices(d,q):[]", StringComparison.Ordinal),
-            "the arithmetic drill does not build deterministic two-choice answers with alternating correct positions");
+            "the arithmetic drill does not build stable shuffled two-choice answer positions");
         Assert(
             html.Contains("drillKanjiWritingChoices(d,q)", StringComparison.Ordinal) &&
             html.Contains("d.answerMode!=='writing'", StringComparison.Ordinal) &&
             html.Contains("ただしい かんじを えらんでね", StringComparison.Ordinal),
             "the kanji drill does not reverse readings into four-choice spelling questions");
+        Assert(
+            html.Contains("drillKanjiWords(grade)", StringComparison.Ordinal) &&
+            html.Contains("type:'word'", StringComparison.Ordinal) &&
+            html.Contains("kanjiWord:target.type==='word'", StringComparison.Ordinal) &&
+            html.Contains("'\\u3053\\u3068\\u3070'", StringComparison.Ordinal),
+            "the kanji drill does not include cumulative learned-kanji word questions");
 
         // Drilling is deliberate extra practice, so it must never write curriculum evidence.
         var drillScriptAt = html.IndexOf("drillStorageKey(){", StringComparison.Ordinal);

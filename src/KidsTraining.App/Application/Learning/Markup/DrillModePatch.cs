@@ -118,8 +118,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   drillCourses(){return [
     {id:'g1',grade:1,total:200,badge:'1年生',title:'たしざん・ひきざん',sub:'1＋1から じゅんばんに 200もん',color:'#ff8a3d',edge:'#e07d2a',shade:'#fff3e6'},
     {id:'g2',grade:2,total:200,badge:'2年生',title:'かけざん（九九）',sub:'2のだんから じゅんばんに 200もん',color:'#4a9bf0',edge:'#2f7ccd',shade:'#eaf3ff'},
-    {id:'k1',grade:1,total:200,badge:'1年生',title:'かんじの 音読み・訓読み',sub:'1年生の 漢字 80字を 音読み・訓読みで 200もん',color:'#5fbf7a',edge:'#3f9a5b',shade:'#eaf7ee'},
-    {id:'k2',grade:2,total:200,badge:'2年生',title:'かんじの 音読み・訓読み',sub:'2年生の 漢字 160字を 音読み・訓読みで 200もん',color:'#b07ae0',edge:'#8d55c4',shade:'#f4ecff'}
+    {id:'k1',grade:1,total:200,badge:'1年生',title:'かんじ・ことば',sub:'1年生の 漢字と くみあわせた ことばを 200もん',color:'#5fbf7a',edge:'#3f9a5b',shade:'#eaf7ee'},
+    {id:'k2',grade:2,total:200,badge:'2年生',title:'かんじ・ことば',sub:'1・2年生で ならった 漢字の ことばを 200もん',color:'#b07ae0',edge:'#8d55c4',shade:'#f4ecff'}
   ];}
   drillCourse(id){const list=this.drillCourses();for(let i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
   drillDefaultRecord(){return {idx:0,perfect:0,mistakes:0,runs:0,best:0};}
@@ -142,24 +142,39 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   }
   drillBank(id){if(!this._drillBanks)this._drillBanks={};if(!this._drillBanks[id])this._drillBanks[id]=this.buildDrillBank(id);return this._drillBanks[id];}
   drillKanjiEntries(grade){if(!this._drillKanji)this._drillKanji={};if(!this._drillKanji[grade])this._drillKanji[grade]=this.kanjiCurriculumEntries().filter(e=>e.g===grade);return this._drillKanji[grade];}
+  drillKanjiWords(grade){
+    const rows=grade===1?[
+      ['一年','いちねん'],['一日','いちにち'],['一人','ひとり'],['二人','ふたり'],['三人','さんにん'],['四月','しがつ'],['五月','ごがつ'],['六月','ろくがつ'],['七月','しちがつ'],['八月','はちがつ'],['九月','くがつ'],['十月','じゅうがつ'],
+      ['上下','じょうげ'],['左右','さゆう'],['大小','だいしょう'],['火山','かざん'],['青空','あおぞら'],['夕日','ゆうひ'],['入口','いりぐち'],['出口','でぐち'],['人口','じんこう'],['学校','がっこう'],['先生','せんせい'],['学年','がくねん'],
+      ['正月','しょうがつ'],['文字','もじ'],['名字','みょうじ'],['本名','ほんみょう'],['小学校','しょうがっこう'],['中学校','ちゅうがっこう'],['大学','だいがく'],['男子','だんし'],['女子','じょし'],['王子','おうじ'],['手足','てあし'],['山林','さんりん'],
+      ['森林','しんりん'],['水田','すいでん'],['川上','かわかみ'],['川下','かわしも'],['川口','かわぐち'],['小石','こいし'],['大木','たいぼく'],['小川','おがわ'],['青虫','あおむし'],['草木','くさき'],['花火','はなび'],['火花','ひばな'],
+      ['竹林','ちくりん'],['糸口','いとぐち'],['目玉','めだま'],['目上','めうえ'],['目下','めした'],['手本','てほん'],['百円','ひゃくえん'],['千円','せんえん'],['休日','きゅうじつ'],['見学','けんがく'],['入学','にゅうがく'],['学力','がくりょく']
+    ]:[
+      ['公園','こうえん'],['遠足','えんそく'],['夏休み','なつやすみ'],['家出','いえで'],['歌声','うたごえ'],['絵本','えほん'],['外国','がいこく'],['外国人','がいこくじん'],['三角','さんかく'],['四角','しかく'],
+      ['音楽','おんがく'],['楽園','らくえん'],['活火山','かっかざん'],['時間','じかん'],['丸太','まるた'],['岩山','いわやま'],['顔色','かおいろ'],['汽車','きしゃ'],['日記','にっき'],['帰国','きこく'],
+      ['弓矢','ゆみや'],['牛肉','ぎゅうにく'],['金魚','きんぎょ'],['東京','とうきょう'],['強力','きょうりょく'],['教室','きょうしつ'],['近道','ちかみち'],['兄弟','きょうだい'],['図形','ずけい'],['時計','とけい'],
+      ['元気','げんき'],['言語','げんご'],['原文','げんぶん'],['戸口','とぐち'],['古本','ふるほん'],['午前','ごぜん'],['午後','ごご'],['国語','こくご'],['工作','こうさく'],['広場','ひろば']
+    ];
+    return rows.map(row=>({word:row[0],reading:row[1]}));
+  }
   buildKanjiDrillBank(id){
     const grade=id==='k1'?1:2,entries=this.drillKanjiEntries(grade),list=[],targets=[];
     entries.forEach(e=>{if(e.on)targets.push({e:e,type:'on',reading:e.on,word:e.k});if(e.kun)targets.push({e:e,type:'kun',reading:e.kun,word:e.kunWord||e.k});});
-    const uniqueReadings=Array.from(new Set(targets.map(target=>target.reading)));
+    const wordTargets=this.drillKanjiWords(grade).map(item=>({e:null,type:'word',reading:item.reading,word:item.word})),choiceTargets=targets.concat(wordTargets);
+    const uniqueReadings=Array.from(new Set(choiceTargets.map(target=>target.reading)));
     const targetFor=(e,preferred)=>{const type=preferred==='on'&&e.on?'on':preferred==='kun'&&e.kun?'kun':e.on?'on':'kun';return{e:e,type:type,reading:type==='on'?e.on:e.kun,word:type==='on'?e.k:e.kunWord||e.k};};
     const ask=(sec,target,index)=>{
-      const opts=[target.reading],base=targets.findIndex(candidate=>candidate.e===target.e&&candidate.type===target.type);
-      [13,29,47].forEach(step=>{let j=(base+step)%targets.length,guard=0;while(guard<targets.length&&opts.indexOf(targets[j].reading)>=0){j=(j+1)%targets.length;guard++;}if(guard<targets.length)opts.push(targets[j].reading);});
+      const opts=[target.reading],base=Math.max(0,choiceTargets.findIndex(candidate=>candidate===target||(target.e&&candidate.e===target.e&&candidate.type===target.type)));
+      [13,29,47].forEach(step=>{let j=(base+step)%choiceTargets.length,guard=0;while(guard<choiceTargets.length&&opts.indexOf(choiceTargets[j].reading)>=0){j=(j+1)%choiceTargets.length;guard++;}if(guard<choiceTargets.length)opts.push(choiceTargets[j].reading);});
       for(let i=0;i<uniqueReadings.length&&opts.length<4;i++)if(opts.indexOf(uniqueReadings[i])<0)opts.push(uniqueReadings[i]);
-      const order=opts.slice(1);order.splice(index%4,0,target.reading);const label=target.type==='on'?'\u97f3\u8aad\u307f':'\u8a13\u8aad\u307f';
-      list.push({no:list.length+1,sec:sec,text:target.word,ans:target.reading,hint:label+'だよ。さいしょの もじは 「'+Array.from(target.reading)[0]+'」だよ。',kind:'pick',choices:order,kanji:target.e.k,readingType:target.type});
+      const order=opts.slice(1);order.splice(index%4,0,target.reading);const label=target.type==='on'?'\u97f3\u8aad\u307f':target.type==='kun'?'\u8a13\u8aad\u307f':'\u3053\u3068\u3070';
+      list.push({no:list.length+1,sec:sec,text:target.word,ans:target.reading,hint:label+'だよ。さいしょの もじは 「'+Array.from(target.reading)[0]+'」だよ。',kind:'pick',choices:order,kanji:target.e?target.e.k:'',kanjiWord:target.type==='word',readingType:target.type});
     };
-    const A='\u3042\u305f\u3089\u3057\u3044 \u304b\u3093\u3058',B='\u97f3\u8aad\u307f\u30fb\u8a13\u8aad\u307f \u3075\u304f\u3057\u3085\u3046',C='\u3057\u3042\u3052\u306e \u30df\u30c3\u30af\u30b9';
+    const A='\u3042\u305f\u3089\u3057\u3044 \u304b\u3093\u3058',B='\u306a\u3089\u3063\u305f \u304b\u3093\u3058\u306e \u3053\u3068\u3070',C='\u3057\u3042\u3052\u306e \u30df\u30c3\u30af\u30b9';
     const primary=entries.map((entry,index)=>targetFor(entry,index%2===0?'on':'kun'));
-    const alternate=entries.map((entry,index)=>targetFor(entry,index%2===0?'kun':'on'));
     for(let i=0;i<primary.length;i++)ask(A,primary[i],i);
     const extra=200-list.length;
-    for(let i=0;i<extra;i++)ask(i<Math.min(extra,entries.length)?B:C,alternate[(i*(grade===1?7:13)+1)%alternate.length],entries.length+i);
+    for(let i=0;i<extra;i++)ask(i<wordTargets.length?B:C,wordTargets[i%wordTargets.length],entries.length+i);
     return list;
   }
   buildDrillBank(id){
@@ -205,7 +220,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   }
   drillAnswerLine(q){if(q.kind==='pick')return q.text+' → '+q.ans;return q.text.indexOf('□')>=0?q.text.replace('□',String(q.ans)):q.text+' ＝ '+q.ans;}
   drillMatches(q,value){const raw=String(value==null?'':value);if(!raw.length)return false;return q.kind==='pick'?raw===String(q.ans):Number(raw)===Number(q.ans);}
-  drillReadingLabel(q){return q&&q.readingType==='on'?'\u97f3\u8aad\u307f':'\u8a13\u8aad\u307f';}
+  drillReadingLabel(q){return q&&q.readingType==='on'?'\u97f3\u8aad\u307f':q&&q.readingType==='kun'?'\u8a13\u8aad\u307f':'\u3053\u3068\u3070';}
   drillPrompt(q){return q&&q.readingType?q.text+' ['+this.drillReadingLabel(q)+']':(q?q.text:'');}
   drillQuestionAt(d,index){
     if(!d)return null;const bank=this.drillBank(d.id),again=Array.isArray(d.again)?d.again:[];
@@ -216,13 +231,20 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   drillQuestion(){const d=this.state.drill;return d?this.drillQuestionAt(d,d.idx):null;}
   selectDrillCourse(id){const course=this.drillCourse(id);if(!course)return;this.sfx('select');this.setState({screen:'drill-mode',drillCourseChoice:id});}
   cancelDrillMode(){this.sfx('tap');this.setState({screen:'start',drillCourseChoice:''});}
+  drillChoiceOrder(total,seed){
+    const count=Math.max(0,Math.floor(Number(total)||0)),order=[];for(let i=0;i<count;i++)order.push(i%2);
+    let state=(Number(seed)>>>0)||0x6d2b79f5,next=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return state>>>0;};
+    for(let i=order.length-1;i>0;i--){const j=next()%(i+1),value=order[i];order[i]=order[j];order[j]=value;}
+    return order;
+  }
+  drillChoicePosition(d,q){const order=d&&Array.isArray(d.choiceOrder)?d.choiceOrder:[];if(order.length)return order[Math.max(0,Number(q&&q.no)-1)%order.length];return this.drillChoiceOrder(2,(Number(q&&q.no)||1)*2654435761)[0];}
   drillNumericChoices(d,q){
     if(!d||!q||q.kind!=='num')return [];
     const answer=Number(q.ans);if(!Number.isFinite(answer))return [];
     let distractor=null;
     if(d.id==='g2'&&String(q.text).indexOf('□')<0){const match=/^(\d+) × (\d+)$/.exec(String(q.text));if(match){const left=Number(match[1]),right=Number(match[2]),near=right<9?right+1:right-1;distractor=left*near;}}
     if(!Number.isFinite(distractor)||distractor===answer||distractor<0){distractor=Number(q.no)%2===0&&answer>0?answer-1:answer+1;}
-    return Number(q.no)%2===0?[answer,distractor]:[distractor,answer];
+    return this.drillChoicePosition(d,q)===0?[answer,distractor]:[distractor,answer];
   }
   drillKanjiWritingChoices(d,q){
     if(!d||!q||(d.id!=='k1'&&d.id!=='k2'))return [];
@@ -243,10 +265,10 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     let idx=restart?0:this.clamp(saved.idx,0,bank.length);
     if(idx>=bank.length)idx=0;
     const fresh=restart||idx===0;
-    const mode=id==='g1'||id==='g2'?(answerMode==='choice'?'choice':'input'):(answerMode==='writing'?'writing':'reading');
+    const mode=id==='g1'||id==='g2'?(answerMode==='choice'?'choice':'input'):(answerMode==='writing'?'writing':'reading'),choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder(bank.length,choiceSeed);
     if(fresh){progress[id]={idx:0,perfect:0,mistakes:0,runs:saved.runs,best:saved.best};this.writeDrillProgress(progress);}
     this.sfx('select');
-    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,answerMode:mode,idx:idx,miss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:false,last:null}});
+    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,answerMode:mode,choiceSeed:choiceSeed,choiceOrder:choiceOrder,idx:idx,miss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:false,last:null}});
   }
   drillAdvance(patch){
     const d=this.state.drill;if(!d)return;
