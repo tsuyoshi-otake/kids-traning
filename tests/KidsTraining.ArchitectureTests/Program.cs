@@ -1557,7 +1557,7 @@ internal static class Program
         Assert(LearningSessionSettings.FormatSchoolGrade(9) == "中学3年", "middle school grade formatting is incorrect");
 
         Assert(!service.Update(9, 9, 1, false).Success, "question counts below 10 were accepted");
-        Assert(!service.Update(31, 15, 1, false).Success, "question counts above 30 were accepted");
+        Assert(!service.Update(51, 15, 1, false).Success, "question counts above 50 were accepted");
         Assert(!service.Update(30, 31, 1, false).Success, "a pass line above the question count was accepted");
         Assert(!service.Update(20, 15, 0, false).Success && !service.Update(20, 15, 10, false).Success, "an out-of-range school grade was accepted");
         Assert(!service.Update(20, 15, 1, null).Success, "a missing school-grade preference was accepted");
@@ -1572,7 +1572,10 @@ internal static class Program
 
         var page = ParentControlPageRenderer.Build([], false, saved.Settings);
         Assert(page.Contains("id=\"exportPassword\"", StringComparison.Ordinal) && page.Contains("fetch('/api/export'", StringComparison.Ordinal) && page.Contains("kids-training-learning-history.json", StringComparison.Ordinal), "parent page does not expose the protected learning-history JSON export");
-        Assert(page.Contains("min=\"10\" max=\"30\"", StringComparison.Ordinal) && page.Contains("10〜30問", StringComparison.Ordinal), "parent page does not expose the 10-to-30 fixed question range");
+        Assert(page.Contains("min=\"10\" max=\"50\"", StringComparison.Ordinal) && page.Contains("10〜50問", StringComparison.Ordinal), "parent page does not expose the 10-to-50 fixed question range");
+        Assert(page.Contains("count < 10 || count > 50", StringComparison.Ordinal), "parent page client-side validation does not accept the full 10-to-50 range");
+        Assert(!page.Contains("count > 30", StringComparison.Ordinal), "parent page client-side validation still caps the question count at 30");
+        Assert(page.Contains("lastQuestionCount", StringComparison.Ordinal), "parent page does not rescale the pass line when the question count changes");
         Assert(page.Contains("id=\"schoolGrade\"", StringComparison.Ordinal) && page.Contains("value=\"9\" selected", StringComparison.Ordinal) && page.Contains("中学3年", StringComparison.Ordinal), "parent page does not expose the persisted school grade");
         Assert(page.Contains("id=\"preferSchoolGrade\"", StringComparison.Ordinal) && page.Contains("type=\"checkbox\" checked", StringComparison.Ordinal), "parent page does not expose the persisted school-grade preference");
 

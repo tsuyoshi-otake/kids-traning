@@ -160,8 +160,8 @@ internal static class ParentControlPageRenderer
           <small class="field-help" id="preferSchoolGradeHelp">ONでは登録学年以上から始めます。学年上限にはならず、OFFで低学年単元へ戻せます。</small>
         </label>
         <label for="questionCount">1回の出題数
-          <input id="questionCount" type="number" inputmode="numeric" min="10" max="30" step="1" required aria-describedby="questionCountHelp settingsError" value="{{settings.QuestionCount}}">
-          <small class="field-help" id="questionCountHelp">10〜30問</small>
+          <input id="questionCount" type="number" inputmode="numeric" min="10" max="50" step="1" required aria-describedby="questionCountHelp settingsError" value="{{settings.QuestionCount}}">
+          <small class="field-help" id="questionCountHelp">10〜50問</small>
         </label>
         <label for="passLine">合格点
           <input id="passLine" type="number" inputmode="numeric" min="1" max="{{settings.QuestionCount}}" step="1" required aria-describedby="passLineHelp settingsError" value="{{settings.PassLine}}">
@@ -278,8 +278,8 @@ internal static class ParentControlPageRenderer
       const pass = Number(passLine.value);
       const grade = Number(schoolGrade.value);
       passLine.max = Number.isInteger(count) ? String(count) : '30';
-      if (!Number.isInteger(count) || count < 10 || count > 30) {
-        return { error: '1回の出題数は10〜30問にしてください。', fieldId: 'questionCount' };
+      if (!Number.isInteger(count) || count < 10 || count > 50) {
+        return { error: '1回の出題数は10〜50問にしてください。', fieldId: 'questionCount' };
       }
       if (!Number.isInteger(pass) || pass < 1 || pass > count) {
         return { error: '合格点は1点以上、出題数以下にしてください。', fieldId: 'passLine' };
@@ -452,7 +452,25 @@ internal static class ParentControlPageRenderer
     resetHistoryButton.addEventListener('click', () => resetLearning('history'));
     resetFullButton.addEventListener('click', () => resetLearning('full'));
     exportButton.addEventListener('click', exportLearningData);
+    // Changing the count keeps the pass line at the same share of the session, matching the
+    // in-app +/- control. Without this a parent who drops 30 to 10 is told the saved pass line
+    // is now invalid instead of simply getting a proportional one.
+    let lastQuestionCount = Number(questionCount.value);
     questionCount.addEventListener('input', () => { showSettingsError(''); cleanLearningSettings(); });
+    questionCount.addEventListener('change', () => {
+      const count = Number(questionCount.value);
+      const previous = lastQuestionCount;
+      const pass = Number(passLine.value);
+      if (Number.isInteger(count) && count >= 10 && count <= 50) {
+        if (Number.isInteger(previous) && previous > 0 && Number.isInteger(pass)) {
+          const scaled = Math.round(count * Math.min(1, Math.max(0, pass / previous)));
+          passLine.value = String(Math.min(count, Math.max(1, scaled)));
+        }
+        lastQuestionCount = count;
+      }
+      showSettingsError('');
+      cleanLearningSettings();
+    });
     passLine.addEventListener('input', () => showSettingsError(''));
     schoolGrade.addEventListener('change', () => showSettingsError(''));
     preferSchoolGrade.addEventListener('change', () => showSettingsError(''));

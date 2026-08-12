@@ -19,7 +19,7 @@ internal static partial class LearningMarkupPatcher
     [()=>mc('1000円札 1まいは 100円玉 なんまい？','10まい',['100まい','5まい','1まい'],'100円が 10まいで 1000円。')],
     [()=>{const paid=[500,1000][this.rand(0,1)];let price=this.rand(2,Math.floor(paid/10)-1)*10;if(price*2===paid)price+=10;const change=paid-price;return mc(paid+'円を はらって '+price+'円の ものを かうと、おつりは？',change+'円',[price+'円',(change+10)+'円',Math.max(0,change-10)+'円',(change+20)+'円'],paid+'−'+price+'='+change+'円。');}]
   ];}return this.pickStage(stage,buckets,0);}
-  pickGroups(p){const stage=this.topicStage(p,'groups'),make=(count,size,prompt,answer,ex)=>({topic:'groups',mode:'choices',isGroups:true,groupCount:count,groupSize:size,prompt:prompt,answer:''+answer,choices:this.pick4(''+answer,[answer+1,Math.max(1,answer-1),answer+size,count].map(String)),explanation:ex});const buckets=[
+  pickGroups(p){const stage=this.topicStage(p,'groups'),make=(count,size,prompt,answer,ex)=>({topic:'groups',mode:'choices',isGroups:true,groupCount:count,groupSize:size,prompt:prompt,answer:''+answer,choices:this.pick4(''+answer,[answer+1,answer-1,answer+size,count,size,answer+count,answer+2].filter(v=>v>0&&v!==answer).map(String)),explanation:ex});const buckets=[
     [()=>{const count=this.rand(2,4),size=this.rand(2,4),total=count*size;return make(count,size,size+'こずつの まとまりが '+count+'つ。ぜんぶで いくつ？',total,size+'こが '+count+'つで '+total+'こ。');}],
     [()=>{const count=this.rand(2,5),size=this.rand(2,5),total=count*size;return make(count,size,total+'こを '+size+'こずつ かこむと、まとまりは いくつ？',count,size+'こずつで '+count+'まとまり。');}],
     [()=>{const people=this.rand(2,5),each=this.rand(2,5),total=people*each;return make(people,each,total+'こを '+people+'人に おなじかずずつ わけると、ひとりぶんは？',each,total+'こを '+people+'人に わけると '+each+'こずつ。');}],

@@ -588,7 +588,7 @@ for (const [standard, ime] of [['shi', 'si'], ['chi', 'ti'], ['tsu', 'tu'], ['fu
 // Exercise the real schema migration and lane selection code before auditing generators.
 // These checks protect the early-learning contract independently of the registered grade.
 app.state = {
-  // The real app clamps a saved session length into 10-30 before it is ever used, so a
+  // The real app clamps a saved session length into 10-50 before it is ever used, so a
   // numeric count is part of the settings contract; buildSession sizes its plan from it.
   settings: { count: 10, topics: Object.fromEntries(TOPICS.map((topic) => [topic, true])) },
   session: null,

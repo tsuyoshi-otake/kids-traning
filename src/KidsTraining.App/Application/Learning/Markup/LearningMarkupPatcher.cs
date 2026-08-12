@@ -48,12 +48,12 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true},count:this.props.questionCount??10,pass:this.props.passLine??8};}",
-            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true,eigo:true,money:true,groups:true,order:true,soroban:true,seikatsu:true,shakai:true,rika:true,kateika:true,gijutsu:true,doutoku:true,jouhou:true,sougou:true,tokubetsu:true,keyboard:true,thinking:true},count:this.props.questionCount??20,pass:this.props.passLine??15,preferSchoolGrade:false};}",
+            "defaultSettings(){return {topics:{add:true,sub:true,hissan:true,mul:true,clock:true,kokugo:true,moji:true,measure:true,kazu:true,shape:true,div:true,frac:true,chart:true,story:true,bun:true,goi:true,dokkai:true,eigo:true,money:true,groups:true,order:true,soroban:true,seikatsu:true,shakai:true,rika:true,kateika:true,gijutsu:true,doutoku:true,jouhou:true,sougou:true,tokubetsu:true,keyboard:true,thinking:true},count:this.props.questionCount??30,pass:this.props.passLine??23,preferSchoolGrade:false};}",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
             "countDelta(d){this.sfx('tap');const s=this.state.settings;const count=this.clamp(s.count+d,4,15);this.setSettings({count:count,pass:Math.min(s.pass,count)});}",
-            "countDelta(d){this.sfx('tap');const s=this.state.settings;const count=this.clamp((Number(s.count)||20)+d,10,30);this.setSettings({count:count,pass:Math.min(Math.max(1,Number(s.pass)||15),count)});}",
+            "countDelta(d){this.sfx('tap');const s=this.state.settings;const prev=this.clamp(Number(s.count)||30,10,50);const count=this.clamp(Math.round((prev+d*5)/5)*5,10,50);if(count===prev)return;const ratio=this.clamp((Number(s.pass)||23)/prev,0,1);this.setSettings({count:count,pass:this.clamp(Math.round(count*ratio),1,count)});}",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
@@ -82,7 +82,7 @@ internal static partial class LearningMarkupPatcher
         // one but counts as wrong. Return fewer choices instead of fake duplicates.
         markup = ReplaceRequired(markup,
             "pick4(ans,pool){const s=new Set([ans]);const out=[ans];for(const x of pool){if(out.length>=4)break;if(!s.has(x)){s.add(x);out.push(x);}}let k=1;while(out.length<4){const v=ans+'　'.repeat(k);if(!s.has(v)){s.add(v);out.push(v);}k++;}return this.shuffle(out);}",
-            "pick4(ans,pool){const s=new Set([String(ans)]);const out=[String(ans)];for(const x of pool){if(out.length>=4)break;const v=String(x);if(!s.has(v)){s.add(v);out.push(v);}}return this.shuffle(out);}",
+            "pick4(ans,pool){const a=String(ans),s=new Set([a]),out=[a];for(const x of pool||[]){if(out.length>=4)break;const v=String(x);if(!s.has(v)){s.add(v);out.push(v);}}if(out.length<4){const n=Number(a);if(a.trim()!==''&&Number.isInteger(n))for(let d=1;d<=12&&out.length<4;d++)for(const c of [n+d,n-d]){if(c<0||out.length>=4)continue;const v=String(c);if(!s.has(v)){s.add(v);out.push(v);}}}return this.shuffle(out);}",
             StringComparison.Ordinal);
 
         markup = PatchRewardSystem(markup);
@@ -231,6 +231,9 @@ internal static partial class LearningMarkupPatcher
         markup = PatchLearningCheckpoint(markup);
         markup = PatchKanjiPictureQuestions(markup);
         markup = PatchDrillMode(markup);
+        markup = PatchParentPinGate(markup);
+        markup = PatchCelebrationEffects(markup);
+        markup = PatchLearningLabelWording(markup);
 
         return markup;
     }
@@ -293,7 +296,7 @@ componentDidMount(){
     const migrated=JSON.stringify(profiles);this._lastSaved=migrated;
     try{localStorage.setItem('kt_profiles_v1',migrated);localStorage.setItem('kt_parent_pin_v1',parentPin);}catch(e){}
     const storedTopics=sourceSettings.topics&&typeof sourceSettings.topics==='object'?sourceSettings.topics:{};
-    const count=this.clamp(numberOrDefault(host.questionCount,numberOrDefault(sourceSettings.count,def.count)),10,30);
+    const count=this.clamp(numberOrDefault(host.questionCount,numberOrDefault(sourceSettings.count,def.count)),10,50);
     const pass=this.clamp(numberOrDefault(host.passLine,numberOrDefault(sourceSettings.pass,def.pass)),1,count);
     const settings={...def,...sourceSettings,topics:{...def.topics,...storedTopics},count:count,pass:pass,schoolGrade:schoolGrade,preferSchoolGrade:preferSchoolGrade};
     try{localStorage.setItem('kt_settings_v1',JSON.stringify(settings));}catch(e){}

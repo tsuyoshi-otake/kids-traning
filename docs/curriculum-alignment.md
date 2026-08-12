@@ -70,8 +70,10 @@
 | 4 | 国語 | `japanese.g4.language-information` | 語彙・文法・情報・話す聞く・書く読む | 問題・自動 | 国語編 |
 | 5 | 国語 | `japanese.g5.kanji-reading-writing` | 配当漢字193字の読む・書いて使う | 問題・自動 | 国語編 |
 | 5 | 国語 | `japanese.g5.language-information` | 資料、引用、討論、構成 | 問題・自動 | 国語編 |
+| 5 | 国語 | `japanese.g5.keigo-vocabulary` | 敬語・言葉の使い分け | 問題・自動 | 国語編 |
 | 6 | 国語 | `japanese.g6.kanji-reading-writing` | 配当漢字191字の読む・書いて使う | 問題・自動 | 国語編 |
-| 6 | 国語 | `japanese.g6.language-information` | 資料、引用、討論、構成 | 問題・自動 | 国語編 |
+| 6 | 国語 | `japanese.g6.language-information` | 常体・敬体、複数資料の比較、提案・推敲 | 問題・自動 | 国語編 |
+| 6 | 国語 | `japanese.g6.keigo-vocabulary` | 敬語・言葉の使い分け | 問題・自動 | 国語編 |
 | 4 | 理科 | `science.g4.matter-energy` | 空気・水・温度・電流 | 問題＋活動 | 理科編 |
 | 4 | 理科 | `science.g4.life-seasons` | 人の体・季節と生物 | 問題＋活動 | 理科編 |
 | 4 | 理科 | `science.g4.earth-sky` | 天気・水の循環・月と星 | 問題＋活動 | 理科編 |

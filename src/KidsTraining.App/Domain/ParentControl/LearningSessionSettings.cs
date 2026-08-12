@@ -7,12 +7,13 @@ internal sealed record LearningSessionSettings(
     bool PreferSchoolGrade)
 {
     public const int MinimumQuestionCount = 10;
-    public const int MaximumQuestionCount = 30;
+    public const int MaximumQuestionCount = 50;
     public const int MinimumPassLine = 1;
     public const int MinimumSchoolGrade = 1;
     public const int MaximumSchoolGrade = 9;
 
-    public static LearningSessionSettings Default { get; } = new(20, 15, 1, false);
+    // 23/30 keeps the pass ratio near the long-standing 15/20 (75%) default.
+    public static LearningSessionSettings Default { get; } = new(30, 23, 1, false);
 
     public static LearningSessionSettings Normalize(
         int? questionCount,
