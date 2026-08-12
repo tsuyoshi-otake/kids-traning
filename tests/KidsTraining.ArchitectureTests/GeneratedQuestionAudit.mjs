@@ -588,7 +588,9 @@ for (const [standard, ime] of [['shi', 'si'], ['chi', 'ti'], ['tsu', 'tu'], ['fu
 // Exercise the real schema migration and lane selection code before auditing generators.
 // These checks protect the early-learning contract independently of the registered grade.
 app.state = {
-  settings: { topics: Object.fromEntries(TOPICS.map((topic) => [topic, true])) },
+  // The real app clamps a saved session length into 10-30 before it is ever used, so a
+  // numeric count is part of the settings contract; buildSession sizes its plan from it.
+  settings: { count: 10, topics: Object.fromEntries(TOPICS.map((topic) => [topic, true])) },
   session: null,
 };
 const legacyProfiles = [
@@ -1154,8 +1156,181 @@ if (sparseBank && fullBank) {
       'retention=' + sparseProgressStat.retentionStep + ', next=' + sparseProgressStat.nextReviewAt,
     );
   }
+
+  // Passing the last stage only starts retention. The star is earned by the scheduled
+  // reviews, so the audit drives that chain to its end -- a unit that could never be
+  // cleared would leave the child stuck on a finished topic forever.
+  const CLEAR_CHECK = 'scheduled reviews carry a finished unit all the way to cleared';
+  const clearSteps = [];
+  for (let round = 0; round < 6 && !sparseProgressStat.masteredAt; round += 1) {
+    sparseProgressStat.nextReviewAt = Date.now() - 1;
+    app.state.session = evidenceSession();
+    record(sparseProgressProfile, sparseBank, app.terminalUnitStage(sparseBank.id), 'review');
+    clearSteps.push(sparseProgressStat.retentionStep);
+  }
+  observe(CLEAR_CHECK, clearSteps.length);
+  if (
+    !sparseProgressStat.masteredAt ||
+    !(sparseProgressProfile.cleared || {})[sparseBank.id] ||
+    !app.topicReady(sparseProgressProfile, sparseBank.id)
+  ) {
+    violated(
+      CLEAR_CHECK,
+      'confirmations ' + clearSteps.join(',') + ' left mastered=' + !!sparseProgressStat.masteredAt +
+        ', cleared=' + !!(sparseProgressProfile.cleared || {})[sparseBank.id] +
+        ', ready=' + app.topicReady(sparseProgressProfile, sparseBank.id),
+      sparseBank.id,
+    );
+  }
+
+  const RELAPSE_CHECK = 'a missed retention review restarts the confirmations without taking the star back';
+  sparseProgressStat.nextReviewAt = Date.now() - 1;
+  app.state.session = evidenceSession();
+  record(sparseProgressProfile, sparseBank, app.terminalUnitStage(sparseBank.id), 'review', 'incorrect');
+  observe(RELAPSE_CHECK, 1);
+  if (
+    sparseProgressStat.retentionStep !== 0 ||
+    !sparseProgressStat.masteredAt ||
+    !(sparseProgressProfile.cleared || {})[sparseBank.id] ||
+    app.topicReady(sparseProgressProfile, sparseBank.id)
+  ) {
+    violated(
+      RELAPSE_CHECK,
+      'retention=' + sparseProgressStat.retentionStep + ', cleared=' + !!(sparseProgressProfile.cleared || {})[sparseBank.id] +
+        ', ready=' + app.topicReady(sparseProgressProfile, sparseBank.id),
+      sparseBank.id,
+    );
+  }
+
+  // The confirmations can only arrive as due review questions, so the session planner has
+  // to keep offering the retained unit at its terminal stage.
+  const REVIEW_REACH_CHECK = 'a unit in retention is still offered as a due review at its terminal stage';
+  const fullRetentionStat = fullProgressProfile.unitStats[fullBank.id];
+  fullRetentionStat.nextReviewAt = Date.now() - 1;
+  const retentionSession = {
+    reviewTopics: app.dueTopics(fullProgressProfile).slice(),
+    targetTopics: [],
+    activeTargetTopic: null,
+    supportTopics: {},
+    questionCounts: {},
+    lastQuestionKey: '',
+  };
+  // "When do I get the star?" is an acceptance question, not a detail. The answer has to be "after
+  // three more sessions", never "tomorrow": no confirmation may sit behind a clock.
+  const ONE_DAY_CHECK = 'the confirmations that earn a star are open immediately, not on a timer';
+  const oneDayProfile = freshUnitProfile(fullBank);
+  const oneDayStat = oneDayProfile.unitStats[fullBank.id];
+  app.state.session = evidenceSession();
+  for (let stage = 0; stage < 5; stage += 1) qualifyCurrentStage(oneDayProfile, fullBank);
+  const clearWaits = [];
+  for (let round = 0; round < 6 && !oneDayStat.masteredAt; round += 1) {
+    clearWaits.push(Math.max(0, Number(oneDayStat.nextReviewAt) - Date.now()));
+    app.state.session = evidenceSession();
+    record(oneDayProfile, fullBank, app.terminalUnitStage(fullBank.id), 'review');
+  }
+  const totalWait = clearWaits.reduce((sum, wait) => sum + wait, 0);
+  observe(ONE_DAY_CHECK, clearWaits.length);
+  if (!oneDayStat.masteredAt || totalWait !== 0) {
+    violated(
+      ONE_DAY_CHECK,
+      oneDayStat.masteredAt
+        ? 'the star sat behind ' + Math.round(totalWait / 60000) + ' minutes of waiting over gaps ' + clearWaits.join('/') + ' ms'
+        : 'the star never arrived in ' + clearWaits.length + ' straight confirmations',
+      fullBank.id,
+    );
+  }
+
+  const offeredTopic = app.sessionTopic(fullProgressProfile, retentionSession, 'review');
+  const offeredStage = app.sessionStage(fullProgressProfile, retentionSession, fullBank.id, 'review');
+  observe(REVIEW_REACH_CHECK, 2);
+  if (offeredTopic !== fullBank.id || offeredStage !== app.terminalUnitStage(fullBank.id)) {
+    violated(
+      REVIEW_REACH_CHECK,
+      'the review slot offered ' + offeredTopic + ' at stage ' + offeredStage + ' instead of ' + fullBank.id + ' at stage ' + app.terminalUnitStage(fullBank.id),
+      fullBank.id,
+    );
+  }
+
+  // With the clock out of the way, the one-review-per-session splice is the entire spacing left
+  // between confirmations. If a session ever handed out two, the star would collapse into one sitting.
+  const SPACING_CHECK = 'one session confirms a retained unit at most once';
+  const repeatOffer = app.sessionTopic(fullProgressProfile, retentionSession, 'review');
+  observe(SPACING_CHECK, 1);
+  if (repeatOffer === fullBank.id) {
+    violated(SPACING_CHECK, 'the same session offered ' + fullBank.id + ' a second confirmation', fullBank.id);
+  }
 }
 app.state.session = null;
+
+// ——— Session pacing. A bored child stops practising, so monotony is a defect, not taste. ———
+
+// The old plan opened every session with the same brand-new unit three times in a row.
+// Targets must be spread through the plan with other work between them, and the session
+// must not open on the hardest thing.
+const INTERLEAVE_CHECK = 'target practice is spread through the session, not massed at the front';
+const paceProfile = () => app.ensureLearningProfile({ name: 'pace', grade: 1, stars: 0, xp: 0, mastery: {}, skillStats: {}, cleared: {} });
+const interleavePlan = app.buildSession(paceProfile(), 1).rolePlan;
+const targetPositions = interleavePlan.map((role, index) => (role === 'target' ? index : -1)).filter((index) => index >= 0);
+const expectedTargets = Math.max(4, Math.floor(interleavePlan.length * 0.25)) - 1;
+const massedTargets = targetPositions.some((position, index) => index > 0 && position === targetPositions[index - 1] + 1);
+observe(INTERLEAVE_CHECK, 1);
+if (
+  interleavePlan[interleavePlan.length - 1] !== 'exit' ||
+  interleavePlan[0] === 'target' ||
+  massedTargets ||
+  targetPositions.length !== expectedTargets
+) {
+  violated(INTERLEAVE_CHECK, 'role plan came out as ' + interleavePlan.join(','), 'buildSession');
+}
+
+// Two questions on the same unit back to back is the smallest unit of boredom the planner
+// can remove. Simulate whole sessions the way the quiz runs them: answer, then generate.
+const NO_REPEAT_CHECK = 'a session never asks the same unit twice in a row when alternatives exist';
+const simulateSessionUnits = (profile) => {
+  const session = app.buildSession(profile, 1);
+  app.state.session = session;
+  for (let index = 0; index < session.rolePlan.length; index += 1) {
+    app.recordEvidence(profile, session.questions[index], 'independent', 1, { userAnswer: 'audit' });
+    session.idx = index;
+    if (index + 1 < session.rolePlan.length) session.questions.push(app.generateSessionQuestion(profile, session, session.rolePlan[index + 1]));
+  }
+  app.state.session = null;
+  return session.questions.map((question) => question.unitId || question.topic);
+};
+const noRepeatRounds = 12;
+let repeatPairs = 0;
+for (let round = 0; round < noRepeatRounds; round += 1) {
+  const units = simulateSessionUnits(paceProfile());
+  for (let index = 1; index < units.length; index += 1) if (units[index] === units[index - 1]) repeatPairs += 1;
+}
+observe(NO_REPEAT_CHECK, noRepeatRounds);
+if (repeatPairs > 0) {
+  violated(NO_REPEAT_CHECK, repeatPairs + ' adjacent same-unit pairs across ' + noRepeatRounds + ' simulated sessions', 'generateSessionQuestion');
+}
+
+// With only two units left in the grade, the old plan ran one of them six times in a row.
+// Alternation caps the worst case at a double.
+const ENDGAME_CHECK = 'a two-unit endgame alternates units instead of running one back to back';
+const endgameProfile = app.ensureLearningProfile({ name: 'endgame', grade: 1, stars: 0, xp: 0, mastery: {}, skillStats: {}, cleared: {} });
+const gradeOneUnits = app.curriculumCatalog().filter((unit) => unit.grade === 1);
+for (const [index, unit] of gradeOneUnits.entries()) {
+  const keepFresh = index >= gradeOneUnits.length - 2;
+  endgameProfile.unitStats[unit.id] = keepFresh
+    ? { ...app.blankUnitStat(), level: 2, confidence: 0.5, attempts: 4, independent: 3 }
+    : { ...app.blankUnitStat(), level: app.terminalUnitStage(unit.id), confidence: 0.9, attempts: 12, independent: 11, retentionStartedAt: Date.now(), retentionStep: 0, nextReviewAt: Date.now() + 86400000 };
+  endgameProfile.mastery[unit.id] = keepFresh ? 0.5 : 0.9;
+}
+const endgameUnits = simulateSessionUnits(endgameProfile);
+let endgameRun = 1;
+let endgameMaxRun = 1;
+for (let index = 1; index < endgameUnits.length; index += 1) {
+  endgameRun = endgameUnits[index] === endgameUnits[index - 1] ? endgameRun + 1 : 1;
+  endgameMaxRun = Math.max(endgameMaxRun, endgameRun);
+}
+observe(ENDGAME_CHECK, 1);
+if (endgameMaxRun > 2 || new Set(endgameUnits).size < 2) {
+  violated(ENDGAME_CHECK, 'unit order was ' + endgameUnits.map((id) => id.split('.').pop()).join(',') + ' (longest run ' + endgameMaxRun + ')', 'buildSession');
+}
 
 const mathLane = app.curriculumLaneIds().find((lane) => lane.some((id) => id.startsWith('math.')));
 const gradeOneBeginner = normalProfiles[0];
@@ -1752,6 +1927,7 @@ const DRILL_KANJI_CHECK = 'the kanji drills cover their grade and distinguish on
 const DRILL_KANJI_WORD_CHECK = 'kanji word questions use only characters learned by the course grade';
 const DRILL_KANJI_WRITING_CHECK = 'every kanji writing question offers one right spelling and three same-grade distractors with different readings';
 const DRILL_FLOW_CHECK = 'a drill run advances, requeues a revealed question, and resumes where it stopped';
+const DRILL_PAIR_CHECK = 'a correct drill answer shows the question and its answer as one pair before advancing';
 
 const drillCourses = app.drillCourses();
 observe(DRILL_COURSE_CHECK, drillCourses.length);
@@ -2011,12 +2187,50 @@ app.selectDrillCourse('g1');
 if (app.state.screen !== 'drill-mode' || app.state.drillCourseChoice !== 'g1') {
   violated(DRILL_FLOW_CHECK, 'selecting an arithmetic course did not ask how to answer', JSON.stringify(app.state));
 }
+
+// A correct answer holds the completed pair on screen before the next question replaces it, so
+// the run has to flush that echo exactly the way the app's timer does (issue #68).
+const submitDrillAnswer = (value) => {
+  app.setState({ input: String(value) });
+  app.drillSubmit();
+  app.drillFlushEcho();
+};
+const chooseDrillAnswer = (value) => {
+  app.drillChoose(value);
+  app.drillFlushEcho();
+};
+
+observe(DRILL_PAIR_CHECK, 2);
+app.startDrill('g1', true);
+const echoQuestion = app.drillQuestion();
+app.setState({ input: String(echoQuestion.ans) });
+app.drillSubmit();
+if (!app.state.drill.echo || app.state.drill.idx !== 0) {
+  violated(DRILL_PAIR_CHECK, 'a correct answer advanced without showing the completed pair', JSON.stringify(app.state.drill));
+} else if (app.state.drill.echo.main !== app.drillAnswerLine(echoQuestion) || app.state.drill.echo.sub !== '') {
+  violated(DRILL_PAIR_CHECK, `the arithmetic pair read ${JSON.stringify(app.state.drill.echo)}`, app.drillAnswerLine(echoQuestion));
+}
+app.drillFlushEcho();
+if (app.state.drill.idx !== 1 || app.state.drill.echo) {
+  violated(DRILL_PAIR_CHECK, 'flushing the pair did not move on to the next question', JSON.stringify(app.state.drill));
+}
+// Both kanji directions have to leave the same picture behind: the spelling above its reading.
+for (const answerMode of ['reading', 'writing']) {
+  app.startDrill('k1', true, answerMode);
+  const pairQuestion = app.drillPresentedQuestion(app.state.drill, app.drillQuestion());
+  const pair = app.drillPair(app.state.drill, pairQuestion);
+  const spelling = answerMode === 'writing' ? pairQuestion.ans : pairQuestion.text;
+  const reading = answerMode === 'writing' ? pairQuestion.text : pairQuestion.ans;
+  if (pair.main !== spelling || pair.sub !== reading) {
+    violated(DRILL_PAIR_CHECK, `the ${answerMode} pair read ${JSON.stringify(pair)}`, `${spelling} / ${reading}`);
+  }
+}
+
 app.startDrill('g1', true);
 let drillAsked = 0;
 while (!app.state.drill.done && drillAsked <= gradeOneBank.length) {
   drillAsked += 1;
-  app.setState({ input: String(app.drillQuestion().ans) });
-  app.drillSubmit();
+  submitDrillAnswer(app.drillQuestion().ans);
 }
 if (drillAsked !== gradeOneBank.length || app.state.drill.perfect !== gradeOneBank.length) {
   violated(DRILL_FLOW_CHECK, `a clean run asked ${drillAsked} questions and scored ${app.state.drill.perfect} of ${gradeOneBank.length}`, 'clean run');
@@ -2043,8 +2257,7 @@ let lastPrompt = '';
 while (!app.state.drill.done && requeueAsked <= gradeOneBank.length) {
   requeueAsked += 1;
   lastPrompt = app.drillQuestion().text;
-  app.setState({ input: String(app.drillQuestion().ans) });
-  app.drillSubmit();
+  submitDrillAnswer(app.drillQuestion().ans);
 }
 if (lastPrompt !== revealedQuestion.text) {
   violated(DRILL_FLOW_CHECK, `a revealed question was not asked again at the end (last prompt was ${lastPrompt})`, revealedQuestion.text);
@@ -2055,8 +2268,7 @@ if (app.state.drill.perfect !== gradeOneBank.length - 1) {
 
 app.startDrill('g2', true);
 for (let step = 0; step < 7; step += 1) {
-  app.setState({ input: String(app.drillQuestion().ans) });
-  app.drillSubmit();
+  submitDrillAnswer(app.drillQuestion().ans);
 }
 app.exitDrill();
 if (app.state.screen !== 'start' || app.state.drill !== null) {
@@ -2070,15 +2282,15 @@ if (app.state.drill.idx !== 7 || app.state.drill.answerMode !== 'choice' || app.
 app.startDrill('g1', true, 'choice');
 const arithmeticChoiceQuestion = app.drillQuestion();
 const arithmeticChoices = app.drillChoices(app.state.drill, arithmeticChoiceQuestion);
-app.drillChoose(arithmeticChoices.find((choice) => choice !== arithmeticChoiceQuestion.ans));
+chooseDrillAnswer(arithmeticChoices.find((choice) => choice !== arithmeticChoiceQuestion.ans));
 if (app.state.drill.mark !== 'wrong' || app.state.drill.idx !== 0) {
   violated(DRILL_FLOW_CHECK, 'a wrong arithmetic choice did not keep the question on screen', JSON.stringify(app.state.drill));
 }
-app.drillChoose(arithmeticChoiceQuestion.ans);
+chooseDrillAnswer(arithmeticChoiceQuestion.ans);
 if (app.state.drill.idx !== 1 || app.state.drill.perfect !== 0) {
   violated(DRILL_FLOW_CHECK, 'the corrected arithmetic choice did not advance without first-try credit', JSON.stringify(app.state.drill));
 }
-app.drillChoose(app.drillQuestion().ans);
+chooseDrillAnswer(app.drillQuestion().ans);
 if (app.state.drill.idx !== 2 || app.state.drill.perfect !== 1) {
   violated(DRILL_FLOW_CHECK, 'a clean arithmetic choice was not credited', JSON.stringify(app.state.drill));
 }
@@ -2089,15 +2301,15 @@ if (app.state.screen !== 'drill-mode' || app.state.drillCourseChoice !== 'k1') {
 }
 app.startDrill('k1', true, 'reading');
 const kanjiQuestion = app.drillQuestion();
-app.drillChoose(kanjiQuestion.choices.find((choice) => choice !== kanjiQuestion.ans));
+chooseDrillAnswer(kanjiQuestion.choices.find((choice) => choice !== kanjiQuestion.ans));
 if (app.state.drill.mark !== 'wrong' || app.state.drill.idx !== 0) {
   violated(DRILL_FLOW_CHECK, 'a wrong reading did not keep the kanji question on screen', JSON.stringify(app.state.drill));
 }
-app.drillChoose(kanjiQuestion.ans);
+chooseDrillAnswer(kanjiQuestion.ans);
 if (app.state.drill.idx !== 1 || app.state.drill.perfect !== 0) {
   violated(DRILL_FLOW_CHECK, 'choosing the right reading did not advance without crediting a first-try answer', JSON.stringify(app.state.drill));
 }
-app.drillChoose(app.drillQuestion().ans);
+chooseDrillAnswer(app.drillQuestion().ans);
 if (app.state.drill.idx !== 2 || app.state.drill.perfect !== 1) {
   violated(DRILL_FLOW_CHECK, 'a clean kanji answer was not credited', JSON.stringify(app.state.drill));
 }
@@ -2106,11 +2318,11 @@ app.startDrill('k1', true, 'writing');
 const writingBaseQuestion = app.drillQuestion();
 const writingQuestion = app.drillPresentedQuestion(app.state.drill, writingBaseQuestion);
 const writingChoices = app.drillChoices(app.state.drill, writingQuestion);
-app.drillChoose(writingChoices.find((choice) => choice !== writingQuestion.ans));
+chooseDrillAnswer(writingChoices.find((choice) => choice !== writingQuestion.ans));
 if (app.state.drill.mark !== 'wrong' || app.state.drill.idx !== 0) {
   violated(DRILL_FLOW_CHECK, 'a wrong kanji spelling did not keep the question on screen', JSON.stringify(app.state.drill));
 }
-app.drillChoose(writingQuestion.ans);
+chooseDrillAnswer(writingQuestion.ans);
 if (app.state.drill.idx !== 1 || app.state.drill.perfect !== 0) {
   violated(DRILL_FLOW_CHECK, 'choosing the right kanji spelling did not advance without first-try credit', JSON.stringify(app.state.drill));
 }

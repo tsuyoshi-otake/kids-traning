@@ -10,6 +10,7 @@ using KidsTraining.App.Infrastructure.ParentControl;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 
 namespace KidsTraining.ArchitectureTests;
 
@@ -448,16 +449,18 @@ internal static class Program
 
         evidence = evidence.StartRetention(lastAnswer);
         Assert(evidence.IsRetentionActive && evidence.RetentionStep == 0, "the sixth retention stage did not start");
-        Assert(evidence.NextReviewAt == lastAnswer.AddDays(1) && !evidence.IsReady(lastAnswer), "retention did not begin with a one-day delayed review");
+        Assert(evidence.NextReviewAt == lastAnswer && !evidence.IsReady(lastAnswer), "retention did not open its first confirmation immediately");
 
         var firstReview = evidence.NextReviewAt.GetValueOrDefault();
         evidence = evidence.RecordRetentionReview(LearningOutcome.IndependentCorrect, firstReview);
-        Assert(evidence.RetentionStep == 1 && evidence.NextReviewAt == firstReview.AddDays(3), "the first retention confirmation did not schedule the three-day review");
-        Assert(!evidence.IsAchievement, "one delayed success created mastery too early");
+        Assert(evidence.RetentionStep == 1 && evidence.NextReviewAt == firstReview, "the first retention confirmation did not leave the next one open");
+        Assert(!evidence.IsAchievement, "one confirmation created mastery too early");
 
         var secondReview = evidence.NextReviewAt.GetValueOrDefault();
         evidence = evidence.RecordRetentionReview(LearningOutcome.IndependentCorrect, secondReview);
-        Assert(evidence.RetentionStep == 2 && evidence.NextReviewAt == secondReview.AddDays(7), "the second retention confirmation did not schedule the seven-day review");
+        Assert(evidence.RetentionStep == 2 && evidence.NextReviewAt == secondReview, "the second retention confirmation did not leave the next one open");
+        // The star is earned by practising, never by waiting: no confirmation is behind a clock.
+        Assert(secondReview == lastAnswer, "a confirmation gap put the star behind the clock again");
 
         var thirdReview = evidence.NextReviewAt.GetValueOrDefault();
         evidence = evidence.RecordRetentionReview(LearningOutcome.IndependentCorrect, thirdReview);
@@ -469,7 +472,7 @@ internal static class Program
         var maintenanceReview = evidence.NextReviewAt.GetValueOrDefault();
         var failedReview = evidence.RecordRetentionReview(LearningOutcome.Incorrect, maintenanceReview);
         Assert(failedReview.IsAchievement && failedReview.RetentionStep == 0, "a failed review should reset current retention without erasing the achievement");
-        Assert(failedReview.NextReviewAt == maintenanceReview.AddDays(1), "a failed review did not schedule a one-day reconfirmation");
+        Assert(failedReview.NextReviewAt == maintenanceReview, "a failed review did not leave its reconfirmation open");
         Assert(!failedReview.IsReady(maintenanceReview), "failed retention remained currently ready");
         for (var confirmation = 0; confirmation < SkillEvidence.RequiredRetentionConfirmations; confirmation++)
         {
@@ -493,6 +496,33 @@ internal static class Program
             Assert(evidence.NextReviewAt == now.AddDays(days), $"review interval was not {days} days");
             now = evidence.NextReviewAt.GetValueOrDefault();
         }
+
+        // Retention does not run on the review ladder: the confirmations that earn a star are spaced
+        // by sessions, so none of them is behind a clock. The long gap belongs to the maintenance
+        // review that follows mastery.
+        var expectedRetention = new[]
+        {
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            TimeSpan.Zero,
+            TimeSpan.FromDays(21)
+        };
+        var untilStar = TimeSpan.Zero;
+        for (var step = 0; step < expectedRetention.Length; step++)
+        {
+            Assert(
+                ReviewSchedule.RetentionIntervalAt(step) == expectedRetention[step],
+                $"retention interval {step} was not {expectedRetention[step]}");
+            if (step < SkillEvidence.RequiredRetentionConfirmations)
+            {
+                untilStar += ReviewSchedule.RetentionIntervalAt(step);
+            }
+        }
+
+        Assert(untilStar == TimeSpan.Zero, "earning a star requires waiting instead of practising");
+        Assert(
+            ReviewSchedule.RetentionIntervalAt(SkillEvidence.RequiredRetentionConfirmations) >= TimeSpan.FromDays(7),
+            "the post-mastery maintenance review became a short retention gap");
     }
 
     private static void TestDrillModeMarkup(string repositoryRoot)
@@ -602,10 +632,13 @@ internal static class Program
             html.Contains("retentionReview=!!s.retentionStartedAt&&wasDue&&role==='review'&&difficulty===terminalStage", StringComparison.Ordinal),
             "only due terminal-stage review questions may confirm retention");
         Assert(html.Contains("s.retentionStep=Math.min(3,s.retentionStep+1)", StringComparison.Ordinal), "three delayed retention confirmations are not required");
-        Assert(html.Contains("else{s.retentionStep=0;s.reviewStep=0;s.nextReviewAt=now+intervals[0];}", StringComparison.Ordinal), "failed retention does not restart after one day");
+        Assert(html.Contains("else{s.retentionStep=0;s.reviewStep=0;s.nextReviewAt=now+retention[0];}", StringComparison.Ordinal), "failed retention does not restart at the first retention interval");
         Assert(html.Contains("masteredAt", StringComparison.Ordinal) && html.Contains("topicReady", StringComparison.Ordinal), "achievement and readiness are not separate");
         Assert(html.Contains("outcome==='revealed'", StringComparison.Ordinal), "revealed answers have no distinct evidence path");
         Assert(html.Contains("intervals=[86400000,259200000,604800000,1814400000]", StringComparison.Ordinal), "spaced-review intervals are missing");
+        // Retention keeps its own schedule: the three confirmations are open immediately and spaced
+        // by sessions, and only the post-mastery maintenance review is delayed.
+        Assert(html.Contains("retention=[0,0,0,1814400000]", StringComparison.Ordinal), "retention confirmations are behind a clock again");
         Assert(html.Contains("for(let round=0;round<3;round++)", StringComparison.Ordinal), "calibration does not repeat core skills three times");
         Assert(html.Contains("score=(!r||!r.attempts)?0.05", StringComparison.Ordinal), "untested skills are not initialized conservatively");
         Assert(html.Contains("q.sessionRole=role", StringComparison.Ordinal) && html.Contains("'review'", StringComparison.Ordinal) && html.Contains("'target'", StringComparison.Ordinal) && html.Contains("'mixed'", StringComparison.Ordinal) && html.Contains("'exit'", StringComparison.Ordinal), "session roles are incomplete");
@@ -630,6 +663,14 @@ internal static class Program
             html.Contains("session.questions.push(this.generateSessionQuestion(p,session,rolePlan[0]))", StringComparison.Ordinal) &&
             html.Contains("this.generateSessionQuestion(p,s,s.rolePlan[nextIndex])", StringComparison.Ordinal),
             "learning questions are not generated lazily from the latest evidence");
+        Assert(
+            html.Contains("Math.floor((2*i+1)*body.length/(2*targetCount))", StringComparison.Ordinal) &&
+            !html.Contains("for(let i=0;i<targetCount;i++)rolePlan.push('target')", StringComparison.Ordinal),
+            "target questions are massed into one block instead of interleaved through the session");
+        Assert(
+            html.Contains("return this.weightedPick(p,pool,avoid)", StringComparison.Ordinal) &&
+            html.Contains("const spaced=avoid?ids.filter(id=>id!==avoid):ids", StringComparison.Ordinal),
+            "the mixed slot may repeat the unit it just asked");
         Assert(
             html.Contains("questionIdentity(q)", StringComparison.Ordinal) &&
             html.Contains("questionFingerprint(key)", StringComparison.Ordinal) &&
@@ -694,7 +735,7 @@ internal static class Program
         Assert(html.Contains("s.attempts>0&&(Number(s.confidence)<.5||this.topicDue(p,k))", StringComparison.Ordinal), "unattempted upper topics are incorrectly treated as remediation triggers");
         Assert(html.Contains("visiting.has(topic)", StringComparison.Ordinal) && html.Contains("emitted.has(topic)", StringComparison.Ordinal) && html.Contains("filter(req=>!this.topicComplete(p,req))", StringComparison.Ordinal), "prerequisite remediation is not cycle-safe, deduplicated, and retention-completion-aware");
         Assert(html.Contains("for(const id of base)for(const req of this.remediationTopics(p,id))", StringComparison.Ordinal) && html.Contains("return remedial.length?remedial:(out.length?out:allowed)", StringComparison.Ordinal), "allowed topics or curriculum frontier do not prioritize remediation");
-        Assert(html.Contains("candidates=remedial.length?remedial:[id]", StringComparison.Ordinal) && html.Contains("return this.weightedPickExact(p,ids)", StringComparison.Ordinal), "weighted selection does not fall back explicitly after prerequisite remediation");
+        Assert(html.Contains("candidates=remedial.length?remedial:[id]", StringComparison.Ordinal) && html.Contains("return this.weightedPickExact(p,spaced.length?spaced:ids)", StringComparison.Ordinal), "weighted selection does not fall back explicitly after prerequisite remediation");
         Assert(html.Contains("configured[unit.topicId]!==false", StringComparison.Ordinal), "new curriculum topics are disabled for migrated settings");
         Assert(
             html.Contains("reviewCount=due.length?Math.min(due.length", StringComparison.Ordinal) &&
@@ -1372,10 +1413,14 @@ internal static class Program
             var changedPin = preparer.Prepare();
             var manifest = File.ReadAllText(manifestPath, Encoding.UTF8);
             Assert(
-                changedPin.Status == LearningPagePreparationStatus.PreparedFresh &&
-                !manifest.Contains("4456", StringComparison.Ordinal) &&
-                !manifest.Contains("7788", StringComparison.Ordinal),
-                "a PIN change did not invalidate the runtime or a raw PIN leaked into the cache manifest");
+                changedPin.Status == LearningPagePreparationStatus.PreparedFresh,
+                "a PIN change did not invalidate the cached runtime");
+            // The manifest stores hex hashes, so scanning the raw text for a PIN would also fire on
+            // a hash whose hex digits happen to spell one. Every stored value is still searched;
+            // only values that are entirely a hash are exempt, because a leak cannot hide there.
+            Assert(
+                !ManifestLeaksPin(manifest, "4456") && !ManifestLeaksPin(manifest, "7788"),
+                "a raw PIN leaked into the cache manifest");
         }
         finally
         {
@@ -1384,6 +1429,52 @@ internal static class Program
                 Directory.Delete(temporaryRoot, true);
             }
         }
+    }
+
+    private static bool ManifestLeaksPin(string manifest, string pin)
+    {
+        using var document = JsonDocument.Parse(manifest);
+        var pending = new Stack<JsonElement>();
+        pending.Push(document.RootElement);
+        while (pending.Count > 0)
+        {
+            var element = pending.Pop();
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    foreach (var property in element.EnumerateObject())
+                    {
+                        pending.Push(property.Value);
+                    }
+
+                    break;
+                case JsonValueKind.Array:
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        pending.Push(item);
+                    }
+
+                    break;
+                case JsonValueKind.String:
+                    var value = element.GetString() ?? string.Empty;
+                    var isHash = value.Length == 64 && value.All(Uri.IsHexDigit);
+                    if (!isHash && value.Contains(pin, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+
+                    break;
+                case JsonValueKind.Number:
+                    if (string.Equals(element.GetRawText(), pin, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+
+                    break;
+            }
+        }
+
+        return false;
     }
 
     private static void TestLegacyStorageMigrationState()

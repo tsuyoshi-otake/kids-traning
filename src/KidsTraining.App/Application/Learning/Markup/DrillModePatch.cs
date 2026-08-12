@@ -33,6 +33,7 @@ internal static partial class LearningMarkupPatcher
             "if(this._mathKeyHandler)document.removeEventListener('keydown',this._mathKeyHandler);",
             "if(this._mathKeyHandler)document.removeEventListener('keydown',this._mathKeyHandler);" +
             "if(this._drillKeyHandler)document.removeEventListener('keydown',this._drillKeyHandler);" +
+            "this.clearDrillEcho();" +
             "if(this.state.drill)this.saveDrillProgress(this.state.drill,false);",
             StringComparison.Ordinal);
 
@@ -107,7 +108,7 @@ internal static partial class LearningMarkupPatcher
     private static string BuildDrillKeyHandlerScript()
     {
         return """
-this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlKey||e.altKey||e.metaKey)return;const sc=this.state.screen;if(sc==='drill-mode'){const id=String(this.state.drillCourseChoice||'');if(e.key==='Escape'){e.preventDefault();this.cancelDrillMode();return;}if((e.key==='1'||e.key==='2')&&id){e.preventDefault();const kanji=id==='k1'||id==='k2',mode=e.key==='1'?(kanji?'reading':'input'):(kanji?'writing':'choice');this.startDrill(id,false,mode);}return;}if(sc!=='drill')return;const d=this.state.drill;if(!d||d.done)return;const roleButton=!!(e.target&&e.target.getAttribute&&(e.target.getAttribute('role')==='button'||e.target.tagName==='BUTTON'));if(roleButton&&(e.key==='Enter'||e.key===' '))return;if(d.revealed){if(e.key==='Enter'||e.key===' '){e.preventDefault();this.drillNext();}return;}const base=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,base),choices=this.drillChoices(d,dq);if(choices.length){const choiceIndex=Number(e.key)-1;if(choiceIndex>=0&&choiceIndex<choices.length){e.preventDefault();this.drillChoose(choices[choiceIndex]);}return;}if(/^[0-9]$/.test(e.key)){e.preventDefault();this.press(e.key);return;}if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();this.del();return;}if(e.key!=='Enter'||!this.state.input)return;e.preventDefault();this.drillSubmit();};document.addEventListener('keydown',this._drillKeyHandler);
+this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlKey||e.altKey||e.metaKey)return;const sc=this.state.screen;if(sc==='drill-mode'){const id=String(this.state.drillCourseChoice||'');if(e.key==='Escape'){e.preventDefault();this.cancelDrillMode();return;}if((e.key==='1'||e.key==='2')&&id){e.preventDefault();const kanji=id==='k1'||id==='k2',mode=e.key==='1'?(kanji?'reading':'input'):(kanji?'writing':'choice');this.startDrill(id,false,mode);}return;}if(sc!=='drill')return;const d=this.state.drill;if(!d||d.done)return;const roleButton=!!(e.target&&e.target.getAttribute&&(e.target.getAttribute('role')==='button'||e.target.tagName==='BUTTON'));if(roleButton&&(e.key==='Enter'||e.key===' '))return;if(d.echo){if(e.key==='Enter'||e.key===' '){e.preventDefault();this.drillFlushEcho();}return;}if(d.revealed){if(e.key==='Enter'||e.key===' '){e.preventDefault();this.drillNext();}return;}const base=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,base),choices=this.drillChoices(d,dq);if(choices.length){const choiceIndex=Number(e.key)-1;if(choiceIndex>=0&&choiceIndex<choices.length){e.preventDefault();this.drillChoose(choices[choiceIndex]);}return;}if(/^[0-9]$/.test(e.key)){e.preventDefault();this.press(e.key);return;}if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();this.del();return;}if(e.key!=='Enter'||!this.state.input)return;e.preventDefault();this.drillSubmit();};document.addEventListener('keydown',this._drillKeyHandler);
 """.TrimEnd('\r', '\n');
     }
 
@@ -222,6 +223,12 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   drillMatches(q,value){const raw=String(value==null?'':value);if(!raw.length)return false;return q.kind==='pick'?raw===String(q.ans):Number(raw)===Number(q.ans);}
   drillReadingLabel(q){return q&&q.readingType==='on'?'\u97f3\u8aad\u307f':q&&q.readingType==='kun'?'\u8a13\u8aad\u307f':'\u3053\u3068\u3070';}
   drillPrompt(q){return q&&q.readingType?q.text+' ['+this.drillReadingLabel(q)+']':(q?q.text:'');}
+  drillPair(d,q){
+    if(!q)return null;
+    if(q.kind!=='pick')return {main:this.drillAnswerLine(q),sub:''};
+    const writing=!!(d&&d.answerMode==='writing');
+    return {main:writing?String(q.ans):String(q.text),sub:writing?String(q.text):String(q.ans)};
+  }
   drillQuestionAt(d,index){
     if(!d)return null;const bank=this.drillBank(d.id),again=Array.isArray(d.again)?d.again:[];
     if(index<bank.length)return bank[index]||null;
@@ -267,12 +274,13 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     const fresh=restart||idx===0;
     const mode=id==='g1'||id==='g2'?(answerMode==='choice'?'choice':'input'):(answerMode==='writing'?'writing':'reading'),choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder(bank.length,choiceSeed);
     if(fresh){progress[id]={idx:0,perfect:0,mistakes:0,runs:saved.runs,best:saved.best};this.writeDrillProgress(progress);}
+    this.clearDrillEcho();
     this.sfx('select');
-    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,answerMode:mode,choiceSeed:choiceSeed,choiceOrder:choiceOrder,idx:idx,miss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:false,last:null}});
+    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,answerMode:mode,choiceSeed:choiceSeed,choiceOrder:choiceOrder,idx:idx,miss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:false,echo:null}});
   }
   drillAdvance(patch){
     const d=this.state.drill;if(!d)return;
-    const total=this.drillBank(d.id).length,next=Object.assign({},d,{miss:0,mark:'',hint:'',revealed:false},patch||{});
+    const total=this.drillBank(d.id).length,next=Object.assign({},d,{miss:0,mark:'',hint:'',revealed:false,echo:null},patch||{});
     next.idx=d.idx+1;
     const again=Array.isArray(next.again)?next.again:[],countRun=!d.counted&&next.idx>=total;
     if(countRun)next.counted=true;
@@ -281,16 +289,30 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     if(next.done)this.sfx('clear');
     this.setState({drill:next,input:''});
   }
+  drillEchoMs(){return 700;}
+  clearDrillEcho(){if(this._drillEchoTimer){clearTimeout(this._drillEchoTimer);this._drillEchoTimer=null;}this._drillEchoPatch=null;}
+  scheduleDrillAdvance(patch){
+    this.clearDrillEcho();
+    this._drillEchoPatch=patch;
+    this._drillEchoTimer=setTimeout(()=>this.drillFlushEcho(),this.drillEchoMs());
+  }
+  drillFlushEcho(){
+    const patch=this._drillEchoPatch,cur=this.state.drill;
+    this.clearDrillEcho();
+    if(!patch||this.state.screen!=='drill'||!cur||!cur.echo)return;
+    this.drillAdvance(patch);
+  }
   drillSubmit(){this.drillAnswerWith(this.state.input);}
   drillChoose(value){this.drillAnswerWith(value);}
   drillAnswerWith(value){
-    const d=this.state.drill;if(!d||d.done||d.revealed)return;
+    const d=this.state.drill;if(!d||d.done||d.revealed||d.echo)return;
     const q=this.drillPresentedQuestion(d,this.drillQuestion());if(!q)return;
     const raw=String(value==null?'':value);if(!raw.length)return;
     if(this.drillMatches(q,raw)){
       const clean=d.miss===0,firstPass=d.idx<this.drillBank(d.id).length;
       this.sfx(clean&&d.streak>=4?'combo':'correct');
-      this.drillAdvance({perfect:d.perfect+(clean&&firstPass?1:0),streak:clean?d.streak+1:0,last:{ok:true,text:this.drillAnswerLine(q)}});
+      this.setState({drill:Object.assign({},d,{mark:'',hint:'',echo:this.drillPair(d,q)})});
+      this.scheduleDrillAdvance({perfect:d.perfect+(clean&&firstPass?1:0),streak:clean?d.streak+1:0});
       return;
     }
     this.sfx('wrong');
@@ -299,11 +321,11 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   }
   drillNext(){
     const d=this.state.drill;if(!d||!d.revealed)return;
-    const q=this.drillPresentedQuestion(d,this.drillQuestion()),bank=this.drillBank(d.id),again=Array.isArray(d.again)?d.again.slice():[];
+    const bank=this.drillBank(d.id),again=Array.isArray(d.again)?d.again.slice():[];
     if(d.idx<bank.length&&again.indexOf(d.idx)<0)again.push(d.idx);
-    this.drillAdvance({again:again,streak:0,last:{ok:false,text:q?this.drillAnswerLine(q):''}});
+    this.drillAdvance({again:again,streak:0});
   }
-  exitDrill(){const d=this.state.drill;this.saveDrillProgress(d,false);this.sfx('tap');this.setState({screen:'start',drill:null,drillAsk:'',drillCourseChoice:'',input:''});}
+  exitDrill(){const d=this.state.drill;this.clearDrillEcho();this.saveDrillProgress(d,false);this.sfx('tap');this.setState({screen:'start',drill:null,drillAsk:'',drillCourseChoice:'',input:''});}
   askDrillReset(id){this.sfx('tap');this.setState({drillAsk:this.state.drillAsk===id?'':id});}
   confirmDrillReset(id){
     const progress=this.readDrillProgress(),prev=progress[id]||this.drillDefaultRecord();
@@ -349,27 +371,31 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     if(sc==='drill'&&S.drill){
       const d=S.drill,course=this.drillCourse(d.id)||{},total=this.drillBank(d.id).length,baseQuestion=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,baseQuestion);
       const dAgain=Array.isArray(d.again)?d.again:[],seen=Math.min(d.idx,total),inMain=d.idx<total;
-      const dLast=d.last&&typeof d.last==='object'?d.last:null;
       const drillPad=['1','2','3','4','5','6','7','8','9'].map(n=>({label:n,ariaLabel:n,style:keyTile,onClick:()=>this.press(n)}));
       drillPad.push({label:'けす',ariaLabel:'ひとつ けす',style:keyClear,onClick:()=>this.del()});
       drillPad.push({label:'0',ariaLabel:'0',style:keyTile,onClick:()=>this.press('0')});
       drillPad.push({label:'OK',ariaLabel:'こたえる',style:keyOk,onClick:()=>this.drillSubmit()});
       const dChoices=this.drillChoices(d,dq),dPick=dChoices.length>0,dKanji=!!(dq&&dq.kind==='pick'),dWriting=d.answerMode==='writing';
-      const drillPicks=dChoices.map((choice,i)=>({no:String(i+1),label:String(choice),ariaLabel:(i+1)+'ばん、'+choice,onClick:()=>this.drillChoose(choice)}));
+      // The pair is what has to be memorised, so it is shown in one fixed place: green while the
+      // correct answer is echoed, red when the second mistake reveals it, and never anywhere else.
+      const dEcho=d.echo&&typeof d.echo==='object'?d.echo:null,dPair=this.drillPair(d,dq)||{main:'',sub:''};
+      const dSolved=!!dEcho||!!d.revealed,dAnswer=dq?String(dq.ans):'';
+      const drillPicks=dChoices.map((choice,i)=>({
+        no:String(i+1), label:String(choice), ariaLabel:(i+1)+'ばん、'+choice,
+        style:dSolved&&String(choice)===dAnswer?'background:#e8f7ec; border-color:#3aa655; color:#22683c; box-shadow:0 4px 0 #9dd3ae;':'',
+        onClick:()=>this.drillChoose(choice)}));
       drillView={
         badge:course.badge||'', title:course.title||'', section:dq?dq.sec:'',
         countText:inMain?(seen+' / '+total):('なおし '+(d.idx-total+1)+' / '+dAgain.length),
         headStyle:'background:'+(course.color||'#ff8a3d')+';',
         barStyle:'width:'+Math.round(this.clamp(seen/(total||1),0,1)*100)+'%; background:'+(course.color||'#ff8a3d')+';',
         prompt:dq?this.drillPrompt(dq):'', ansBox:S.input||'?',
-        ansStyle:d.mark?'border-color:#e08a7a; color:#b23b23;':'',
+        ansStyle:dEcho?'background:#e8f7ec; border-color:#3aa655; color:#22683c;':(d.mark?'border-color:#e08a7a; color:#b23b23;':''),
         showAns:!dPick, showAsk:dPick, askText:dWriting?'ただしい かんじを えらんでね':(dKanji?'よみかたを えらんでね':'こたえを 2つから えらんでね'),
         showPad:!dPick, showPick:dPick, pickAria:dWriting?'かんじの えらびもんだい':(dKanji?'よみかたの えらびもんだい':'こたえの 2たくもんだい'), picks:drillPicks,
         showHint:d.mark==='wrong', hint:d.hint||'',
-        showAnswer:!!d.revealed, answerText:dq?this.drillAnswerLine(dq):'',
-        showLast:!!dLast&&!d.mark, lastText:dLast?dLast.text:'',
-        lastMark:dLast&&dLast.ok?'○':'✗',
-        lastStyle:dLast&&dLast.ok?'':'background:#ffe0da; border-color:#e08a7a; color:#b23b23;',
+        showEcho:!!dEcho, echoMain:dEcho?dEcho.main:'', echoSub:dEcho?dEcho.sub:'', echoHasSub:!!(dEcho&&dEcho.sub),
+        showAnswer:!!d.revealed, answerMain:dPair.main, answerSub:dPair.sub, answerHasSub:!!dPair.sub,
         showStreak:d.streak>=3, streakText:'れんぞく '+d.streak+'もん！',
         playing:!d.done, finished:!!d.done,
         clearBody:d.perfect+' / '+total+'もんを 1かいめで せいかい',
@@ -450,6 +476,9 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
           <span class="kt-drill-title">{{ drillView.title }}</span>
           <span class="kt-drill-section">{{ drillView.section }}</span>
         </div>
+        <sc-if value="{{ drillView.showStreak }}" hint-placeholder-val="{{ false }}">
+          <div class="kt-drill-streak">🔥 {{ drillView.streakText }}</div>
+        </sc-if>
         <div class="kt-drill-count">{{ drillView.countText }}</div>
       </div>
       <div class="kt-drill-bar kt-drill-bar-wide"><span style="{{ drillView.barStyle }}"></span></div>
@@ -457,42 +486,52 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         <div class="kt-drill-body">
           <div class="kt-drill-stage">
             <div class="kt-drill-prompt">{{ drillView.prompt }}</div>
-            <sc-if value="{{ drillView.showAns }}" hint-placeholder-val="{{ true }}">
-              <div class="kt-drill-ans" style="{{ drillView.ansStyle }}">{{ drillView.ansBox }}</div>
-            </sc-if>
-            <sc-if value="{{ drillView.showAsk }}" hint-placeholder-val="{{ false }}">
-              <div class="kt-drill-ask">{{ drillView.askText }}</div>
-            </sc-if>
-            <sc-if value="{{ drillView.showHint }}" hint-placeholder-val="{{ false }}">
-              <div class="kt-drill-note is-hint" role="status">💡 {{ drillView.hint }}</div>
-            </sc-if>
-            <sc-if value="{{ drillView.showAnswer }}" hint-placeholder-val="{{ false }}">
-              <div class="kt-drill-note is-answer" role="status">こたえは {{ drillView.answerText }}</div>
-              <div class="kt-drill-next" role="button" tabindex="0" onclick="{{ drillView.onNext }}">つぎへ ▶</div>
-            </sc-if>
-            <sc-if value="{{ drillView.showLast }}" hint-placeholder-val="{{ false }}">
-              <div class="kt-drill-last" style="{{ drillView.lastStyle }}">{{ drillView.lastMark }} {{ drillView.lastText }}</div>
-            </sc-if>
+            <div class="kt-drill-answering">
+              <sc-if value="{{ drillView.showAns }}" hint-placeholder-val="{{ true }}">
+                <div class="kt-drill-ans" style="{{ drillView.ansStyle }}">{{ drillView.ansBox }}</div>
+              </sc-if>
+              <sc-if value="{{ drillView.showPick }}" hint-placeholder-val="{{ false }}">
+                <div class="kt-drill-ask">{{ drillView.askText }}</div>
+                <div class="kt-drill-pick" aria-label="{{ drillView.pickAria }}">
+                  <sc-for list="{{ drillView.picks }}" as="p" hint-placeholder-count="4">
+                    <div class="kt-drill-pick-btn" role="button" tabindex="0" style="{{ p.style }}" aria-label="{{ p.ariaLabel }}" onclick="{{ p.onClick }}"><span class="kt-drill-pick-no">{{ p.no }}</span><span>{{ p.label }}</span></div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <div class="kt-drill-feedback">
+              <sc-if value="{{ drillView.showEcho }}" hint-placeholder-val="{{ false }}">
+                <div class="kt-drill-pair is-ok" role="status">
+                  <span class="kt-drill-pair-main">○ {{ drillView.echoMain }}</span>
+                  <sc-if value="{{ drillView.echoHasSub }}" hint-placeholder-val="{{ false }}">
+                    <span class="kt-drill-pair-sub">{{ drillView.echoSub }}</span>
+                  </sc-if>
+                </div>
+              </sc-if>
+              <sc-if value="{{ drillView.showHint }}" hint-placeholder-val="{{ false }}">
+                <div class="kt-drill-note is-hint" role="status">💡 {{ drillView.hint }}</div>
+              </sc-if>
+              <sc-if value="{{ drillView.showAnswer }}" hint-placeholder-val="{{ false }}">
+                <div class="kt-drill-pair is-answer" role="status">
+                  <span class="kt-drill-pair-label">こたえは</span>
+                  <span class="kt-drill-pair-main">{{ drillView.answerMain }}</span>
+                  <sc-if value="{{ drillView.answerHasSub }}" hint-placeholder-val="{{ false }}">
+                    <span class="kt-drill-pair-sub">{{ drillView.answerSub }}</span>
+                  </sc-if>
+                </div>
+                <div class="kt-drill-next" role="button" tabindex="0" onclick="{{ drillView.onNext }}">つぎへ ▶</div>
+              </sc-if>
+            </div>
           </div>
-          <div class="kt-drill-side">
-            <sc-if value="{{ drillView.showStreak }}" hint-placeholder-val="{{ false }}">
-              <div class="kt-drill-streak">🔥 {{ drillView.streakText }}</div>
-            </sc-if>
-            <sc-if value="{{ drillView.showPad }}" hint-placeholder-val="{{ true }}">
+          <sc-if value="{{ drillView.showPad }}" hint-placeholder-val="{{ true }}">
+            <div class="kt-drill-side">
               <div class="kt-drill-pad" aria-label="数字入力パッド">
                 <sc-for list="{{ drillView.pad }}" as="k" hint-placeholder-count="12">
                   <div role="button" tabindex="0" aria-label="{{ k.ariaLabel }}" onclick="{{ k.onClick }}" style="{{ k.style }}">{{ k.label }}</div>
                 </sc-for>
               </div>
-            </sc-if>
-            <sc-if value="{{ drillView.showPick }}" hint-placeholder-val="{{ false }}">
-              <div class="kt-drill-pick" aria-label="{{ drillView.pickAria }}">
-                <sc-for list="{{ drillView.picks }}" as="p" hint-placeholder-count="4">
-                  <div class="kt-drill-pick-btn" role="button" tabindex="0" aria-label="{{ p.ariaLabel }}" onclick="{{ p.onClick }}"><span class="kt-drill-pick-no">{{ p.no }}</span><span>{{ p.label }}</span></div>
-                </sc-for>
-              </div>
-            </sc-if>
-          </div>
+            </div>
+          </sc-if>
         </div>
       </sc-if>
       <sc-if value="{{ drillView.finished }}" hint-placeholder-val="{{ false }}">
@@ -552,20 +591,30 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-count{flex:none;font-size:20px;font-weight:900;color:#6b5e45;}
   .kt-drill-bar-wide{height:16px;}
   .kt-drill-body{flex:1;display:flex;gap:28px;align-items:stretch;}
-  .kt-drill-stage{flex:1;min-width:0;background:#fff;border:4px solid #f0e2c8;border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:18px;}
+  .kt-drill-stage{flex:1;min-width:0;background:#fff;border:4px solid #f0e2c8;border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:18px;}
   .kt-drill-prompt{font-size:72px;font-weight:900;line-height:1.15;letter-spacing:2px;color:#3a3326;text-align:center;}
+  .kt-drill-answering{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;}
   .kt-drill-ans{min-width:220px;background:#fff7ec;border:4px dashed #d8c4a0;border-radius:20px;padding:4px 24px;font-size:52px;font-weight:900;color:#3a3326;text-align:center;}
+  /* The feedback slot keeps its height while it is empty, hinting, or showing the pair, so the
+     question above it never moves across the 200 questions of a course. */
+  .kt-drill-feedback{width:100%;min-height:248px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;}
   .kt-drill-note{border-radius:16px;padding:9px 16px;font-size:19px;font-weight:700;text-align:center;}
   .kt-drill-note.is-hint{background:#fff6db;border:3px solid #ffd24a;color:#7a5d00;}
-  .kt-drill-note.is-answer{background:#ffe0da;border:3px solid #e08a7a;color:#b23b23;font-size:28px;font-weight:900;}
-  .kt-drill-last{background:#e8f7ec;border:3px solid #9dd3ae;border-radius:16px;padding:4px 14px;font-size:17px;font-weight:700;color:#2f6b41;}
+  .kt-drill-pair{min-width:300px;display:flex;flex-direction:column;align-items:center;gap:2px;border-radius:20px;padding:10px 32px;text-align:center;}
+  .kt-drill-pair.is-ok{background:#e8f7ec;border:4px solid #3aa655;color:#22683c;}
+  .kt-drill-pair.is-answer{background:#ffe0da;border:4px solid #e08a7a;color:#b23b23;}
+  .kt-drill-pair-label{font-size:17px;font-weight:700;}
+  .kt-drill-pair-main{font-size:44px;font-weight:900;line-height:1.15;letter-spacing:1px;}
+  .kt-drill-pair-sub{font-size:32px;font-weight:900;line-height:1.2;}
   .kt-drill-side{width:300px;flex:none;display:flex;flex-direction:column;gap:10px;}
-  .kt-drill-streak{background:#fff6db;border:3px solid #ffd24a;border-radius:18px;padding:6px 12px;text-align:center;font-size:17px;font-weight:900;color:#7a5d00;}
-  .kt-drill-ask{font-size:22px;font-weight:700;color:#6b5e45;}
+  .kt-drill-streak{flex:none;background:#fff6db;border:3px solid #ffd24a;border-radius:18px;padding:4px 12px;text-align:center;font-size:16px;font-weight:900;color:#7a5d00;white-space:nowrap;}
+  .kt-drill-ask{font-size:20px;font-weight:700;color:#6b5e45;}
   .kt-drill-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-content:start;}
-  .kt-drill-pick{display:flex;flex-direction:column;gap:10px;align-content:start;}
-  .kt-drill-pick-btn{display:flex;align-items:center;gap:12px;background:#fff;border:4px solid #f0e2c8;border-radius:20px;padding:8px 16px;font-size:30px;font-weight:900;color:#3a3326;box-shadow:0 4px 0 #ecd9b9;cursor:pointer;}
-  .kt-drill-pick-no{flex:none;background:#fff3e0;border-radius:12px;padding:0 10px;font-size:17px;font-weight:900;color:#a1855a;}
+  /* The choices sit directly under the question in two columns: two-choice arithmetic fills one row
+     and the four-choice kanji questions fill a 2x2 block, so both stay in a single glance. */
+  .kt-drill-pick{width:100%;max-width:720px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+  .kt-drill-pick-btn{position:relative;min-height:84px;display:flex;align-items:center;justify-content:center;background:#fff;border:4px solid #f0e2c8;border-radius:20px;padding:8px 44px;font-size:38px;font-weight:900;color:#3a3326;box-shadow:0 4px 0 #ecd9b9;cursor:pointer;overflow-wrap:anywhere;}
+  .kt-drill-pick-no{position:absolute;left:12px;top:50%;transform:translateY(-50%);background:#fff3e0;border-radius:12px;padding:0 10px;font-size:16px;font-weight:900;color:#a1855a;}
   .kt-drill-next{background:#ff8a3d;color:#fff;border:4px solid #e07d2a;border-radius:22px;padding:8px 28px;font-size:26px;font-weight:900;box-shadow:0 5px 0 #d96a26;cursor:pointer;}
   .kt-drill-back{background:#fff;color:#6b5e45;border:4px solid #f0e2c8;border-radius:22px;padding:8px 28px;font-size:26px;font-weight:900;cursor:pointer;}
   .kt-drill-finish{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
@@ -584,6 +633,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     .kt-drill-screen{padding:18px 26px 24px;}
     .kt-drill-side{width:250px;}
     .kt-drill-prompt{font-size:58px;}
+    .kt-drill-pick-btn{font-size:34px;}
   }
 
   @media (max-height: 820px) {
@@ -592,9 +642,15 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     .kt-drill-grid{gap:8px;}
     .kt-drill-card{padding:6px 10px;}
     .kt-drill-card-title{font-size:17px;}
+    .kt-drill-stage{gap:10px;}
     .kt-drill-prompt{font-size:56px;}
     .kt-drill-ans{font-size:42px;min-width:180px;}
-    .kt-drill-pick-btn{font-size:26px;padding:6px 14px;}
+    .kt-drill-feedback{min-height:220px;gap:8px;}
+    .kt-drill-pair{min-width:260px;padding:8px 24px;}
+    .kt-drill-pair-main{font-size:36px;}
+    .kt-drill-pair-sub{font-size:28px;}
+    .kt-drill-pick{gap:10px;}
+    .kt-drill-pick-btn{font-size:30px;min-height:66px;padding:6px 40px;}
     .kt-drill-finish-mark{font-size:72px;}
     .kt-drill-finish-title{font-size:36px;}
     .kt-drill-mode-screen{padding-top:16px;padding-bottom:20px;}

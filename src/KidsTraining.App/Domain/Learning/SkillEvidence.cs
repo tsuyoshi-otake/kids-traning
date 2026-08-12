@@ -117,7 +117,7 @@ internal sealed record SkillEvidence(
             ReviewStep = 0,
             RetentionStep = 0,
             RetentionStartedAt = startedAt,
-            NextReviewAt = ReviewSchedule.NextReview(startedAt, 0)
+            NextReviewAt = ReviewSchedule.NextRetentionReview(startedAt, 0)
         };
     }
 
@@ -140,7 +140,7 @@ internal sealed record SkillEvidence(
             independent++;
             confidence = Math.Clamp(confidence + 0.12, 0.05, 0.99);
             retentionStep = Math.Min(retentionStep + 1, RequiredRetentionConfirmations);
-            nextReview = ReviewSchedule.NextReview(answeredAt, retentionStep);
+            nextReview = ReviewSchedule.NextRetentionReview(answeredAt, retentionStep);
         }
         else
         {
@@ -159,7 +159,7 @@ internal sealed record SkillEvidence(
                 0.05,
                 0.99);
             retentionStep = 0;
-            nextReview = ReviewSchedule.NextReview(answeredAt, 0);
+            nextReview = ReviewSchedule.NextRetentionReview(answeredAt, 0);
         }
 
         return this with
