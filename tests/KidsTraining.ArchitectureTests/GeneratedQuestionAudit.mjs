@@ -1693,6 +1693,107 @@ for (const unit of UNITS) {
           }
         }
 
+        if (topic === 'chart') {
+          if (question.isTable) {
+            observe('chart table fill-ins include a countable pictograph');
+            if (!question.isChart || !Array.isArray(question.rows) || question.rows.length === 0) {
+              violated(
+                'chart table fill-ins include a countable pictograph',
+                'isTable question shipped without isChart rows',
+                context,
+              );
+            }
+          }
+          if (question.isChart) {
+            observe('chart pictograph questions carry bar rows');
+            if (!Array.isArray(question.rows) || question.rows.length === 0) {
+              violated('chart pictograph questions carry bar rows', 'isChart question has no rows', context);
+            }
+          }
+        }
+
+        if (question.isTape) {
+          observe('tape diagrams include labeled parts');
+          if (!Array.isArray(question.tapeParts) || question.tapeParts.length === 0) {
+            violated('tape diagrams include labeled parts', 'isTape question has no tapeParts', context);
+          }
+        }
+        if (question.isMoney) {
+          observe('money visuals include coin or bill pieces');
+          if (!Array.isArray(question.moneyPieces) || question.moneyPieces.length === 0) {
+            violated('money visuals include coin or bill pieces', 'isMoney question has no moneyPieces', context);
+          }
+        }
+        if (question.isCount) {
+          observe('counting visuals include a positive count');
+          if (!(Number(question.count) > 0)) {
+            violated('counting visuals include a positive count', 'isCount question has no count', context);
+          }
+        }
+        if (question.isFracViz) {
+          observe('fraction visuals include numerator and denominator');
+          if (!(Number(question.fd) > 0) || question.fn == null) {
+            violated('fraction visuals include numerator and denominator', 'isFracViz missing fd/fn', context);
+          }
+        }
+        if (question.isOrder) {
+          observe('order visuals include length, position, and direction');
+          if (!(Number(question.oc) > 0 && Number(question.op) > 0 && question.od)) {
+            violated('order visuals include length, position, and direction', 'isOrder incomplete', context);
+          }
+        }
+        if (question.isClock) {
+          observe('clock visuals include hour and minute');
+          if (question.h == null || question.m == null) {
+            violated('clock visuals include hour and minute', 'isClock missing h/m', context);
+          }
+        }
+        if (question.isShape) {
+          observe('shape visuals include a drawable style');
+          if (!question.shapeStyle) {
+            violated('shape visuals include a drawable style', 'isShape missing shapeStyle', context);
+          }
+        }
+        if (question.isGroups) {
+          observe('group visuals include group count and size');
+          if (!(Number(question.groupCount) > 0 && Number(question.groupSize) > 0)) {
+            violated('group visuals include group count and size', 'isGroups incomplete', context);
+          }
+        }
+        if (question.isMeasure) {
+          observe('measure comparison visuals include at least one amount');
+          if (!(Number(question.m1) || Number(question.m2) || Number(question.m3))) {
+            violated('measure comparison visuals include at least one amount', 'isMeasure missing m1/m2/m3', context);
+          }
+        }
+
+        const figurePrompt = String(prompt || '');
+        if (
+          /^(この かたちの|とけいを よもう|まるは いくつ|オレンジの ます|いろの ついた|おかねは ぜんぶ|テープ図の|グラフを みて)/.test(figurePrompt) ||
+          /表の □/.test(figurePrompt)
+        ) {
+          observe('figure-required prompts ship a matching visual flag');
+          const hasVisual =
+            question.isChart ||
+            question.isTable ||
+            question.isTape ||
+            question.isMeasure ||
+            question.isFracViz ||
+            question.isOrder ||
+            question.isMoney ||
+            question.isCount ||
+            question.isClock ||
+            question.isShape ||
+            question.isGroups;
+          if (!hasVisual) {
+            violated(
+              'figure-required prompts ship a matching visual flag',
+              'prompt asks the learner to look at a figure that was never attached',
+              context,
+            );
+          }
+        }
+
         for (const text of [answer, explanation, ...((question.choices || []).map(String))]) {
           for (const match of text.matchAll(/(\d+)\s*(ふん|ぷん)/g)) {
             observe('minute readings follow the ふん / ぷん rule');

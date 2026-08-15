@@ -828,6 +828,10 @@ internal static class Program
             "representative four- and five-letter romaji words are missing");
         Assert(html.Contains("isTape:true", StringComparison.Ordinal) && html.Contains("isTable:true", StringComparison.Ordinal), "tape-diagram or table questions are missing");
         Assert(
+            html.Contains("isChart:true,rows:rows,isTable:true,tableRows:tableRows", StringComparison.Ordinal) &&
+            html.Contains("グラフを みて、表の □ に はいる 数は？", StringComparison.Ordinal),
+            "grade 2 table fill-in chart questions must show the pictograph to count");
+        Assert(
             html.Contains("subtype:'kanji-picture'", StringComparison.Ordinal) &&
             html.Contains("pictureKind:'svg'", StringComparison.Ordinal) &&
             html.Contains("kanjiPictureSvg(id,label)", StringComparison.Ordinal) &&
