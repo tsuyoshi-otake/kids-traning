@@ -832,6 +832,12 @@ internal static class Program
             html.Contains("グラフを みて、表の □ に はいる 数は？", StringComparison.Ordinal),
             "grade 2 table fill-in chart questions must show the pictograph to count");
         Assert(
+            html.Contains("data-viz-kind=\"{{ mrow.vizKind }}\"", StringComparison.Ordinal) &&
+            html.Contains(".kt-measure-visual:has(> .kt-measure-row[data-viz-kind=\"chart\"]):has(> .kt-measure-row[data-viz-kind=\"table\"])", StringComparison.Ordinal) &&
+            html.Contains("grid-template-rows: repeat(4, max-content)", StringComparison.Ordinal) &&
+            html.Contains("grid-auto-flow: column", StringComparison.Ordinal),
+            "grade 2 chart and count table are not arranged as aligned horizontal columns");
+        Assert(
             html.Contains("subtype:'kanji-picture'", StringComparison.Ordinal) &&
             html.Contains("pictureKind:'svg'", StringComparison.Ordinal) &&
             html.Contains("kanjiPictureSvg(id,label)", StringComparison.Ordinal) &&

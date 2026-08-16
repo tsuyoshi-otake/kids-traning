@@ -100,7 +100,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "<div role=\"img\" aria-label=\"{{ mrow.ariaLabel }}\" style=\"display:flex; align-items:center; gap:10px; width:max-content; max-width:none;\">",
-            "<div class=\"kt-measure-row\" role=\"img\" aria-label=\"{{ mrow.ariaLabel }}\" style=\"display:flex; align-items:center; gap:10px; width:max-content; max-width:none;\">",
+            "<div class=\"kt-measure-row\" data-viz-kind=\"{{ mrow.vizKind }}\" role=\"img\" aria-label=\"{{ mrow.ariaLabel }}\" style=\"display:flex; align-items:center; gap:10px; width:max-content; max-width:none;\">",
             StringComparison.Ordinal);
 
         markup = markup.Replace(
@@ -238,6 +238,21 @@ internal static partial class LearningMarkupPatcher
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
+  }
+
+  /* Grade-2 table fill-ins show the source graph and its counts as aligned
+     columns. Keeping each category on one shared row prevents eight visual
+     rows from pushing the answer choices below a 768px-high viewport. */
+  .kt-measure-visual:has(> .kt-measure-row[data-viz-kind="chart"]):has(> .kt-measure-row[data-viz-kind="table"]) {
+    display: grid !important;
+    grid-template-columns: repeat(2, max-content) !important;
+    grid-template-rows: repeat(4, max-content);
+    grid-auto-flow: column;
+    justify-content: center;
+    align-items: center;
+    gap: var(--kt-space-2) var(--kt-space-6) !important;
+    max-width: 1000px !important;
+    margin: var(--kt-space-1) auto var(--kt-space-2) !important;
   }
 
   .kt-choice,
