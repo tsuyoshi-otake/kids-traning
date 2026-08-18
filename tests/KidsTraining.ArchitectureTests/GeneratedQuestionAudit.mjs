@@ -1262,31 +1262,33 @@ if (sparseBank && fullBank) {
 }
 app.state.session = null;
 
-// ——— Session pacing. A bored child stops practising, so monotony is a defect, not taste. ———
+// ——— Session pacing. Switching task types every item drains attention, so scatter is a defect. ———
 
-// The old plan opened every session with the same brand-new unit three times in a row.
-// Targets must be spread through the plan with other work between them, and the session
-// must not open on the hardest thing.
-const INTERLEAVE_CHECK = 'target practice is spread through the session, not massed at the front';
+// Reviews, then mixed work, then a contiguous target block, then the exit check.
+// The session must not open on the new unit when mixed work exists.
+const CLUSTER_CHECK = 'target practice is a contiguous block after mixed work, not spread through the session';
 const paceProfile = () => app.ensureLearningProfile({ name: 'pace', grade: 1, stars: 0, xp: 0, mastery: {}, skillStats: {}, cleared: {} });
-const interleavePlan = app.buildSession(paceProfile(), 1).rolePlan;
-const targetPositions = interleavePlan.map((role, index) => (role === 'target' ? index : -1)).filter((index) => index >= 0);
-const expectedTargets = Math.max(4, Math.floor(interleavePlan.length * 0.25)) - 1;
-const massedTargets = targetPositions.some((position, index) => index > 0 && position === targetPositions[index - 1] + 1);
-observe(INTERLEAVE_CHECK, 1);
+const clusterPlan = app.buildSession(paceProfile(), 1).rolePlan;
+const targetPositions = clusterPlan.map((role, index) => (role === 'target' ? index : -1)).filter((index) => index >= 0);
+const expectedTargets = Math.max(4, Math.floor(clusterPlan.length * 0.25)) - 1;
+const firstTarget = targetPositions[0];
+const lastTarget = targetPositions[targetPositions.length - 1];
+const contiguousTargets = targetPositions.length > 0 && lastTarget - firstTarget + 1 === targetPositions.length;
+const mixedCount = clusterPlan.filter((role) => role === 'mixed').length;
+const prefixBeforeTargets = targetPositions.length ? clusterPlan.slice(0, firstTarget) : clusterPlan.slice(0, -1);
+const prefixIsWarmup = prefixBeforeTargets.every((role) => role === 'review' || role === 'mixed');
+observe(CLUSTER_CHECK, 1);
 if (
-  interleavePlan[interleavePlan.length - 1] !== 'exit' ||
-  interleavePlan[0] === 'target' ||
-  massedTargets ||
+  clusterPlan[clusterPlan.length - 1] !== 'exit' ||
+  (mixedCount > 0 && clusterPlan[0] === 'target') ||
+  !contiguousTargets ||
+  !prefixIsWarmup ||
   targetPositions.length !== expectedTargets
 ) {
-  violated(INTERLEAVE_CHECK, 'role plan came out as ' + interleavePlan.join(','), 'buildSession');
+  violated(CLUSTER_CHECK, 'role plan came out as ' + clusterPlan.join(','), 'buildSession');
 }
 
-// Two questions on the same unit back to back is the smallest unit of boredom the planner
-// can remove. Simulate whole sessions the way the quiz runs them: answer, then generate.
-const NO_REPEAT_CHECK = 'a session never asks the same unit twice in a row when alternatives exist';
-const simulateSessionUnits = (profile) => {
+const simulateSession = (profile) => {
   const session = app.buildSession(profile, 1);
   app.state.session = session;
   for (let index = 0; index < session.rolePlan.length; index += 1) {
@@ -1295,22 +1297,29 @@ const simulateSessionUnits = (profile) => {
     if (index + 1 < session.rolePlan.length) session.questions.push(app.generateSessionQuestion(profile, session, session.rolePlan[index + 1]));
   }
   app.state.session = null;
-  return session.questions.map((question) => question.unitId || question.topic);
+  return session;
 };
-const noRepeatRounds = 12;
-let repeatPairs = 0;
-for (let round = 0; round < noRepeatRounds; round += 1) {
-  const units = simulateSessionUnits(paceProfile());
-  for (let index = 1; index < units.length; index += 1) if (units[index] === units[index - 1]) repeatPairs += 1;
+const mixedRunCount = (questions) => {
+  const units = questions.filter((question) => question.sessionRole === 'mixed').map((question) => question.unitId || question.topic);
+  if (!units.length) return { length: 0, runs: 0 };
+  let runs = 1;
+  for (let index = 1; index < units.length; index += 1) if (units[index] !== units[index - 1]) runs += 1;
+  return { length: units.length, runs };
+};
+
+const MIXED_CLUSTER_CHECK = 'mixed practice keeps the same unit together instead of switching every question';
+const clusterRounds = 12;
+let scatteredSessions = 0;
+for (let round = 0; round < clusterRounds; round += 1) {
+  const mixed = mixedRunCount(simulateSession(paceProfile()).questions);
+  if (mixed.length >= 6 && mixed.runs > Math.ceil(mixed.length / 3)) scatteredSessions += 1;
 }
-observe(NO_REPEAT_CHECK, noRepeatRounds);
-if (repeatPairs > 0) {
-  violated(NO_REPEAT_CHECK, repeatPairs + ' adjacent same-unit pairs across ' + noRepeatRounds + ' simulated sessions', 'generateSessionQuestion');
+observe(MIXED_CLUSTER_CHECK, clusterRounds);
+if (scatteredSessions > 0) {
+  violated(MIXED_CLUSTER_CHECK, scatteredSessions + ' of ' + clusterRounds + ' sessions still scattered mixed units', 'generateSessionQuestion');
 }
 
-// With only two units left in the grade, the old plan ran one of them six times in a row.
-// Alternation caps the worst case at a double.
-const ENDGAME_CHECK = 'a two-unit endgame alternates units instead of running one back to back';
+const ENDGAME_CHECK = 'a two-unit endgame masses each unit instead of alternating every question';
 const endgameProfile = app.ensureLearningProfile({ name: 'endgame', grade: 1, stars: 0, xp: 0, mastery: {}, skillStats: {}, cleared: {} });
 const gradeOneUnits = app.curriculumCatalog().filter((unit) => unit.grade === 1);
 for (const [index, unit] of gradeOneUnits.entries()) {
@@ -1320,15 +1329,17 @@ for (const [index, unit] of gradeOneUnits.entries()) {
     : { ...app.blankUnitStat(), level: app.terminalUnitStage(unit.id), confidence: 0.9, attempts: 12, independent: 11, retentionStartedAt: Date.now(), retentionStep: 0, nextReviewAt: Date.now() + 86400000 };
   endgameProfile.mastery[unit.id] = keepFresh ? 0.5 : 0.9;
 }
-const endgameUnits = simulateSessionUnits(endgameProfile);
+const endgameSession = simulateSession(endgameProfile);
+const endgameUnits = endgameSession.questions.map((question) => question.unitId || question.topic);
 let endgameRun = 1;
 let endgameMaxRun = 1;
 for (let index = 1; index < endgameUnits.length; index += 1) {
   endgameRun = endgameUnits[index] === endgameUnits[index - 1] ? endgameRun + 1 : 1;
   endgameMaxRun = Math.max(endgameMaxRun, endgameRun);
 }
+const endgameMixed = mixedRunCount(endgameSession.questions);
 observe(ENDGAME_CHECK, 1);
-if (endgameMaxRun > 2 || new Set(endgameUnits).size < 2) {
+if (endgameMaxRun <= 2 || new Set(endgameUnits).size < 2 || (endgameMixed.length >= 4 && endgameMixed.runs > 2)) {
   violated(ENDGAME_CHECK, 'unit order was ' + endgameUnits.map((id) => id.split('.').pop()).join(',') + ' (longest run ' + endgameMaxRun + ')', 'buildSession');
 }
 

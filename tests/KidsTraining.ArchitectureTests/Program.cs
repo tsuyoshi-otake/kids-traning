@@ -664,13 +664,16 @@ internal static class Program
             html.Contains("this.generateSessionQuestion(p,s,s.rolePlan[nextIndex])", StringComparison.Ordinal),
             "learning questions are not generated lazily from the latest evidence");
         Assert(
-            html.Contains("Math.floor((2*i+1)*body.length/(2*targetCount))", StringComparison.Ordinal) &&
-            !html.Contains("for(let i=0;i<targetCount;i++)rolePlan.push('target')", StringComparison.Ordinal),
-            "target questions are massed into one block instead of interleaved through the session");
+            html.Contains("for(let i=0;i<mixedCount;i++)rolePlan.push('mixed')", StringComparison.Ordinal) &&
+            html.Contains("for(let i=0;i<targetCount;i++)rolePlan.push('target')", StringComparison.Ordinal) &&
+            !html.Contains("Math.floor((2*i+1)*body.length/(2*targetCount))", StringComparison.Ordinal),
+            "target questions are interleaved through the session instead of massed");
         Assert(
-            html.Contains("return this.weightedPick(p,pool,avoid)", StringComparison.Ordinal) &&
-            html.Contains("const spaced=avoid?ids.filter(id=>id!==avoid):ids", StringComparison.Ordinal),
-            "the mixed slot may repeat the unit it just asked");
+            html.Contains("mixedClusterTopic", StringComparison.Ordinal) &&
+            html.Contains("mixedClusterLeft", StringComparison.Ordinal) &&
+            html.Contains("mixedClusterUsed", StringComparison.Ordinal) &&
+            html.Contains("return this.weightedPick(p,[current])", StringComparison.Ordinal),
+            "mixed questions still switch units every item instead of clustering");
         Assert(
             html.Contains("questionIdentity(q)", StringComparison.Ordinal) &&
             html.Contains("questionFingerprint(key)", StringComparison.Ordinal) &&
