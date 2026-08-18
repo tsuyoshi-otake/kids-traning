@@ -117,10 +117,12 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         return """
   drillStorageKey(){return 'kt_drill_v1';}
   drillCourses(){return [
-    {id:'g1',grade:1,total:200,badge:'1年生',title:'たしざん・ひきざん',sub:'1＋1から じゅんばんに 200もん',color:'#ff8a3d',edge:'#e07d2a',shade:'#fff3e6'},
-    {id:'g2',grade:2,total:200,badge:'2年生',title:'かけざん（九九）',sub:'2のだんから じゅんばんに 200もん',color:'#4a9bf0',edge:'#2f7ccd',shade:'#eaf3ff'},
-    {id:'k1',grade:1,total:200,badge:'1年生',title:'かんじ・ことば',sub:'1年生の 漢字と くみあわせた ことばを 200もん',color:'#5fbf7a',edge:'#3f9a5b',shade:'#eaf7ee'},
-    {id:'k2',grade:2,total:200,badge:'2年生',title:'かんじ・ことば',sub:'1・2年生で ならった 漢字の ことばを 200もん',color:'#b07ae0',edge:'#8d55c4',shade:'#f4ecff'}
+    {id:'g1',grade:1,total:100,badge:'1年生',title:'たしざん・ひきざん',sub:'1＋1から じゅんばんに 100もん',color:'#ff8a3d',edge:'#e07d2a',shade:'#fff3e6'},
+    {id:'g2',grade:2,total:100,badge:'2年生',title:'かけざん（九九）',sub:'2のだんから じゅんばんに 100もん',color:'#4a9bf0',edge:'#2f7ccd',shade:'#eaf3ff'},
+    {id:'d3',grade:3,total:100,badge:'3年生',title:'わりざん',sub:'九九の ぎゃくさんを 100もん',color:'#3cb8a8',edge:'#2a8f83',shade:'#e5f7f4'},
+    {id:'h2',grade:2,total:100,badge:'2年生',title:'ひっ算',sub:'くりあがり・くりさがりの たしざん・ひきざんを 100もん',color:'#e39b2e',edge:'#c47d16',shade:'#fff4e0'},
+    {id:'k1',grade:1,total:100,badge:'1年生',title:'かんじ・ことば',sub:'1年生の 漢字と くみあわせた ことばを 100もん',color:'#5fbf7a',edge:'#3f9a5b',shade:'#eaf7ee'},
+    {id:'k2',grade:2,total:100,badge:'2年生',title:'かんじ・ことば',sub:'1・2年生で ならった 漢字の ことばを 100もん',color:'#b07ae0',edge:'#8d55c4',shade:'#f4ecff'}
   ];}
   drillCourse(id){const list=this.drillCourses();for(let i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
   drillDefaultRecord(){return {idx:0,perfect:0,mistakes:0,runs:0,best:0};}
@@ -158,12 +160,22 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     ];
     return rows.map(row=>({word:row[0],reading:row[1]}));
   }
+  drillFreeOnReadings(){return ['いち','に','さん','ご','ろく','しち','はち','きゅう','じゅう','ひゃく','せん','まん','えん','おう','ほん'];}
+  drillStandaloneOnKey(e){return e&&e.k&&e.on?e.k+':'+e.on:'';}
+  drillStandaloneOnKeys(){return new Set(['一:いち','二:に','三:さん','五:ご','六:ろく','七:しち','八:はち','九:きゅう','十:じゅう','百:ひゃく','千:せん','万:まん','円:えん','王:おう','本:ほん']);}
+  drillStandaloneTargets(entries){
+    const freeOn=this.drillStandaloneOnKeys(),out=[];
+    for(const e of entries||[]){
+      if(e.kun)out.push({e:e,type:'kun',reading:e.kun,word:e.kunWord||e.k});
+      if(freeOn.has(this.drillStandaloneOnKey(e)))out.push({e:e,type:'on',reading:e.on,word:e.k});
+    }
+    return out;
+  }
   buildKanjiDrillBank(id){
-    const grade=id==='k1'?1:2,entries=this.drillKanjiEntries(grade),list=[],targets=[];
-    entries.forEach(e=>{if(e.on)targets.push({e:e,type:'on',reading:e.on,word:e.k});if(e.kun)targets.push({e:e,type:'kun',reading:e.kun,word:e.kunWord||e.k});});
-    const wordTargets=this.drillKanjiWords(grade).map(item=>({e:null,type:'word',reading:item.reading,word:item.word})),choiceTargets=targets.concat(wordTargets);
+    const grade=id==='k1'?1:2,entries=this.drillKanjiEntries(grade),list=[];
+    const standalone=this.drillStandaloneTargets(entries);
+    const wordTargets=this.drillKanjiWords(grade).map(item=>({e:null,type:'word',reading:item.reading,word:item.word})),choiceTargets=standalone.concat(wordTargets);
     const uniqueReadings=Array.from(new Set(choiceTargets.map(target=>target.reading)));
-    const targetFor=(e,preferred)=>{const type=preferred==='on'&&e.on?'on':preferred==='kun'&&e.kun?'kun':e.on?'on':'kun';return{e:e,type:type,reading:type==='on'?e.on:e.kun,word:type==='on'?e.k:e.kunWord||e.k};};
     const ask=(sec,target,index)=>{
       const opts=[target.reading],base=Math.max(0,choiceTargets.findIndex(candidate=>candidate===target||(target.e&&candidate.e===target.e&&candidate.type===target.type)));
       [13,29,47].forEach(step=>{let j=(base+step)%choiceTargets.length,guard=0;while(guard<choiceTargets.length&&opts.indexOf(choiceTargets[j].reading)>=0){j=(j+1)%choiceTargets.length;guard++;}if(guard<choiceTargets.length)opts.push(choiceTargets[j].reading);});
@@ -172,51 +184,67 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       list.push({no:list.length+1,sec:sec,text:target.word,ans:target.reading,hint:label+'だよ。さいしょの もじは 「'+Array.from(target.reading)[0]+'」だよ。',kind:'pick',choices:order,kanji:target.e?target.e.k:'',kanjiWord:target.type==='word',readingType:target.type});
     };
     const A='\u3042\u305f\u3089\u3057\u3044 \u304b\u3093\u3058',B='\u306a\u3089\u3063\u305f \u304b\u3093\u3058\u306e \u3053\u3068\u3070',C='\u3057\u3042\u3052\u306e \u30df\u30c3\u30af\u30b9';
-    const primary=entries.map((entry,index)=>targetFor(entry,index%2===0?'on':'kun'));
-    for(let i=0;i<primary.length;i++)ask(A,primary[i],i);
-    const extra=200-list.length;
-    for(let i=0;i<extra;i++)ask(i<wordTargets.length?B:C,wordTargets[i%wordTargets.length],entries.length+i);
+    const cap=100,wordSlots=Math.min(20,wordTargets.length,cap),ons=standalone.filter(target=>target.type==='on'),kuns=standalone.filter(target=>target.type==='kun'),ordered=ons.concat(kuns),kanjiSlots=Math.min(ordered.length,cap-wordSlots);
+    for(let i=0;i<kanjiSlots;i++)ask(A,ordered[i],i);
+    const extra=cap-list.length;
+    for(let i=0;i<extra;i++)ask(i<wordTargets.length?B:C,wordTargets[i%wordTargets.length],kanjiSlots+i);
+    return list;
+  }
+  buildHissanDrillBank(){
+    const list=[],carry=(a,b)=>{let c=0,i=0;while(a||b||i){const t=a%10+b%10+i;if(t>=10)c++;i=t>=10?1:0;a=Math.floor(a/10);b=Math.floor(b/10);}return c;},
+      borrow=(a,b)=>{let c=0,l=0;while(a||b){let d=a%10-l;const t=b%10;l=0;if(d<t){c++;l=1;}a=Math.floor(a/10);b=Math.floor(b/10);}return c;},
+      push=(sec,a,op,b,hint)=>list.push({no:list.length+1,sec:sec,text:a+' '+op+' '+b,ans:op==='＋'?a+b:a-b,hint:hint,kind:'num',choices:null}),
+      pick=(pool,n)=>{const out=[],seen=new Set();for(let i=0;i<n;i++){const item=pool[Math.min(pool.length-1,Math.floor(i*pool.length/n))];const key=item.join(',');if(seen.has(key))continue;seen.add(key);out.push(item);}for(let i=0;i<pool.length&&out.length<n;i++){const key=pool[i].join(',');if(seen.has(key))continue;seen.add(key);out.push(pool[i]);}return out;},
+      dump=(sec,op,pairs,hint)=>{for(const pair of pairs)push(sec,pair[0],op,pair[1],hint);};
+    const A='くりあがりなし',B='くりあがりの たしざん',C='くりさがりの ひきざん',D='3けたの ひっ算',E='0が ある ひっ算';
+    const hA='くらいを そろえて、右の くらいから じゅんに けいさんしよう。',hB='一のくらいが 10を こえたら、十のくらいに 1 くりあげよう。',hC='たりない ときは となりの くらいから 1 かりよう。',hD='3けたも おなじ。右の くらいから じゅんに けいさんしよう。',hE='0の くらいは、となりから 1 かりて 10を つくろう。';
+    const twoAdd=[],twoSub=[],carryAdd=[],borrowSub=[],threeAdd=[],threeSub=[],hardAdd=[],hardSub=[[700,286],[500,173],[800,405],[600,258],[900,327],[802,467]];
+    for(let a=21;a<=87;a++)for(let b=11;b<=99-a;b++)if(carry(a,b)===0)twoAdd.push([a,b]);
+    for(let a=32;a<=98;a++)for(let b=11;b<a;b++)if(borrow(a,b)===0)twoSub.push([a,b]);
+    for(let a=24;a<=79;a++)for(let b=16;b<=79;b++)if(a+b<=99&&carry(a,b)>=1)carryAdd.push([a,b]);
+    for(let a=31;a<=98;a++)for(let b=12;b<a;b++)if(borrow(a,b)>=1)borrowSub.push([a,b]);
+    for(let a=123;a<=799;a+=3)for(let b=111;b<=799;b+=5)if(a+b<=999&&carry(a,b)>=1)threeAdd.push([a,b]);
+    for(let a=301;a<=999;a+=3)for(let b=111;b<a;b+=5)if(borrow(a,b)>=1)threeSub.push([a,b]);
+    for(let a=248;a<=799;a+=4)for(let b=178;b<=699;b+=6)if(a+b<=999&&carry(a,b)>=2)hardAdd.push([a,b]);
+    for(let a=401;a<=999;a+=4)for(let b=112;b<a;b+=6)if(borrow(a,b)>=2)hardSub.push([a,b]);
+    dump(A,'＋',pick(twoAdd,15),hA);dump(A,'−',pick(twoSub,15),hA);
+    dump(B,'＋',pick(carryAdd,20),hB);dump(C,'−',pick(borrowSub,20),hC);
+    dump(D,'＋',pick(threeAdd,10),hD);dump(D,'−',pick(threeSub,10),hD);
+    dump(E,'＋',pick(hardAdd,5),hE);dump(E,'−',pick(hardSub,5),hE);
     return list;
   }
   buildDrillBank(id){
     if(id==='k1'||id==='k2')return this.buildKanjiDrillBank(id);
+    if(id==='h2')return this.buildHissanDrillBank();
     const list=[],add=(sec,text,ans,hint,choices)=>{list.push({no:list.length+1,sec:sec,text:text,ans:ans,hint:hint,kind:choices?'pick':'num',choices:choices||null});};
-    if(id==='g2'){
-      const A='九九を おぼえる',B='むずかしい だんの ふくしゅう',C='ひっくりかえしても おなじ',D='□に はいる かず',E='しあげの ミックス';
-      [2,5,3,4,6,7,8,9,1].forEach(a=>{for(let b=1;b<=9;b++)add(A,a+' × '+b,a*b,a+'のだんを 1から となえて みよう。');});
-      [6,7,8,9].forEach(a=>{for(let b=9;b>=1;b--)add(B,a+' × '+b,a*b,a+'のだんを 9から ぎゃくに となえて みよう。');});
-      [[3,4],[6,7],[2,8],[4,9],[5,6],[3,8],[7,9],[2,6],[4,7],[3,9],[6,8],[5,7],[2,9],[4,8],[3,6],[7,8],[5,9],[6,9]].forEach(pr=>{
-        add(C,pr[0]+' × '+pr[1],pr[0]*pr[1],'かける じゅんばんを かえても こたえは おなじだよ。');
-        add(C,pr[1]+' × '+pr[0],pr[0]*pr[1],'さっきと おなじ こたえに なるよ。');
+    if(id==='d3'){
+      const A='九九で わる',B='□に はいる かず',C='しあげの ミックス';
+      [2,5,3,4,6,7,8,9,1].forEach(a=>{for(let b=1;b<=9;b++)add(A,(a*b)+' ÷ '+b,a,b+'ずつ の だん。'+(a*b)+' ÷ '+b+' は '+a+'。');});
+      [[56,7,8],[56,8,7],[48,6,8],[54,6,9],[63,7,9],[72,8,9],[49,7,7],[64,8,8],[81,9,9],[36,6,6],[24,6,4],[32,8,4],[27,9,3],[35,7,5],[45,9,5],[16,4,4],[18,6,3],[21,7,3],[28,7,4]].forEach((pr,i)=>{
+        const prod=pr[0],div=pr[1],quo=pr[2];
+        if(i%2===0)add(B,prod+' ÷ □ ＝ '+quo,div,quo+'のだんを となえて '+prod+'を さがそう。');
+        else add(C,prod+' ÷ '+div,quo,div+'のだん。'+prod+' ÷ '+div+' は '+quo+'。');
       });
-      [[3,4],[4,3],[6,2],[7,5],[8,3],[9,6],[2,7],[5,8],[6,9],[7,4],[8,6],[9,3],[4,7],[3,9],[6,5],[5,4],[8,8],[7,7],[9,9],[6,6],[4,4],[3,3],[8,4],[9,5],[7,8],[6,7],[9,8]].forEach((pr,i)=>{
-        const a=pr[0],b=pr[1];
-        if(i%2===0)add(D,a+' × □ ＝ '+(a*b),b,a+'のだんを となえて '+(a*b)+'を さがそう。');
-        else add(D,'□ × '+b+' ＝ '+(a*b),a,b+'ずつ たして '+(a*b)+'に なる かずだよ。');
-      });
-      [[7,8],[6,7],[8,7],[7,6],[9,7],[7,9],[8,6],[6,8],[9,6],[6,9],[8,8],[7,7],[9,8],[8,9],[4,7],[7,4],[6,4],[4,6],[9,9],[3,8]].forEach(pr=>add(E,pr[0]+' × '+pr[1],pr[0]*pr[1],pr[0]+'のだんを 1から おもいだそう。'));
       return list;
     }
-    const A='たしざんの きほん',B='10の ともだち',C='ひきざんの きほん',D='10から ひく',E='くりあがりの たしざん',F='くりさがりの ひきざん',G='しあげの ミックス';
+    if(id==='g2'){
+      const A='九九を おぼえる',B='しあげの ミックス';
+      [2,5,3,4,6,7,8,9,1].forEach(a=>{for(let b=1;b<=9;b++)add(A,a+' × '+b,a*b,a+'のだんを 1から となえて みよう。');});
+      [[7,8],[6,7],[8,7],[7,6],[9,7],[7,9],[8,6],[6,8],[9,6],[6,9],[8,8],[7,7],[9,8],[8,9],[4,7],[7,4],[6,4],[4,6],[9,9]].forEach(pr=>add(B,pr[0]+' × '+pr[1],pr[0]*pr[1],pr[0]+'のだんを 1から おもいだそう。'));
+      return list;
+    }
+    const A='たしざんの きほん',B='10の ともだち',C='ひきざんの きほん',D='10から ひく',E='くりあがりの たしざん',F='くりさがりの ひきざん';
     const hA='ゆびを つかって かぞえて みよう。',hB='あと いくつで 10に なるかな。',hC='ゆびを おって かぞえよう。',hD='10ぽんの ゆびから おろして みよう。',hE='さきに 10を つくって、のこりを たそう。',hF='10から ひいて、のこった かずを たそう。';
-    for(let s=2;s<=7;s++)for(let a=1;a<s;a++)add(A,a+' ＋ '+(s-a),s,hA);
+    for(let s=2;s<=6;s++)for(let a=1;a<s;a++)add(A,a+' ＋ '+(s-a),s,hA);
     for(let a=1;a<=9;a++)add(B,a+' ＋ '+(10-a),10,hB);
     for(let a=9;a>=1;a--)add(B,a+' ＋ '+(10-a),10,hB);
     for(let a=1;a<=9;a++)add(B,a+' ＋ □ ＝ 10',10-a,hB);
-    for(let a=2;a<=7;a++)for(let b=1;b<a;b++)add(C,a+' − '+b,a-b,hC);
+    for(let a=2;a<=6;a++)for(let b=1;b<a;b++)add(C,a+' − '+b,a-b,hC);
     for(let b=1;b<=9;b++)add(D,'10 − '+b,10-b,hD);
     for(let b=9;b>=1;b--)add(D,'10 − '+b,10-b,hD);
     for(let b=1;b<=9;b++)add(D,'10 − □ ＝ '+(10-b),b,hD);
-    for(let a=9;a>=2;a--)for(let b=11-a;b<=9;b++)add(E,a+' ＋ '+b,a+b,hE);
-    for(let m=11;m<=18;m++)for(let b=m-9;b<=9;b++)add(F,m+' − '+b,m-b,hF);
-    const mixB=[3,7,4,8,2,6,1,9],mixD=[7,3,9,5,8,4,6,2];
-    const mixE=[[9,4],[8,7],[7,6],[6,8],[9,7],[8,5],[7,9],[6,6]],mixF=[[13,7],[15,8],[12,6],[16,9],[14,5],[17,8],[11,4],[18,9]];
-    for(let i=0;i<8;i++){
-      add(G,'□ ＋ '+mixB[i]+' ＝ 10',10-mixB[i],hB);
-      add(G,'10 − '+mixD[i],10-mixD[i],hD);
-      add(G,mixE[i][0]+' ＋ '+mixE[i][1],mixE[i][0]+mixE[i][1],hE);
-      add(G,mixF[i][0]+' − '+mixF[i][1],mixF[i][0]-mixF[i][1],hF);
-    }
+    for(let a=9,n=0;a>=2&&n<8;a--)for(let b=11-a;b<=9&&n<8;b++,n++)add(E,a+' ＋ '+b,a+b,hE);
+    for(let m=11,n=0;m<=18&&n<8;m++)for(let b=m-9;b<=9&&n<8;b++,n++)add(F,m+' − '+b,m-b,hF);
     return list;
   }
   drillAnswerLine(q){if(q.kind==='pick')return q.text+' → '+q.ans;return q.text.indexOf('□')>=0?q.text.replace('□',String(q.ans)):q.text+' ＝ '+q.ans;}
@@ -250,6 +278,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     const answer=Number(q.ans);if(!Number.isFinite(answer))return [];
     let distractor=null;
     if(d.id==='g2'&&String(q.text).indexOf('□')<0){const match=/^(\d+) × (\d+)$/.exec(String(q.text));if(match){const left=Number(match[1]),right=Number(match[2]),near=right<9?right+1:right-1;distractor=left*near;}}
+    if(d.id==='d3'&&String(q.text).indexOf('□')<0){const match=/^(\d+) ÷ (\d+)$/.exec(String(q.text));if(match){const left=Number(match[1]),right=Number(match[2]),near=answer<9?answer+1:answer-1;if(near>0)distractor=near;}}
     if(!Number.isFinite(distractor)||distractor===answer||distractor<0){distractor=Number(q.no)%2===0&&answer>0?answer-1:answer+1;}
     return this.drillChoicePosition(d,q)===0?[answer,distractor]:[distractor,answer];
   }
@@ -272,7 +301,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     let idx=restart?0:this.clamp(saved.idx,0,bank.length);
     if(idx>=bank.length)idx=0;
     const fresh=restart||idx===0;
-    const mode=id==='g1'||id==='g2'?(answerMode==='choice'?'choice':'input'):(answerMode==='writing'?'writing':'reading'),choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder(bank.length,choiceSeed);
+    const mode=id==='k1'||id==='k2'?(answerMode==='writing'?'writing':'reading'):(answerMode==='choice'?'choice':'input'),choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder(bank.length,choiceSeed);
     if(fresh){progress[id]={idx:0,perfect:0,mistakes:0,runs:saved.runs,best:saved.best};this.writeDrillProgress(progress);}
     this.clearDrillEcho();
     this.sfx('select');
@@ -411,7 +440,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         return """
             <!-- とっくんモード -->
             <div class="kt-drill-grid">
-              <sc-for list="{{ drillCards }}" as="d" hint-placeholder-count="4">
+              <sc-for list="{{ drillCards }}" as="d" hint-placeholder-count="6">
                 <div class="kt-hero-card kt-drill-card" style="{{ d.cardStyle }}">
                   <div class="kt-drill-card-top">
                     <span class="kt-drill-card-kicker">とっくん・{{ d.badge }}</span>
@@ -596,7 +625,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-answering{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;}
   .kt-drill-ans{min-width:220px;background:#fff7ec;border:4px dashed #d8c4a0;border-radius:20px;padding:4px 24px;font-size:52px;font-weight:900;color:#3a3326;text-align:center;}
   /* The feedback slot keeps its height while it is empty, hinting, or showing the pair, so the
-     question above it never moves across the 200 questions of a course. */
+     question above it never moves across the 100 questions of a course. */
   .kt-drill-feedback{width:100%;min-height:248px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;}
   .kt-drill-note{border-radius:16px;padding:9px 16px;font-size:19px;font-weight:700;text-align:center;}
   .kt-drill-note.is-hint{background:#fff6db;border:3px solid #ffd24a;color:#7a5d00;}

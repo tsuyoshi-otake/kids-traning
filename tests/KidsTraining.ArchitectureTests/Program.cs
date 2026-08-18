@@ -539,7 +539,7 @@ internal static class Program
             heroRowAt >= 0 && weakCardAt > heroRowAt && entryAt > weakCardAt && heroRowEndAt > entryAt,
             "the drill courses are not offered beside the weakness card inside the start screen card row");
         Assert(
-            html.Contains("<sc-for list=\"{{ drillCards }}\" as=\"d\" hint-placeholder-count=\"4\">", StringComparison.Ordinal) &&
+            html.Contains("<sc-for list=\"{{ drillCards }}\" as=\"d\" hint-placeholder-count=\"6\">", StringComparison.Ordinal) &&
             html.Contains("onStart:()=>this.selectDrillCourse(c.id)", StringComparison.Ordinal),
             "the start screen does not list every drill course as its own selectable card");
         Assert(
@@ -560,6 +560,10 @@ internal static class Program
         Assert(
             html.Contains("title:'たしざん・ひきざん'", StringComparison.Ordinal) &&
             html.Contains("title:'かけざん（九九）'", StringComparison.Ordinal) &&
+            html.Contains("title:'わりざん'", StringComparison.Ordinal) &&
+            html.Contains("{id:'d3',grade:3", StringComparison.Ordinal) &&
+            html.Contains("title:'ひっ算'", StringComparison.Ordinal) &&
+            html.Contains("{id:'h2',grade:2", StringComparison.Ordinal) &&
             html.Contains("{id:'k1',grade:1", StringComparison.Ordinal) &&
             html.Contains("{id:'k2',grade:2", StringComparison.Ordinal),
             "the arithmetic and kanji courses are not all defined for grade 1 and grade 2");

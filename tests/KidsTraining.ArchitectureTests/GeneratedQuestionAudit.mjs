@@ -2000,7 +2000,7 @@ for (const subtype of ['kanji-choice', 'kanji-picture']) {
 // The drill is a fixed course, so every question can be checked instead of sampled. Each
 // prompt is solved from its own text: an answer that disagrees with the arithmetic in the
 // prompt would teach the child a wrong fact, which no amount of sampling may miss.
-const DRILL_OPERATORS = { '＋': (x, y) => x + y, '−': (x, y) => x - y, '×': (x, y) => x * y };
+const DRILL_OPERATORS = { '＋': (x, y) => x + y, '−': (x, y) => x - y, '×': (x, y) => x * y, '÷': (x, y) => x / y };
 const solveDrillPrompt = (text) => {
   const parts = String(text).split(' ');
   const apply = DRILL_OPERATORS[parts[1]];
@@ -2043,10 +2043,10 @@ const DRILL_PAIR_CHECK = 'a correct drill answer shows the question and its answ
 
 const drillCourses = app.drillCourses();
 observe(DRILL_COURSE_CHECK, drillCourses.length);
-if (drillCourses.length !== 4) {
-  violated(DRILL_COURSE_CHECK, `expected an arithmetic and a kanji course for grade 1 and grade 2, found ${drillCourses.length}`, JSON.stringify(drillCourses.map((c) => c.id)));
+if (drillCourses.length !== 6) {
+  violated(DRILL_COURSE_CHECK, `expected six 100-question courses, found ${drillCourses.length}`, JSON.stringify(drillCourses.map((c) => c.id)));
 }
-const DRILL_FIRST_PROMPT = { g1: '1 ＋ 1', g2: '2 × 1' };
+const DRILL_FIRST_PROMPT = { g1: '1 ＋ 1', g2: '2 × 1', d3: '2 ÷ 1', h2: '21 ＋ 11' };
 for (const course of drillCourses) {
   const bank = app.drillBank(course.id);
   if (bank.length !== course.total) {
@@ -2082,7 +2082,7 @@ for (const course of drillCourses) {
 // The optional recognition mode must be safe across the entire fixed bank, not only a sample.
 // A session keeps its shuffled layout stable while avoiding a learnable question-number pattern.
 observe(DRILL_CHOICE_CHECK, 400);
-for (const courseId of ['g1', 'g2']) {
+for (const courseId of ['g1', 'g2', 'd3', 'h2']) {
   const bank = app.drillBank(courseId);
   const choiceOrder = app.drillChoiceOrder(bank.length, courseId === 'g1' ? 123456789 : 987654321);
   const secondOrder = app.drillChoiceOrder(bank.length, courseId === 'g1' ? 987654321 : 123456789);
@@ -2151,6 +2151,54 @@ for (let addend = 1; addend <= 9; addend += 1) {
   }
 }
 
+const DRILL_HISSAN_CHECK = 'the grade-2 written-arithmetic drill follows the two-digit then three-digit regrouping sequence';
+const hissanBank = app.drillBank('h2');
+observe(DRILL_HISSAN_CHECK, hissanBank.length);
+const hissanDigits = (value) => String(value).length;
+let sawThreeDigit = false;
+let carryAdds = 0;
+let borrowSubs = 0;
+let zeroHeavy = 0;
+for (const question of hissanBank) {
+  const match = /^(\d+) (＋|−) (\d+)$/.exec(question.text);
+  if (!match) {
+    violated(DRILL_HISSAN_CHECK, `question ${question.no} is not a written-arithmetic prompt`, question.text);
+    continue;
+  }
+  const left = Number(match[1]);
+  const right = Number(match[3]);
+  const widest = Math.max(hissanDigits(left), hissanDigits(right));
+  if (widest > 3) {
+    violated(DRILL_HISSAN_CHECK, `question ${question.no} leaves the grade-2 range`, question.text);
+  }
+  if (widest === 3) sawThreeDigit = true;
+  if (!sawThreeDigit && widest !== 2) {
+    violated(DRILL_HISSAN_CHECK, `question ${question.no} leaves two-digit work before three-digit work starts`, question.text);
+  }
+  if (match[2] === '＋' && ((left % 10) + (right % 10) >= 10)) carryAdds += 1;
+  if (match[2] === '−' && ((left % 10) < (right % 10))) borrowSubs += 1;
+  if (question.text === '700 − 286') zeroHeavy += 1;
+}
+if (carryAdds < 20 || borrowSubs < 20 || !sawThreeDigit || zeroHeavy < 1) {
+  violated(DRILL_HISSAN_CHECK, `carry ${carryAdds}, borrow ${borrowSubs}, zero-heavy ${zeroHeavy}`, 'grade-2 written arithmetic coverage');
+}
+
+const DRILL_DIV_CHECK = 'the division drill covers every ordered inverse of a multiplication fact';
+const divisionBank = app.drillBank('d3');
+const drilledDivisions = new Set();
+for (const question of divisionBank) {
+  const match = /^(\d+) ÷ (\d+)$/.exec(question.text);
+  if (match) drilledDivisions.add(`${question.ans}x${match[2]}`);
+}
+observe(DRILL_DIV_CHECK, drilledDivisions.size);
+for (let left = 1; left <= 9; left += 1) {
+  for (let right = 1; right <= 9; right += 1) {
+    if (!drilledDivisions.has(`${left}x${right}`)) {
+      violated(DRILL_DIV_CHECK, `${left * right} ÷ ${right} is never drilled`, 'division fact coverage');
+    }
+  }
+}
+
 const gradeTwoBank = app.drillBank('g2');
 const drilledFacts = new Set();
 for (const question of gradeTwoBank) {
@@ -2166,10 +2214,10 @@ for (let left = 1; left <= 9; left += 1) {
   }
 }
 
-// The kanji courses still introduce every character in their own grade, then apply those
-// characters in real words. Grade 1 may use only grade-1 kanji; grade 2 is cumulative and
-// may combine grade-1 and grade-2 kanji, but never a later-grade character.
+const DRILL_STANDALONE_CHECK = 'isolated kanji drills ask only readings that are words on their own';
 const KANJI_DRILL_GRADES = { k1: 1, k2: 2 };
+const freeOnKeys = app.drillStandaloneOnKeys();
+observe(DRILL_STANDALONE_CHECK, 2);
 const gradeByKanji = new Map(curriculum.map((entry) => [entry.k, entry.g]));
 observe(DRILL_KANJI_CHECK, Object.keys(KANJI_DRILL_GRADES).length);
 observe(DRILL_KANJI_WORD_CHECK, 160);
@@ -2229,6 +2277,12 @@ for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
     }
     asked.add(entry.k);
     readingTypes.add(question.readingType);
+    if (question.readingType === 'kun' && (question.ans !== entry.kun || question.text !== (entry.kunWord || entry.k))) {
+      violated(DRILL_STANDALONE_CHECK, `${courseId} question ${question.no} is not a standalone kun word`, JSON.stringify(question));
+    }
+    if (question.readingType === 'on' && (!freeOnKeys.has(`${question.kanji}:${question.ans}`) || question.text !== question.kanji)) {
+      violated(DRILL_STANDALONE_CHECK, `${courseId} asks bound on-yomi ${question.ans} in isolation`, JSON.stringify(question));
+    }
     if (question.ans !== expected) {
       violated(DRILL_KANJI_CHECK, `${courseId} reads ${entry.k} as ${question.ans} instead of ${expected}`, question.text);
     }
@@ -2239,25 +2293,31 @@ for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
       violated(DRILL_KANJI_CHECK, `${courseId} question ${question.no} never offers the right reading ${expected}`, JSON.stringify(choices));
     }
   }
-  if (asked.size !== gradeEntries.length) {
-    const missing = gradeEntries.filter((entry) => !asked.has(entry.k)).map((entry) => entry.k);
-    violated(DRILL_KANJI_CHECK, `${courseId} drills ${asked.size} of the ${gradeEntries.length} grade-${grade} kanji`, missing.join(''));
+  const isolatedCount = bank.filter((question) => question.readingType === 'on' || question.readingType === 'kun').length;
+  const standaloneTargets = app.drillStandaloneTargets(gradeEntries);
+  const standaloneKanji = new Set(standaloneTargets.map((target) => target.e.k));
+  const missingStandalone = [...standaloneKanji].filter((kanji) => !asked.has(kanji));
+  if (standaloneTargets.length <= isolatedCount && missingStandalone.length) {
+    violated(DRILL_KANJI_CHECK, `${courseId} skipped standalone ${missingStandalone.join('')}`, courseId);
+  }
+  if (isolatedCount >= 20 && asked.size < 20) {
+    violated(DRILL_KANJI_CHECK, `${courseId} drills only ${asked.size} kanji in a 100-question course`, courseId);
   }
   if (!readingTypes.has('on') || !readingTypes.has('kun') || !readingTypes.has('word')) {
     violated(DRILL_KANJI_CHECK, `${courseId} does not include on-yomi, kun-yomi, and word questions`, JSON.stringify([...readingTypes]));
   }
   const expectedWords = app.drillKanjiWords(grade);
-  const expectedWordQuestions = 200 - gradeEntries.length;
   const wordQuestions = bank.filter((question) => question.readingType === 'word');
-  if (wordQuestions.length !== expectedWordQuestions || askedWords.size !== expectedWords.length) {
-    violated(DRILL_KANJI_WORD_CHECK, `${courseId} has ${wordQuestions.length} word questions using ${askedWords.size} unique words`, `expected ${expectedWordQuestions} questions using ${expectedWords.length} words`);
+  const expectedWordQuestions = 100 - isolatedCount;
+  if (wordQuestions.length !== expectedWordQuestions || askedWords.size < Math.min(expectedWords.length, expectedWordQuestions)) {
+    violated(DRILL_KANJI_WORD_CHECK, `${courseId} has ${wordQuestions.length} word questions using ${askedWords.size} unique words`, `expected ${expectedWordQuestions} questions`);
   }
 }
 
 // Writing mode reverses each prompt: the reading is shown and the child chooses the canonical
 // spelling (including okurigana). Distractors stay inside the same grade and never share the
 // target reading, so an alternative valid spelling cannot create an ambiguous question.
-observe(DRILL_KANJI_WRITING_CHECK, 400);
+observe(DRILL_KANJI_WRITING_CHECK, 200);
 for (const [courseId, grade] of Object.entries(KANJI_DRILL_GRADES)) {
   const bank = app.drillBank(courseId);
   const gradeSpellings = new Set(bank.map((question) => question.text));
