@@ -309,6 +309,18 @@ for (const [id, stages] of [['math.g4.number-calculation', [2, 3]], ['math.g5.nu
     }
   }
 }
+{
+  const prompts = new Set();
+  for (const grade of [7, 8, 9]) for (const slug of ['language-classics', 'communication-reading-writing']) {
+    const unit = app.curriculumUnit(`japanese.g${grade}.${slug}`);
+    observe('middle Japanese assesses distinct contextual skills at every stage');
+    if (JSON.stringify(unit.questions.map(item => item.stage)) !== '[1,2,3,4,5]') violated('middle Japanese assesses distinct contextual skills at every stage', 'missing stage coverage', unit.id);
+    for (const item of unit.questions) {
+      if (prompts.has(item.prompt) || !/[「『【]/.test(item.prompt)) violated('middle Japanese assesses distinct contextual skills at every stage', 'duplicated or context-free question', item.prompt);
+      prompts.add(item.prompt);
+    }
+  }
+}
 const writtenCases = [
   { name: 'multi-digit addition', question: { topic: 'hissan', difficulty: 5, prompt: '1234 + 111', answer: '1345' }, kind: 'addition', expects: ['5', '4', '3', '1'] },
   { name: 'multi-digit subtraction', question: { topic: 'hissan', difficulty: 5, prompt: '9000 - 111', answer: '8889' }, kind: 'subtraction', expects: ['9', '8', '8', '8'] },
