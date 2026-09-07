@@ -1718,6 +1718,21 @@ internal static class Program
             }
 
             Assert(rejected && store.ReadSnapshot() == snapshot, "a PIN-bearing or invalid snapshot was accepted or replaced the prior export");
+            foreach (var invalidVersion in new[] { "0", "2", "1.5", "2147483648", "1e100", "\"1\"", "null", "true", "{}", "[]" })
+            {
+                rejected = false;
+                try
+                {
+                    store.WriteSnapshot("{\"schemaVersion\":" + invalidVersion + ",\"history\":[]}");
+                }
+                catch (InvalidDataException)
+                {
+                    rejected = true;
+                }
+
+                Assert(rejected && store.ReadSnapshot() == snapshot,
+                    $"invalid schema version {invalidVersion} was accepted or replaced the prior export");
+            }
             store.Clear();
             Assert(store.ReadSnapshot().Contains("\"history\": []", StringComparison.Ordinal), "clearing learning history did not produce an empty snapshot");
         }

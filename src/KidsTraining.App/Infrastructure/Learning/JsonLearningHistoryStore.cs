@@ -97,7 +97,8 @@ internal sealed class JsonLearningHistoryStore
             var root = document.RootElement;
             if (root.ValueKind != JsonValueKind.Object ||
                 !root.TryGetProperty("schemaVersion", out var schemaVersion) ||
-                schemaVersion.GetInt32() != SchemaVersion ||
+                schemaVersion.ValueKind != JsonValueKind.Number ||
+                !schemaVersion.TryGetInt32(out var version) || version != SchemaVersion ||
                 root.TryGetProperty("parentPin", out _) ||
                 root.TryGetProperty("password", out _))
             {
