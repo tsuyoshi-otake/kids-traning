@@ -104,7 +104,11 @@ internal static partial class LearningMarkupPatcher
         steps.push({phase:'sum',column:column,expect:String(total),writeDigit:String(digit),carry:carry,prompt:'部分積の'+this.writtenPlaceName(column)+'：'+values.join(' ＋ ')+(incoming?' ＋ くり上がり '+incoming:'')+' は？',explain:'そろえた部分積を、右の位から足そう。',completeText:values.join(' ＋ ')+(incoming?' ＋ '+incoming:'')+'＝'+total+(carry?'。'+digit+'を書いて、'+carry+'をくり上げる。':'。'+digit+'を書く。')});
       }
     }
-    if(decimalPlaces>0)steps.push({phase:'decimal',expect:String(decimalPlaces),prompt:'もとの2つの数で、小数点より右の数字は合わせて何けた？',explain:'2つの数の、小数点より右のけた数を足そう。',completeText:'小数点より右は合わせて'+decimalPlaces+'けた。整数の積の右から'+decimalPlaces+'けた戻す。'});
+    if(decimalPlaces>0){
+      steps.push({phase:'decimal',expect:String(decimalPlaces),prompt:'もとの2つの数で、小数点より右の数字は合わせて何けた？',explain:'2つの数の、小数点より右のけた数を足そう。',completeText:'小数点より右は合わせて'+decimalPlaces+'けた。整数の積の右から'+decimalPlaces+'けた戻す。'});
+      const result=String(Number(leftDigits)*Number(rightDigits)/Math.pow(10,decimalPlaces));
+      steps.push({phase:'decimal-result',expect:result,prompt:'小数点を正しい位置に戻して、かけ算の答えを入力しよう。',explain:'整数の積の右から'+decimalPlaces+'けたのところに小数点を置こう。足りない位には0を補うよ。',completeText:left+' × '+right+'＝'+result+'。'});
+    }
     const width=Math.max(leftDigits.length+rightDigits.length,String(Number(leftDigits)*Number(rightDigits)).length);
     return{kind:'multiplication',op:'×',left:left,right:right,leftDigits:leftDigits,rightDigits:rightDigits,decimalPlaces:decimalPlaces,prepareCount:prepare.length,partials:partials,width:width,steps:steps,note:decimalPlaces?'小数点をいったん外して整数の筆算をし、最後に小数点を戻します。':'右の位から部分積を作り、位をそろえて足します。',aria:left+' かける '+right+'の筆算。正解した途中の数字だけを表示します。'};
   }
@@ -153,6 +157,7 @@ internal static partial class LearningMarkupPatcher
       partialRows.forEach(text=>lines.push({text:'  '+text,tone:'partial'}));
       if(plan.partials.length>1){const result=Array(width).fill(blank);for(const step of done.filter(item=>item.phase==='sum')){result[step.column]=step.writeDigit;if(step.carry&&step.column+1<result.length)result[step.column+1]=String(step.carry);}lines.push({text:'─'.repeat(width+2),tone:'rule'});lines.push({text:'  '+result.reverse().join(''),tone:'result'});}
       if(plan.decimalPlaces)lines.push({text:doneHas('decimal')?'小数点を右から'+plan.decimalPlaces+'けた戻す':'小数点の位置　'+blank,tone:'caption'});
+      if(doneHas('decimal-result'))lines.push({text:'答え　'+plan.steps.at(-1).expect,tone:'caption'});
     }else if(plan.kind==='division'){
       const readyDividend=!plan.scale||doneHas('prepare','dividend'),readyDivisor=!plan.scale||doneHas('prepare','divisor'),digits=plan.dividend.length,divisorWidth=plan.divisor.length,dividendStart=divisorWidth+3,quotient=Array(digits).fill(' ');
       for(let i=0;i<plan.iterations.length;i++){const iteration=plan.iterations[i],qDone=done.some(step=>step.phase==='quotient'&&step.iteration===i);quotient[iteration.end]=qDone?String(iteration.quotient):blank;}
@@ -182,6 +187,8 @@ internal static partial class LearningMarkupPatcher
     const writtenPad=['1','2','3','4','5','6','7','8','9'].map(n=>({label:n,ariaLabel:n+' を入力',style:keyTile,onClick:()=>this.press(n)}));
     writtenPad.push({label:'けす',ariaLabel:'入力した数字を1けた消す',style:keyClear,onClick:()=>this.del()});
     writtenPad.push({label:'0',ariaLabel:'0 を入力',style:keyTile,onClick:()=>this.press('0')});
+    const activeWritten=S.screen==='quiz'&&S.session&&this.cur()&&this.writtenArithmeticPlan(this.cur());
+    if(activeWritten&&activeWritten.steps[Number(S.waStep)||0]?.phase==='decimal-result')writtenPad.push({label:'.',ariaLabel:'小数点を入力',style:keyTile,onClick:()=>this.press('.')});
     writtenPad.push({label:'OK',ariaLabel:'この途中の答えを決定',style:keyOk,onClick:()=>this.submitWrittenStep()});
 """;
 

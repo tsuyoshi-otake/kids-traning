@@ -315,8 +315,8 @@ const writtenCases = [
   { name: 'three-by-one multiplication', question: { topic: 'hissan', difficulty: 5, prompt: '123 × 7', answer: '861' }, kind: 'multiplication', expects: ['21', '16', '8'] },
   { name: 'two-by-two multiplication', question: { topic: 'hissan', difficulty: 5, prompt: '12 × 34', answer: '408' }, kind: 'multiplication', expects: ['8', '4', '6', '3', '8', '10', '4'] },
   { name: '864 long division', question: { topic: 'kazu', difficulty: 2, prompt: '864÷24は？', answer: '36' }, kind: 'division', expects: ['3', '72', '14', '144', '6', '144', '0'] },
-  { name: 'one-place decimal multiplication', question: { topic: 'kazu', difficulty: 3, prompt: '3.6×4は？', answer: '14.4' }, kind: 'multiplication', expects: ['36', '24', '14', '1'] },
-  { name: 'two-place decimal multiplication', question: { topic: 'kazu', difficulty: 3, prompt: '2.4×0.5は？', answer: '1.2' }, kind: 'multiplication', expects: ['24', '5', '20', '12', '2'] },
+  { name: 'one-place decimal multiplication', question: { topic: 'kazu', difficulty: 3, prompt: '3.6×4は？', answer: '14.4' }, kind: 'multiplication', expects: ['36', '24', '14', '1', '14.4'] },
+  { name: 'two-place decimal multiplication', question: { topic: 'kazu', difficulty: 3, prompt: '2.4×0.5は？', answer: '1.2' }, kind: 'multiplication', expects: ['24', '5', '20', '12', '2', '1.2'] },
   { name: 'decimal long division', question: { topic: 'kazu', difficulty: 4, prompt: '3.6÷0.9は？', answer: '4' }, kind: 'division', expects: ['36', '9', '4', '36', '0'] },
   { name: 'remainder long division', question: { topic: 'div', difficulty: 5, prompt: '157 ÷ 9', answer: '17 あまり 4' }, kind: 'division', expects: ['1', '9', '6', '67', '7', '63', '4'] },
 ];
@@ -437,6 +437,26 @@ for (const question of [
     violated('written arithmetic controller reaches exactly one explicit terminal state', `failure terminals: finish=${finished}, exhaust=${exhausted}, reveal=${revealed}, busy=${app._answerBusy}`, JSON.stringify(app.state));
   }
   Object.assign(app, { finishScoredQuestion: originals.finish, exhaustQuestion: originals.exhaust, revealAnswer: originals.reveal, sfx: originals.sfx });
+}
+
+for (const sample of writtenCases.filter(sample => sample.name.includes('decimal multiplication'))) {
+  const originals = { finish: app.finishScoredQuestion, sfx: app.sfx };
+  let finished = 0;
+  app.sfx = () => {};
+  app.finishScoredQuestion = () => { finished++; app._terminalQuestionToken = app.currentQuestionToken(); };
+  app.state = { screen: 'quiz', session: { attempt: 1, idx: 0, questions: [sample.question] }, input: '', waStep: 0, waMistakes: 0 };
+  app._terminalQuestionToken = ''; app._answerBusy = false;
+  const plan = app.writtenArithmeticPlan(sample.question);
+  for (const step of plan.steps.slice(0, -1)) app.submitWrittenStep(step.expect);
+  observe('decimal multiplication requires the placed decimal result before scoring');
+  if (finished || app.state.waStep !== plan.steps.length - 1) violated('decimal multiplication requires the placed decimal result before scoring', 'finished after counting decimal places', sample.name);
+  app.submitWrittenStep(String(Number(sample.question.answer) * 10));
+  if (finished || app.state.waMistakes !== 1) violated('decimal multiplication requires the placed decimal result before scoring', 'misplaced decimal accepted', sample.name);
+  app.submitWrittenStep(sample.question.answer);
+  app.submitWrittenStep(sample.question.answer);
+  const view = app.writtenArithmeticView(plan, plan.steps.length);
+  if (finished !== 1 || !view.lines.some(line => line.text === '答え　' + sample.question.answer)) violated('decimal multiplication requires the placed decimal result before scoring', 'final result absent or duplicate scoring', sample.name);
+  Object.assign(app, { finishScoredQuestion: originals.finish, sfx: originals.sfx });
 }
 
 // A paused exercise must reopen on the same intermediate operation, with the same assisted
@@ -1643,7 +1663,7 @@ for (const unit of UNITS) {
             violated('generated written arithmetic has a complete finite step plan', `step count was ${writtenPlan.steps?.length}`, context);
           }
           for (const [stepIndex, step] of (writtenPlan.steps || []).entries()) {
-            if (!step || !/^\d+$/.test(String(step.expect)) || !step.prompt || !step.explain || !step.completeText) {
+            if (!step || !/^\d+(?:\.\d+)?$/.test(String(step.expect)) || !step.prompt || !step.explain || !step.completeText) {
               violated('generated written arithmetic has a complete finite step plan', `step ${stepIndex} is incomplete`, `${context} | ${JSON.stringify(step)}`);
             }
           }
