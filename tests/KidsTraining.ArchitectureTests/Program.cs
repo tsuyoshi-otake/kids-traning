@@ -779,7 +779,7 @@ internal static class Program
             "the retry screen still shows the score gap only, hiding the real unmet condition");
         Assert(html.Contains("const gradeOpts=[1,2,3,4,5,6,7,8,9].map", StringComparison.Ordinal), "UI does not expose all supported school grades");
         Assert(!html.Contains("if(done('add'))staged.push", StringComparison.Ordinal), "cross-subject prerequisite chain remains");
-        Assert(html.Contains("1000万を 10こ", StringComparison.Ordinal) && html.Contains("const scale=(g>=3&&stage>=4)?5", StringComparison.Ordinal), "key grade 3 number/chart content is missing");
+        Assert(html.Contains("1000万を 10こ", StringComparison.Ordinal) && html.Contains("chartScale:scale,chartUnit:unit", StringComparison.Ordinal), "key grade 3 number/chart content is missing");
         Assert(html.Contains("pickWeekday(stage)", StringComparison.Ordinal) && html.Contains("subtype:'weekday'", StringComparison.Ordinal) && html.Contains("月曜日", StringComparison.Ordinal) && html.Contains("日曜日", StringComparison.Ordinal), "weekday names, order, or calendar offsets are missing");
         Assert(html.Contains("subtype:'number-sequence'", StringComparison.Ordinal) && html.Contains("subtype:'number-compose'", StringComparison.Ordinal), "number sequence or composition variants are missing");
         Assert(html.Contains("subtype:'missing-add'", StringComparison.Ordinal) && html.Contains("subtype:'missing-sub'", StringComparison.Ordinal), "missing-number addition or subtraction variants are missing");
@@ -835,7 +835,7 @@ internal static class Program
             "representative four- and five-letter romaji words are missing");
         Assert(html.Contains("isTape:true", StringComparison.Ordinal) && html.Contains("isTable:true", StringComparison.Ordinal), "tape-diagram or table questions are missing");
         Assert(
-            html.Contains("isChart:true,rows:rows,isTable:true,tableRows:tableRows", StringComparison.Ordinal) &&
+            html.Contains("isChart:true,rows:rows", StringComparison.Ordinal) && html.Contains("isTable:true,tableRows:tableRows", StringComparison.Ordinal) &&
             html.Contains("グラフを みて、表の □ に はいる 数は？", StringComparison.Ordinal),
             "grade 2 table fill-in chart questions must show the pictograph to count");
         Assert(

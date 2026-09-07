@@ -1716,6 +1716,20 @@ for (const unit of UNITS) {
             }
           }
           if (question.isChart) {
+            observe('pictographs disclose scale before the learner answers');
+            const expectedScale = grade >= 3 && stage >= 4 ? 5 : grade >= 3 && stage >= 3 ? 2 : 1;
+            const expectedUnit = expectedScale > 1 ? '人' : 'こ';
+            if (question.chartScale !== expectedScale || question.chartUnit !== expectedUnit ||
+                !prompt.includes(`1ますは ${expectedScale}${expectedUnit}。`)) {
+              violated('pictographs disclose scale before the learner answers', 'scale or unit is absent or inconsistent', context);
+            }
+            if (prompt.includes('より いくつ 多い？')) {
+              const counts = question.rows.map(row => row.count);
+              const expectedDifference = (Math.max(...counts) - Math.min(...counts)) * expectedScale;
+              if (Number(answer) !== expectedDifference) {
+                violated('pictographs disclose scale before the learner answers', 'the answer differs from the displayed scaled difference', context);
+              }
+            }
             observe('chart pictograph questions carry bar rows');
             if (!Array.isArray(question.rows) || question.rows.length === 0) {
               violated('chart pictograph questions carry bar rows', 'isChart question has no rows', context);
