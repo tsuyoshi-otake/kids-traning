@@ -15,7 +15,8 @@ internal sealed record CurriculumQuestion(
     string Explanation,
     string? ActivityPrompt = null,
     CurriculumQuestionDisplay? Display = null,
-    bool WrittenArithmetic = false);
+    bool WrittenArithmetic = false,
+    CurriculumFigure? Figure = null);
 
 internal sealed record CurriculumUnit(
     string Id,
@@ -182,6 +183,7 @@ internal static partial class CurriculumPolicy
         AddUpperGradeUnits(AddBank, Add);
         AddMiddleCore(AddBank);
         AddMiddleActivities(AddBank);
+        AddDataFigureQuestions(units);
         return units;
     }
 

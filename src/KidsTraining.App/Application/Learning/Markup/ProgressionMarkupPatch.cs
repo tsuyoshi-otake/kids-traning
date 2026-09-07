@@ -29,6 +29,7 @@ internal static partial class LearningMarkupPatcher
                 explanation = question.Explanation,
                 activityPrompt = question.ActivityPrompt,
                 writtenArithmetic = question.WrittenArithmetic,
+                figure = question.Figure is null ? (JsonElement?)null : JsonSerializer.SerializeToElement(question.Figure, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }),
                 display = question.Display is null ? null : new
                 {
                     prompt = question.Display.Prompt,

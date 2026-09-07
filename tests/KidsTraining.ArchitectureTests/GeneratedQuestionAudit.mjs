@@ -321,6 +321,28 @@ for (const [id, stages] of [['math.g4.number-calculation', [2, 3]], ['math.g5.nu
     }
   }
 }
+{
+  const flatten = value => Array.isArray(value) ? value.flatMap(flatten) : value && typeof value === 'object' ? [value, ...flatten(value.children || [])] : [];
+  const calculations = {
+    'math.g4.relations-data': [f=>f.values[2]-f.values[0],f=>f.table[0][1]+f.table[1][1]],
+    'math.g5.rate-statistics': [f=>40*f.values[0]/100,f=>f.values[1]+f.values[2]],
+    'math.g6.ratio-data': [f=>f.values[2]+f.values[3],f=>100*f.values[1]/f.values.reduce((a,b)=>a+b,0)],
+    'math.g7.proportion-functions': [f=>f.values[4],f=>f.values[4]/Number(f.labels[4])],
+    'math.g8.linear-functions': [f=>f.values[0],f=>f.values[3]-f.values[1]],
+    'math.g8.probability-distribution': [f=>f.values[3]-f.values[1],f=>f.values[4]-f.values[0]],
+    'math.g9.quadratic-functions': [f=>f.values[1],f=>(f.values[6]-f.values[4])/(Number(f.labels[6])-Number(f.labels[4]))],
+  };
+  for(const [id, calculate] of Object.entries(calculations)) {
+    const unit=app.curriculumUnit(id),items=unit.questions.filter(item=>item.figure);
+    for(const [index,item] of items.entries()){
+      observe('data figure answers agree with independent readings and accessible tables');
+      const q=app.pickCurriculumBank(unit,item.stage,item),f=q.figure,nodes=flatten(app.dataFigureView(f));
+      const expected=calculate[index](f),numbers=nodes.filter(node=>node.type==='td').flatMap(node=>node.children).map(Number);
+      if(parseFloat(item.answer)!==expected || JSON.stringify(numbers)!==JSON.stringify(f.kind==='table'?f.table.flat():f.values) || !nodes.some(node=>node.type==='table') || (f.kind!=='table'&&!nodes.some(node=>node.type==='svg'))) violated('data figure answers agree with independent readings and accessible tables','answer or accessible values differ',JSON.stringify(item));
+    }
+    if(items.length!==calculate.length) violated('data figure answers agree with independent readings and accessible tables','missing authored diagram',id);
+  }
+}
 const writtenCases = [
   { name: 'multi-digit addition', question: { topic: 'hissan', difficulty: 5, prompt: '1234 + 111', answer: '1345' }, kind: 'addition', expects: ['5', '4', '3', '1'] },
   { name: 'multi-digit subtraction', question: { topic: 'hissan', difficulty: 5, prompt: '9000 - 111', answer: '8889' }, kind: 'subtraction', expects: ['9', '8', '8', '8'] },
