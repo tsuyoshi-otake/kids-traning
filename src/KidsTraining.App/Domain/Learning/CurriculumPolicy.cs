@@ -14,7 +14,8 @@ internal sealed record CurriculumQuestion(
     IReadOnlyList<string> Distractors,
     string Explanation,
     string? ActivityPrompt = null,
-    CurriculumQuestionDisplay? Display = null);
+    CurriculumQuestionDisplay? Display = null,
+    bool WrittenArithmetic = false);
 
 internal sealed record CurriculumUnit(
     string Id,
@@ -204,12 +205,12 @@ internal static partial class CurriculumPolicy
             Q(1, "1億は 1万の いくつ分？", "10000", ["100", "1000", "100000"], "1億÷1万=10000。"),
             Q(1, "1000万は 100万の いくつ分？", "10", ["100", "5", "1000"], "1000万÷100万=10。"),
             Q(1, "9000は 1000の いくつ分？", "9", ["90", "3", "900"], "9000÷1000=9。"),
-            Q(2, "864÷24は？", "36", ["34", "38", "42"], "24×36=864。"),
-            Q(2, "775÷25は？", "31", ["29", "33", "35"], "25×31=775。"),
-            Q(2, "912÷24は？", "38", ["36", "39", "42"], "24×38=912。"),
-            Q(3, "3.6×4は？", "14.4", ["1.44", "7.2", "144"], "36×4=144として小数点を1けた戻す。"),
-            Q(3, "2.7×3は？", "8.1", ["8.7", "0.81", "81"], "27×3=81として小数点を1けた戻す。"),
-            Q(3, "4.5×6は？", "27", ["2.7", "270", "24"], "45×6=270として小数点を1けた戻す。"),
+            Q(2, "864÷24は？", "36", ["34", "38", "42"], "24×36=864。", writtenArithmetic: true),
+            Q(2, "775÷25は？", "31", ["29", "33", "35"], "25×31=775。", writtenArithmetic: true),
+            Q(2, "912÷24は？", "38", ["36", "39", "42"], "24×38=912。", writtenArithmetic: true),
+            Q(3, "3.6×4は？", "14.4", ["1.44", "7.2", "144"], "36×4=144として小数点を1けた戻す。", writtenArithmetic: true),
+            Q(3, "2.7×3は？", "8.1", ["8.7", "0.81", "81"], "27×3=81として小数点を1けた戻す。", writtenArithmetic: true),
+            Q(3, "4.5×6は？", "27", ["2.7", "270", "24"], "45×6=270として小数点を1けた戻す。", writtenArithmetic: true),
             Q(4, "3/8と同じ大きさは？", "6/16", ["3/16", "6/8", "9/16"], "分子と分母を同じ数で2倍しても大きさは同じ。"),
             Q(4, "2/5と同じ大きさは？", "4/10", ["2/10", "4/5", "6/10"], "分子と分母を同じ数で2倍しても大きさは同じ。"),
             Q(4, "1/4と同じ大きさは？", "2/8", ["1/8", "2/4", "3/8"], "分子と分母を同じ数で2倍しても大きさは同じ。"),
@@ -262,12 +263,12 @@ internal static partial class CurriculumPolicy
             Q(2, "4と6の最小公倍数は？", "12", ["10", "18", "24"], "4と6の最初の共通する倍数は12。"),
             Q(2, "3と5の最小公倍数は？", "15", ["8", "10", "30"], "3と5の最初の共通する倍数は15。"),
             Q(2, "6と8の最小公倍数は？", "24", ["14", "48", "16"], "6と8の最初の共通する倍数は24。"),
-            Q(3, "2.4×0.5は？", "1.2", ["0.12", "2.9", "12"], "0.5倍は半分なので1.2。"),
-            Q(3, "1.5×0.4は？", "0.6", ["0.06", "6", "0.9"], "15×4=60として小数点を2けた戻す。"),
-            Q(3, "3.2×0.25は？", "0.8", ["0.08", "8", "1.28"], "32×25=800として小数点を3けた戻す。"),
-            Q(4, "3.6÷0.9は？", "4", ["0.4", "3", "40"], "両方を10倍して36÷9。"),
-            Q(4, "4.8÷0.6は？", "8", ["0.8", "80", "48"], "両方を10倍して48÷6。"),
-            Q(4, "2.7÷0.3は？", "9", ["0.9", "90", "27"], "両方を10倍して27÷3。"),
+            Q(3, "2.4×0.5は？", "1.2", ["0.12", "2.9", "12"], "0.5倍は半分なので1.2。", writtenArithmetic: true),
+            Q(3, "1.5×0.4は？", "0.6", ["0.06", "6", "0.9"], "15×4=60として小数点を2けた戻す。", writtenArithmetic: true),
+            Q(3, "3.2×0.25は？", "0.8", ["0.08", "8", "1.28"], "32×25=800として小数点を3けた戻す。", writtenArithmetic: true),
+            Q(4, "3.6÷0.9は？", "4", ["0.4", "3", "40"], "両方を10倍して36÷9。", writtenArithmetic: true),
+            Q(4, "4.8÷0.6は？", "8", ["0.8", "80", "48"], "両方を10倍して48÷6。", writtenArithmetic: true),
+            Q(4, "2.7÷0.3は？", "9", ["0.9", "90", "27"], "両方を10倍して27÷3。", writtenArithmetic: true),
             Q(5, "2/3+1/4は？", "11/12", ["3/7", "3/12", "8/12"], "通分すると8/12+3/12=11/12。"),
             Q(5, "1/2+1/3は？", "5/6", ["2/5", "2/6", "3/6"], "通分すると3/6+2/6=5/6。"),
             Q(5, "3/4+1/6は？", "11/12", ["4/10", "4/12", "2/3"], "通分すると9/12+2/12=11/12。")
@@ -380,8 +381,9 @@ internal static partial class CurriculumPolicy
         IReadOnlyList<string> distractors,
         string explanation,
         string? activity = null,
-        CurriculumQuestionDisplay? display = null) =>
-        new(stage, prompt, answer, distractors, explanation, activity, display);
+        CurriculumQuestionDisplay? display = null,
+        bool writtenArithmetic = false) =>
+        new(stage, prompt, answer, distractors, explanation, activity, display, writtenArithmetic);
 
     private static CurriculumQuestionDisplay D(
         string? prompt = null,

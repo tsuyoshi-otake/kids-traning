@@ -299,6 +299,16 @@ if (!fractionQuestion || fractionQuestion.prompt !== '2/3×3/5は？' || fractio
 
 // Written arithmetic is an assessed, bounded state machine. It must teach every intermediate
 // operation while keeping unfinished values out of the rendered and accessible view.
+for (const [id, stages] of [['math.g4.number-calculation', [2, 3]], ['math.g5.number-calculation', [3, 4]]]) {
+  const unit = app.curriculumUnit(id);
+  for (const item of unit.questions.filter(item => stages.includes(item.stage))) {
+    const question = app.pickCurriculumBank(unit, item.stage, item);
+    observe('upper calculation banks consistently select written arithmetic');
+    if (question.writtenArithmetic !== true || !app.writtenArithmeticPlan(question)) {
+      violated('upper calculation banks consistently select written arithmetic', `${id}: ${item.prompt}`, JSON.stringify(question));
+    }
+  }
+}
 const writtenCases = [
   { name: 'multi-digit addition', question: { topic: 'hissan', difficulty: 5, prompt: '1234 + 111', answer: '1345' }, kind: 'addition', expects: ['5', '4', '3', '1'] },
   { name: 'multi-digit subtraction', question: { topic: 'hissan', difficulty: 5, prompt: '9000 - 111', answer: '8889' }, kind: 'subtraction', expects: ['9', '8', '8', '8'] },
@@ -1645,7 +1655,7 @@ for (const unit of UNITS) {
             const right = Number(arithmetic[3]);
             const operator = arithmetic[2] === '−' ? '-' : arithmetic[2];
             const expected = operator === '+' ? String(left + right) : operator === '-' ? String(left - right) : operator === '×' ? String(left * right) : null;
-            if (expected !== null && Number(question.answer) !== Number(expected)) {
+            if (expected !== null && Math.abs(Number(question.answer) - Number(expected)) > 1e-10) {
               violated('generated written arithmetic has a complete finite step plan', `canonical answer ${question.answer} disagrees with ${expected}`, context);
             }
             if (operator === '÷') {

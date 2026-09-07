@@ -28,6 +28,7 @@ internal static partial class LearningMarkupPatcher
                 distractors = question.Distractors,
                 explanation = question.Explanation,
                 activityPrompt = question.ActivityPrompt,
+                writtenArithmetic = question.WrittenArithmetic,
                 display = question.Display is null ? null : new
                 {
                     prompt = question.Display.Prompt,
