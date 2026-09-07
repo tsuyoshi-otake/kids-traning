@@ -8,6 +8,7 @@ internal static partial class LearningMarkupPatcher
     private static string PatchWrittenArithmetic(string markup)
     {
         markup = ReplaceRequired(markup, "\n  renderVals(){", BuildWrittenArithmeticMethodsScript() + "\n  renderVals(){", StringComparison.Ordinal);
+        markup = ReplaceRequired(markup, "press(d){if(this.state.input.length>=4)return;", "press(d){const q=this.state.screen==='quiz'&&this.state.session?this.cur():null,plan=q?this.writtenArithmeticPlan(q):null,decimal=plan?.steps[Number(this.state.waStep)||0]?.phase==='decimal-result';if(this.state.input.length>=(decimal?8:4))return;", StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
             "let isAddViz=false,addFrames=[],isMulViz=false,mulGroups=[],isMeasureViz=false,measureRows=[],isShapeViz=false,shapeStyle='',promptStyle='',isKokugo=false,isNotKokugo=false,kokuPre='',kokuWord='',kokuPost='',kokuMean='',kokuInstruction='',kokuShowMean=false,clockMarks=[],clockAskLabel='',showNumChoices=false,numChoiceTiles=[],showHsChoices=false,hsChoiceTiles=[],typeSlots=[],typeKana='',typeHint='',typeShowHint=false,typeShowBoard=false,typeKeyRows=[];",
@@ -58,6 +59,7 @@ internal static partial class LearningMarkupPatcher
     return null;
   }
   writtenPlaceName(column){const names=['一','十','百','千','万'];return(names[column]||String(Math.pow(10,column)))+'の位';}
+  writtenStepAnswerMatches(step,value){const text=String(value);return step.phase==='decimal-result'?/^\d+(?:\.\d+)?$/.test(text)&&Number(text)===Number(step.expect):text===String(step.expect);}
   writtenDecimalPlaces(value){const point=String(value).indexOf('.');return point<0?0:String(value).length-point-1;}
   writtenIntegerDigits(value){const digits=String(value).replace('.','').replace(/^0+(?=\d)/,'');return digits||'0';}
   writtenAddSubPlan(expression){

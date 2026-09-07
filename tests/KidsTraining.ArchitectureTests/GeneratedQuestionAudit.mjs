@@ -508,6 +508,11 @@ for (const sample of writtenCases.filter(sample => sample.name.includes('decimal
   Object.assign(app, { finishScoredQuestion: originals.finish, sfx: originals.sfx });
 }
 
+for(const [expected,answer,accepted] of [['27','27.0',true],['14.4','14.40',true],['1.2','1.20',true],['1.2','12',false],['1.2','1.2.0',false],['0.6','',false]]){
+  observe('written decimal products accept equivalent trailing zeroes only');
+  if(app.writtenStepAnswerMatches({phase:'decimal-result',expect:expected},answer)!==accepted) violated('written decimal products accept equivalent trailing zeroes only','decimal equivalence mismatch',`${expected}: ${answer}`);
+}
+
 {
   const flatten=value=>Array.isArray(value)?value.flatMap(flatten):value&&typeof value==='object'?[value,...flatten(value.children||[])]:[];
   for(const value of [0,5,7,10,23,99,105,999]){
