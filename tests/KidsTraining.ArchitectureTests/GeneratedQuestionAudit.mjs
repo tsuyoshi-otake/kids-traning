@@ -332,6 +332,21 @@ const writtenCases = [
   { name: 'decimal long division', question: { topic: 'kazu', difficulty: 4, prompt: '3.6÷0.9は？', answer: '4' }, kind: 'division', expects: ['36', '9', '4', '36', '0'] },
   { name: 'remainder long division', question: { topic: 'div', difficulty: 5, prompt: '157 ÷ 9', answer: '17 あまり 4' }, kind: 'division', expects: ['1', '9', '6', '67', '7', '63', '4'] },
 ];
+for (const [left, right, answer] of [[700,286,414],[802,467,335],[1000,1,999],[654,321,333],[52,18,34]]) {
+  const plan=app.writtenArithmeticPlan({topic:'hissan',writtenArithmetic:true,prompt:`${left} - ${right}`});
+  observe('subtraction regroups across zero without negative intermediate digits');
+  const result=Number(plan.steps.map(step=>step.writeDigit).reverse().join(''));
+  if(result!==answer) violated('subtraction regroups across zero without negative intermediate digits', 'wrong final subtraction', `${left}-${right}`);
+  for(const [index,step] of plan.steps.entries()) {
+    const recomposed=step.regrouped.reduce((sum,value,column)=>sum+value*10**column,0);
+    const view=app.writtenArithmeticView(plan,index);
+    if(recomposed!==left || step.regrouped.some(value=>value<0) || /-1から|−1から/.test(JSON.stringify(view))) violated('subtraction regroups across zero without negative intermediate digits','regrouping changed the number or exposed negative digits',JSON.stringify(view));
+    const resultLine=view.lines.find(line=>line.tone==='result').text.replace(/\s/g,'');
+    const expectedVisible=plan.steps.slice(0,index).map(item=>item.writeDigit).reverse().join('');
+    if(resultLine!==expectedVisible) violated('subtraction regroups across zero without negative intermediate digits','unfinished subtraction digit exposed',JSON.stringify(view));
+  }
+  if(left===700 && JSON.stringify(plan.steps[0].regrouped)!=='[10,9,6]') violated('subtraction regroups across zero without negative intermediate digits','700 was not decomposed into 6 hundreds, 9 tens and 10 ones',JSON.stringify(plan));
+}
 for (const sample of writtenCases) {
   observe('written arithmetic plans every required intermediate operation');
   const plan = app.writtenArithmeticPlan(sample.question);

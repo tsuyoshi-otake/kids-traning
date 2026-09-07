@@ -71,11 +71,20 @@ internal static partial class LearningMarkupPatcher
         steps.push({phase:'column',column:column,expect:String(total),writeDigit:String(digit),carry:carry,prompt:this.writtenPlaceName(column)+'：'+terms+' は？',explain:'この位をたして、答えを入力しよう。',completeText:terms+'＝'+total+(carry?'。'+digit+'を書いて、'+carry+'をくり上げる。':'。'+digit+'を書く。')});
       }
     }else{
-      let borrow=0;
+      const remaining=Array.from({length:width},(_,column)=>a[column]||0);
       for(let column=0;column<width;column++){
-        const original=a[column]||0,bv=b[column]||0,afterBorrow=original-borrow,needsBorrow=afterBorrow<bv,top=afterBorrow+(needsBorrow?10:0),digit=top-bv;
-        steps.push({phase:'column',column:column,expect:String(digit),writeDigit:String(digit),borrow:needsBorrow?1:0,prompt:this.writtenPlaceName(column)+'：'+(needsBorrow?(afterBorrow+'から'+bv+'は引けないので、10を借りて '+top+' − '+bv+' は？'):(afterBorrow+' − '+bv+' は？')),explain:needsBorrow?'左の位から1を借りると、この位には10が増えるよ。':'この位どうしを引こう。',completeText:(needsBorrow?('10を借りて '+top):String(afterBorrow))+' − '+bv+'＝'+digit+(needsBorrow?'。左の位は1減る。':'。')});
-        borrow=needsBorrow?1:0;
+        const bv=b[column]||0,moves=[];
+        if(remaining[column]<bv){
+          let source=column+1;while(source<width&&remaining[source]===0)source++;
+          if(source>=width)return null;
+          for(let place=source;place>column;place--){
+            const before=remaining[place],nextBefore=remaining[place-1];remaining[place]--;remaining[place-1]+=10;
+            moves.push({from:place,to:place-1,before:before,after:remaining[place],nextBefore:nextBefore,nextAfter:remaining[place-1]});
+          }
+        }
+        const top=remaining[column],digit=top-bv;
+        const regroup=moves.map(move=>this.writtenPlaceName(move.from)+'の1を'+this.writtenPlaceName(move.to)+'の10に分ける').join('。');
+        steps.push({phase:'column',column:column,expect:String(digit),writeDigit:String(digit),regroupMoves:moves,regrouped:remaining.slice(),prompt:(regroup?regroup+'。':'')+this.writtenPlaceName(column)+'：'+top+' − '+bv+' は？',explain:moves.length?'左の0でない位から順に分け直すよ。全体の数は変わらない。':'分け直した数から、この位の数を引こう。',completeText:top+' − '+bv+'＝'+digit+'。'});
       }
     }
     return{kind:op==='+'?'addition':'subtraction',op:op,left:left,right:right,width:width,steps:steps,note:'右の位から、一つずつ計算します。',aria:left+(op==='+'?' たす ':' ひく ')+right+'の筆算。まだ答えていない位は空欄です。'};
@@ -147,6 +156,11 @@ internal static partial class LearningMarkupPatcher
       lines.push({text:(plan.op==='+'?'＋':'−')+' '+pad(plan.right,width),tone:'number'});
       lines.push({text:'─'.repeat(width+2),tone:'rule'});
       lines.push({text:'  '+result.reverse().join(''),tone:'result'});
+      if(plan.kind==='subtraction'){
+        const visible=active||done.at(-1),moves=visible?.regroupMoves||[];
+        for(const move of moves)lines.push({text:this.writtenPlaceName(move.from)+' '+move.before+'̶→'+move.after+'　'+this.writtenPlaceName(move.to)+' '+move.nextBefore+'̶→'+move.nextAfter,tone:'caption'});
+        if(visible&&plan.steps.slice(0,Math.min(completed+1,plan.steps.length)).some(step=>step.regroupMoves?.length))lines.push({text:'分け直した数：'+visible.regrouped.map((value,column)=>this.writtenPlaceName(column)+' '+value).reverse().join('・'),tone:'caption'});
+      }
     }else if(plan.kind==='multiplication'){
       const readyLeft=!plan.left.includes('.')||doneHas('prepare','left'),readyRight=!plan.right.includes('.')||doneHas('prepare','right'),width=plan.width;
       if(plan.decimalPlaces)lines.push({text:'もとの式　'+plan.left+' × '+plan.right,tone:'caption'});
