@@ -47,12 +47,10 @@ internal sealed class UpdateService
             }
 
             var asset = release.Assets.FirstOrDefault(static candidate =>
-                string.Equals(candidate.Name, InstallerAssetName, StringComparison.OrdinalIgnoreCase)) ??
-                release.Assets.FirstOrDefault(static candidate =>
-                    candidate.Name.EndsWith(".msi", StringComparison.OrdinalIgnoreCase));
+                string.Equals(candidate.Name, InstallerAssetName, StringComparison.OrdinalIgnoreCase));
             if (asset is null || string.IsNullOrWhiteSpace(asset.DownloadUrl))
             {
-                return UpdateCheckResult.Failed($"Release {release.TagName} has no MSI asset.");
+                return UpdateCheckResult.Failed($"Release {release.TagName} has no usable {InstallerAssetName} asset.");
             }
 
             await updateInstaller.StartAsync(asset, releaseVersion, cancellationToken).ConfigureAwait(true);

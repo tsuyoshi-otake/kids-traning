@@ -1659,11 +1659,24 @@ internal static class Program
         releaseClient.Release = new ReleaseInfo("v2.0.0", false, false, []);
         Assert(Check(service).Status == UpdateCheckStatus.Failed, "missing MSI did not fail");
         releaseClient.Release = new ReleaseInfo(
+            "v2.0.0", false, false,
+            [new ReleaseAsset("OtherProduct.msi", "https://example.invalid/OtherProduct.msi")]);
+        Assert(Check(service).Status == UpdateCheckStatus.Failed && installer.StartCount == 0,
+            "an unrelated MSI was selected when KidsTraining.msi was missing");
+        releaseClient.Release = new ReleaseInfo(
+            "v2.0.0", false, false,
+            [new ReleaseAsset("KidsTraining.msi", " "),
+             new ReleaseAsset("OtherProduct.msi", "https://example.invalid/OtherProduct.msi")]);
+        Assert(Check(service).Status == UpdateCheckStatus.Failed && installer.StartCount == 0,
+            "an unusable official asset did not fail without starting an installer");
+        releaseClient.Release = new ReleaseInfo(
             "v2.0.0",
             false,
             false,
-            [new ReleaseAsset("KidsTraining.msi", "https://example.invalid/KidsTraining.msi")]);
+            [new ReleaseAsset("OtherProduct.msi", "https://example.invalid/OtherProduct.msi"),
+             new ReleaseAsset("KidsTraining.msi", "https://example.invalid/KidsTraining.msi")]);
         Assert(Check(service).Status == UpdateCheckStatus.UpdateStarted && installer.StartCount == 1, "valid update did not start exactly once");
+        Assert(installer.LastAsset?.Name == "KidsTraining.msi", "the official installer was not selected");
     }
 
     private static void TestSingleInstanceCoordinator()
@@ -2026,12 +2039,15 @@ internal static class Program
     {
         public int StartCount { get; private set; }
 
+        public ReleaseAsset? LastAsset { get; private set; }
+
         public Task StartAsync(
             ReleaseAsset asset,
             Version releaseVersion,
             CancellationToken cancellationToken)
         {
             StartCount++;
+            LastAsset = asset;
             return Task.CompletedTask;
         }
     }
