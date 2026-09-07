@@ -508,6 +508,65 @@ for (const sample of writtenCases.filter(sample => sample.name.includes('decimal
   Object.assign(app, { finishScoredQuestion: originals.finish, sfx: originals.sfx });
 }
 
+{
+  const flatten=value=>Array.isArray(value)?value.flatMap(flatten):value&&typeof value==='object'?[value,...flatten(value.children||[])]:[];
+  for(const value of [0,5,7,10,23,99,105,999]){
+    observe('soroban represents place value with one five-bead and four one-beads');
+    const digits=app.sorobanDigits(value);
+    if(app.sorobanNumber(digits)!==value) violated('soroban represents place value with one five-bead and four one-beads','round trip changed value',String(value));
+    const q={mode:'num',soroban:{kind:'read',initial:value,steps:[]}};
+    const buttons=flatten(app.sorobanView(q)).filter(node=>node.props?.className==='kt-soroban-bead');
+    if(buttons.length!==15 || buttons.filter(node=>node.props['aria-label'].includes('五珠')).length!==3 || buttons.some(node=>!node.props.disabled)) violated('soroban represents place value with one five-bead and four one-beads','wrong bead geometry or readable board was editable',String(value));
+    for(let column=0;column<3;column++){
+      const rod=buttons.slice(column*5,column*5+5),shown=(rod[0].props['aria-pressed']?5:0)+rod.slice(1).filter(node=>node.props['aria-pressed']).length;
+      if(shown!==digits[column]) violated('soroban represents place value with one five-bead and four one-beads','rendered beads changed digit',`${value} column${column}`);
+    }
+  }
+  const originals={finish:app.finishScoredQuestion,exhaust:app.exhaustQuestion,sfx:app.sfx};
+  for(let index=0;index<15;index++){
+    const q=app.sorobanQuestion(index),s=q.soroban,addition=q.prompt.match(/で (\d+)に(\d+)を/),subtraction=q.prompt.match(/で (\d+)から(\d+)を/);
+    const expected=addition?Number(addition[1])+Number(addition[2]):subtraction?Number(subtraction[1])-Number(subtraction[2]):s.kind==='read'?s.initial:Number(q.prompt.match(/^\d+/)[0]);
+    observe('soroban authored operations reach their arithmetic result');
+    if(expected!==Number(q.answer)||(s.steps.length&&s.steps.at(-1).target!==expected)) violated('soroban authored operations reach their arithmetic result','plan and arithmetic differ',JSON.stringify(q));
+  }
+  let finished=0,exhausted=0;
+  app.sfx=()=>{};
+  app.finishScoredQuestion=()=>{finished++;app._terminalQuestionToken=app.currentQuestionToken();};
+  app.exhaustQuestion=()=>{exhausted++;app._terminalQuestionToken=app.currentQuestionToken();};
+  const begin=index=>{const q=app.sorobanQuestion(index);app.state={...app.freshQ(),screen:'quiz',session:{attempt:index,idx:0,questions:[q],rolePlan:['soroban']}};return q;};
+  begin(11);app.submitSoroban();
+  observe('soroban operations require bead movement and finalize exactly once');
+  if(finished||app.state.sbMiss||app._answerBusy) violated('soroban operations require bead movement and finalize exactly once','untouched board was scored',JSON.stringify(app.state));
+  app.moveSorobanBead(2,4);app.submitSoroban();app.submitSoroban();
+  if(finished!==1||app.sorobanNumber(app.state.sbBoard)!==9) violated('soroban operations require bead movement and finalize exactly once','6+3 failed or scored twice',JSON.stringify(app.state));
+  const subtraction=begin(12);
+  app.moveSorobanBead(2,0);app.moveSorobanBead(2,3);
+  const originalSetState=app.setState;let renderedDisabled=false;
+  app.setState=function(patch,callback){originalSetState.call(this,patch,()=>{renderedDisabled=flatten(this.sorobanView(subtraction)).filter(node=>node.props?.className==='kt-soroban-bead').some(node=>node.props.disabled);callback?.();});};
+  app.submitSoroban();app.setState=originalSetState;
+  if(renderedDisabled) violated('soroban operations require bead movement and finalize exactly once','intermediate render disabled all beads before callback released the guard',JSON.stringify(app.state));
+  if(finished!==1||app.state.sbStep!==1||app.sorobanNumber(app.state.sbBoard)!==18) violated('soroban operations require bead movement and finalize exactly once','complement step did not preserve 18',JSON.stringify(app.state));
+  const snapshot={...app.state};
+  if(!app.validSorobanCheckpoint(subtraction,snapshot)||app.validSorobanCheckpoint(subtraction,{...snapshot,sbBoard:[0,1,10]})||app.validSorobanCheckpoint(subtraction,{...snapshot,sbStep:2})||app.validSorobanCheckpoint(subtraction,{...snapshot,sbMiss:'bad'})) violated('soroban operations require bead movement and finalize exactly once','checkpoint accepts invalid board or step',JSON.stringify(snapshot));
+  app.moveSorobanBead(1,1);app.submitSoroban();app.submitSoroban();
+  if(finished!==2||app.sorobanNumber(app.state.sbBoard)!==8||app._answerBusy) violated('soroban operations require bead movement and finalize exactly once','12-4 failed or scored twice',JSON.stringify(app.state));
+  const terminalBoard=JSON.stringify(app.state.sbBoard);app.moveSorobanBead(2,0);
+  if(JSON.stringify(app.state.sbBoard)!==terminalBoard) violated('soroban operations require bead movement and finalize exactly once','terminal board remained editable',JSON.stringify(app.state));
+  begin(11);app.moveSorobanBead(2,1);app.submitSoroban();app.submitSoroban();app.submitSoroban();
+  if(exhausted!==1||app._answerBusy) violated('soroban operations require bead movement and finalize exactly once','third miss did not finalize once',JSON.stringify(app.state));
+  begin(12);app.moveSorobanBead(2,0);app.submitSoroban();app.resetSoroban();
+  if(app.sorobanNumber(app.state.sbBoard)!==12||app.state.sbStep!==0||app.state.sbMiss!==1||app.state.sbMoved) violated('soroban operations require bead movement and finalize exactly once','reset lost mistakes or failed to reset work',JSON.stringify(app.state));
+  Object.assign(app,{finishScoredQuestion:originals.finish,exhaustQuestion:originals.exhaust,sfx:originals.sfx});
+  const priorStorage=globalThis.localStorage,originalProfile=app.curP,originalValid=app.validLearningCheckpoint,storage=new Map();
+  globalThis.localStorage={getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,String(value)),removeItem:key=>storage.delete(key)};
+  app.curP=()=>({name:'soroban-audit'});app.state=snapshot;
+  const checkpoint=app.checkpointState();storage.set(app.learningCheckpointKey(),JSON.stringify(checkpoint));app.state={};app.validLearningCheckpoint=value=>app.validSorobanCheckpoint(subtraction,value);
+  observe('soroban checkpoint resumes the exact complement operation');
+  if(!app.restoreLearningCheckpoint()||app.sorobanNumber(app.state.sbBoard)!==18||app.state.sbStep!==1||app.state.sbMoved!==false) violated('soroban checkpoint resumes the exact complement operation','saved operation changed on restore',JSON.stringify(app.state));
+  app.curP=originalProfile;app.validLearningCheckpoint=originalValid;
+  if(priorStorage===undefined)delete globalThis.localStorage;else globalThis.localStorage=priorStorage;
+}
+
 // A paused exercise must reopen on the same intermediate operation, with the same assisted
 // choices and error accounting. The checkpoint stores state, never a second copy of the plan.
 {
