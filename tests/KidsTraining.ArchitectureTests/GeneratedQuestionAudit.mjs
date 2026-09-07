@@ -125,6 +125,9 @@ assertFurigana('一人', 'ひとり');
 assertFurigana('担当', 'たんとう');
 assertFurigana('学校', 'がっこう');
 assertFurigana('記録', 'きろく');
+assertFurigana('受賞', 'じゅしょう');
+assertFurigana('仲間', 'なかま');
+assertFurigana('落選', 'らくせん');
 
 for (const [weekday, reading] of [
   ['月曜日', 'げつようび'],
