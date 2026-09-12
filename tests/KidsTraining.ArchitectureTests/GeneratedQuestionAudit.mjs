@@ -13,6 +13,7 @@
 // combinations, and a different seed to confirm a clean sweep was not luck.
 
 import { readFileSync } from 'node:fs';
+import { auditThinkingQuestions } from './ThinkingQuestionAudit.mjs';
 
 const runtimePagePath = process.argv[2];
 if (!runtimePagePath) {
@@ -630,8 +631,8 @@ if (!shouldAppendNumericQuestionMark({ mode: 'num', topic: 'add', prompt: '12 + 
 const TOPICS = [
   'add', 'sub', 'hissan', 'mul', 'clock', 'kokugo', 'moji', 'measure', 'kazu', 'shape',
   'div', 'frac', 'chart', 'story', 'bun', 'goi', 'dokkai', 'eigo', 'money', 'groups',
-  'order', 'soroban', 'seikatsu', 'shakai', 'rika', 'kateika', 'gijutsu', 'doutoku', 'jouhou', 'sougou',
-  'tokubetsu', 'keyboard', 'thinking',
+  'order', 'soroban', 'seikatsu', 'shakai', 'rika', 'gijutsu', 'jouhou', 'sougou',
+  'keyboard', 'thinking',
 ];
 const STAGES = [1, 2, 3, 4, 5];
 const SAMPLES_PER_COMBINATION = Math.max(1, Number(process.argv[3]) || 300);
@@ -724,6 +725,7 @@ const TWO_TERM_ADDITION = /^\s*(\d+)\s*[+＋]\s*(\d+)\s*$/;
 
 let generated = 0;
 const UNITS = app.curriculumCatalog();
+auditThinkingQuestions(app, observe, violated);
 observe('common IME romaji spellings are equivalent', 10);
 for (const [standard, ime] of [['shi', 'si'], ['chi', 'ti'], ['tsu', 'tu'], ['fu', 'hu'], ['sha', 'sya'], ['cha', 'tya'], ['ja', 'zya']]) {
   if (!app.romajiInputEquivalent(standard, ime)) {
@@ -1651,15 +1653,16 @@ if (!thinkingGradeOne) {
 
   const crossSessionProfile = beginnerAtGrade(1);
   const crossSessionPrompts = [];
-  for (let index = 0; index < 6; index += 1) {
+  const reasoningPoolSize = app.curriculumBankPool(thinkingGradeOne, 1).length;
+  for (let index = 0; index < reasoningPoolSize; index += 1) {
     crossSessionPrompts.push(app.generateSessionQuestion(crossSessionProfile, reasoningSession(), 'target').prompt);
   }
   const recycledPrompt = app.generateSessionQuestion(crossSessionProfile, reasoningSession(), 'target').prompt;
   const recentFingerprints = crossSessionProfile.unitStats[thinkingGradeOne.id].recentQuestionFingerprints;
   if (
-    new Set(crossSessionPrompts).size !== 6 ||
+    new Set(crossSessionPrompts).size !== reasoningPoolSize ||
     recycledPrompt !== crossSessionPrompts[0] ||
-    recentFingerprints.length !== 6
+    recentFingerprints.length !== reasoningPoolSize
   ) {
     violated(
       'reasoning questions rotate across sessions and stay balanced at the 30-question limit',
@@ -1679,7 +1682,7 @@ if (!thinkingGradeOne) {
   const adjacentDuplicate = maxSessionPrompts.some((prompt, index) => index > 0 && prompt === maxSessionPrompts[index - 1]);
   const counts = [...promptCounts.values()];
   if (
-    promptCounts.size !== 6 ||
+    promptCounts.size !== reasoningPoolSize ||
     adjacentDuplicate ||
     Math.max(...counts) - Math.min(...counts) > 1
   ) {

@@ -38,7 +38,6 @@ internal static partial class CurriculumPolicy
     private const string SocialSource = "https://www.mext.go.jp/content/20230308-mxt_kyoiku02-100002607_003.pdf";
     private const string ScienceSource = "https://www.mext.go.jp/content/20211020-mxt_kyoiku02-100002607_05.pdf";
     private const string EnglishSource = "https://www.mext.go.jp/content/20220614-mxt_kyoiku02-100002607_11.pdf";
-    private const string HomeEconomicsSource = "https://www.mext.go.jp/content/20240918-mxt_kyoiku01-100002607_02.pdf";
     private const string GeneralSource = "https://www.mext.go.jp/a_menu/shotou/new-cs/1384661.htm";
     private const string MiddleJapaneseSource = "https://www.mext.go.jp/component/a_menu/education/micro_detail/__icsFiles/afieldfile/2019/03/18/1387018_002.pdf";
     private const string MiddleMathematicsSource = "https://www.mext.go.jp/component/a_menu/education/micro_detail/__icsFiles/afieldfile/2019/03/18/1387018_004.pdf";
@@ -52,7 +51,7 @@ internal static partial class CurriculumPolicy
     [
         "add", "sub", "mul", "clock", "kokugo", "hissan", "moji", "measure", "kazu", "shape", "div",
         "frac", "chart", "story", "bun", "goi", "dokkai", "eigo", "money", "groups", "order", "keyboard",
-        "soroban", "seikatsu", "shakai", "rika", "kateika", "gijutsu", "doutoku", "sougou", "jouhou", "tokubetsu", "thinking"
+        "soroban", "seikatsu", "shakai", "rika", "gijutsu", "sougou", "jouhou", "thinking"
     ];
 
     private static readonly IReadOnlyList<CurriculumUnit> Units = BuildUnits();
@@ -154,17 +153,13 @@ internal static partial class CurriculumPolicy
         AddLegacyLane("math", 1, MathematicsSource, "kazu", "shape", "add", "sub", "clock", "measure", "story", "money", "groups", "chart");
         AddLegacyLane("japanese", 1, JapaneseSource, "moji", "bun", "kokugo", "goi", "dokkai");
         AddLegacyLane("life", 1, GeneralSource, "seikatsu");
-        AddLegacyLane("moral", 1, GeneralSource, "doutoku");
         AddLegacyLane("information", 1, GeneralSource, "jouhou");
-        AddLegacyLane("special-activities", 1, GeneralSource, "tokubetsu");
         AddLegacyLane("keyboard", 1, GeneralSource, "keyboard");
 
         AddLegacyLane("math", 2, MathematicsSource, "chart", "clock", "add", "sub", "measure", "hissan", "story", "kazu", "money", "order", "groups", "mul", "shape", "frac");
         AddLegacyLane("japanese", 2, JapaneseSource, "kokugo", "bun", "goi", "dokkai", "moji");
         AddLegacyLane("life", 2, GeneralSource, "seikatsu");
-        AddLegacyLane("moral", 2, GeneralSource, "doutoku");
         AddLegacyLane("information", 2, GeneralSource, "jouhou");
-        AddLegacyLane("special-activities", 2, GeneralSource, "tokubetsu");
         AddLegacyLane("keyboard", 2, GeneralSource, "keyboard");
 
         AddLegacyLane("math", 3, MathematicsSource, "mul", "div", "shape", "hissan", "kazu", "soroban", "add", "sub", "clock", "measure", "story", "order", "chart", "frac", "money", "groups");
@@ -172,10 +167,8 @@ internal static partial class CurriculumPolicy
         AddLegacyLane("social", 3, SocialSource, "shakai");
         AddLegacyLane("science", 3, ScienceSource, "rika");
         AddLegacyLane("english", 3, EnglishSource, "eigo");
-        AddLegacyLane("moral", 3, GeneralSource, "doutoku");
         AddLegacyLane("information", 3, GeneralSource, "jouhou");
         AddLegacyLane("integrated", 3, GeneralSource, "sougou");
-        AddLegacyLane("special-activities", 3, GeneralSource, "tokubetsu");
         AddLegacyLane("keyboard", 3, GeneralSource, "keyboard");
 
         AddThinkingUnits(AddBank);
@@ -196,7 +189,6 @@ internal static partial class CurriculumPolicy
         AddUpperScience(addBank);
         AddUpperSocial(addBank);
         AddUpperEnglish(addBank);
-        AddHomeEconomics(addBank);
         AddUpperActivities(addBank);
     }
 
@@ -423,12 +415,9 @@ internal static partial class CurriculumPolicy
         "seikatsu" => "生活",
         "shakai" => "社会",
         "rika" => "理科",
-        "kateika" => "家庭科",
         "gijutsu" => "技術",
-        "doutoku" => "道徳",
         "sougou" => "総合",
         "jouhou" => "情報",
-        "tokubetsu" => "特別活動",
         "thinking" => "思考トレーニング",
         _ => topic
     };
@@ -443,7 +432,6 @@ internal static partial class CurriculumPolicy
 
     private static partial void AddUpperEnglish(Action<string, string, int, string, string, string, CurriculumQuestion[]> add);
 
-    private static partial void AddHomeEconomics(Action<string, string, int, string, string, string, CurriculumQuestion[]> add);
 
     private static partial void AddUpperActivities(Action<string, string, int, string, string, string, CurriculumQuestion[]> add);
 

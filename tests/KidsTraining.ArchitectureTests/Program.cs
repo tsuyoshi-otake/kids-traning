@@ -351,18 +351,18 @@ internal static class Program
             .OrderBy(static unit => unit.Grade)
             .ToArray();
         Assert(
-            thinkingUnits.Length == 3 &&
-            thinkingUnits.Select(static unit => unit.Grade).SequenceEqual([1, 2, 3]) &&
+            thinkingUnits.Length == 6 &&
+            thinkingUnits.Select(static unit => unit.Grade).SequenceEqual([1, 2, 3, 4, 5, 6]) &&
             thinkingUnits.All(static unit => unit.SubjectId == "thinking" && unit.GeneratorKey == "curriculum-bank" && unit.Questions.Count > 0),
-            "the grade 1-3 reasoning practice category is incomplete");
+            "the grade 1-6 reasoning practice category is incomplete");
         Assert(
             thinkingUnits.All(static unit => Enumerable.Range(1, 5).All(stage =>
             {
                 var stageQuestions = unit.Questions.Where(question => question.Stage == stage).ToArray();
-                return stageQuestions.Length >= 6 &&
+                return stageQuestions.Length >= 24 &&
                        stageQuestions.Select(static question => question.Prompt).Distinct(StringComparer.Ordinal).Count() == stageQuestions.Length;
             })),
-            "the reasoning practice category does not provide six distinct prompts at every difficulty stage");
+            "the reasoning practice category does not provide 24 distinct prompts at every difficulty stage");
         Assert(
             Enumerable.Range(1, 9).All(grade => units.Any(unit => unit.Grade == grade)),
             "one or more grades from elementary 1 through junior-high 3 have no curriculum units");
@@ -409,11 +409,10 @@ internal static class Program
             units.Any(static unit => unit.Grade == 6 && unit.SubjectId == "japanese") &&
             units.Any(static unit => unit.Grade == 6 && unit.SubjectId == "science") &&
             units.Any(static unit => unit.Grade == 6 && unit.SubjectId == "social") &&
-            units.Any(static unit => unit.Grade == 6 && unit.SubjectId == "english") &&
-            units.Any(static unit => unit.Grade == 6 && unit.SubjectId == "home-economics"),
+            units.Any(static unit => unit.Grade == 6 && unit.SubjectId == "english"),
             "the grade 4-6 core curriculum is incomplete");
         Assert(
-            new[] { "math", "japanese", "science", "social", "english", "technology", "home-economics", "moral", "integrated", "information", "special-activities" }
+            new[] { "math", "japanese", "science", "social", "english", "technology", "integrated", "information" }
                 .All(subject => Enumerable.Range(7, 3).All(grade => units.Any(unit => unit.Grade == grade && unit.SubjectId == subject))),
             "the junior-high grade 1-3 curriculum is incomplete");
         Assert(
@@ -421,6 +420,10 @@ internal static class Program
             !CurriculumPolicy.AllTopics.Contains("taiiku", StringComparer.Ordinal) &&
             !CurriculumPolicy.AllTopics.Contains("zukou", StringComparer.Ordinal),
             "an explicitly excluded subject entered the curriculum");
+        var removedTopics = new[] { "kateika", "doutoku", "tokubetsu" };
+        Assert(removedTopics.All(topic => !CurriculumPolicy.AllTopics.Contains(topic) &&
+            Enumerable.Range(1, 9).All(grade => !CurriculumPolicy.IsAvailable(grade, topic))) &&
+            units.All(unit => !removedTopics.Contains(unit.TopicId)), "retired topics remain selectable or gate progression");
         var alignment = File.ReadAllText(Path.Combine(repositoryRoot, "docs", "curriculum-alignment.md"));
         Assert(
             units.All(unit => alignment.Contains($"`{unit.Id}`", StringComparison.Ordinal)),
@@ -884,8 +887,8 @@ internal static class Program
             "a reset profile loses its selected grade on the next launch");
         Assert(
             html.Contains("profiles=this.migrateProfiles([normalizeProfile(savedProfile)])", StringComparison.Ordinal) &&
-            html.Contains("topics:{...def.topics,...storedTopics}", StringComparison.Ordinal),
-            "the runtime migration does not retain one profile or merge newly introduced topics");
+            html.Contains("topics:Object.fromEntries(Object.keys(def.topics).map(key=>[key,storedTopics[key]!==false]))", StringComparison.Ordinal),
+            "the runtime migration does not retain one profile or normalize enabled and retired topics");
         Assert(
             html.Contains("numberOrDefault(host.questionCount", StringComparison.Ordinal) &&
             html.Contains("numberOrDefault(host.passLine", StringComparison.Ordinal) &&

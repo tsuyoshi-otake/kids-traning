@@ -4,6 +4,8 @@
 
 登録学校学年は保護者向けの表示・記録属性であり、出題上限ではない。通常モードは登録学年にかかわらず小学1年から開始し、「登録学年の単元を優先する」をONにした場合だけ登録学年から開始する。どちらのモードでも教科別の順序を保ちながら、現在学年の有効な全単元が難易度5を合格して定着確認へ入るまで次学年を解放しない。無効な単元は完了条件から除外し、上位学年の履歴や保存セッションは進級ゲートを迂回できない。1日・3日・7日後の定着確認は、すでに解放された同一学年内の学習を妨げない。
 
+特別活動・家庭科（中学校の家庭分野を含む）・道徳は全学年で出題・選択設定・進級条件から除外する。過去の履歴と獲得済みXP・星は保持する。削除科目を含む保存セッションは再開せず開始画面へ戻す。
+
 ## 根拠資料
 
 - [学習指導要領・解説一覧](https://www.mext.go.jp/a_menu/shotou/new-cs/1384661.htm)
@@ -29,16 +31,16 @@
 |---|---|---|---|
 | 1 | 算数 | `math.g1.kazu`, `math.g1.shape`, `math.g1.add`, `math.g1.sub`, `math.g1.clock`, `math.g1.measure`, `math.g1.story`, `math.g1.money`, `math.g1.groups`, `math.g1.chart` | 自動採点 |
 | 1 | 国語 | `japanese.g1.moji`, `japanese.g1.bun`, `japanese.g1.kokugo`, `japanese.g1.goi`, `japanese.g1.dokkai` | 自動採点 |
-| 1 | 生活・道徳・情報・特別活動・キーボード | `life.g1.seikatsu`, `moral.g1.doutoku`, `information.g1.jouhou`, `special-activities.g1.tokubetsu`, `keyboard.g1.keyboard` | 自動採点＋既存活動 |
+| 1 | 生活・情報・キーボード | `life.g1.seikatsu`, `information.g1.jouhou`, `keyboard.g1.keyboard` | 自動採点＋既存活動 |
 | 1 | 思考トレーニング | `thinking.g1.patterns-and-logic` | 自動採点 |
 | 2 | 算数 | `math.g2.chart`, `math.g2.clock`, `math.g2.add`, `math.g2.sub`, `math.g2.measure`, `math.g2.hissan`, `math.g2.story`, `math.g2.kazu`, `math.g2.money`, `math.g2.order`, `math.g2.groups`, `math.g2.mul`, `math.g2.shape`, `math.g2.frac` | 自動採点 |
 | 2 | 国語 | `japanese.g2.kokugo`, `japanese.g2.bun`, `japanese.g2.goi`, `japanese.g2.dokkai`, `japanese.g2.moji` | 自動採点 |
-| 2 | 生活・道徳・情報・特別活動・キーボード | `life.g2.seikatsu`, `moral.g2.doutoku`, `information.g2.jouhou`, `special-activities.g2.tokubetsu`, `keyboard.g2.keyboard` | 自動採点＋既存活動 |
+| 2 | 生活・情報・キーボード | `life.g2.seikatsu`, `information.g2.jouhou`, `keyboard.g2.keyboard` | 自動採点＋既存活動 |
 | 2 | 思考トレーニング | `thinking.g2.patterns-and-space` | 自動採点 |
 | 3 | 算数 | `math.g3.mul`, `math.g3.div`, `math.g3.shape`, `math.g3.hissan`, `math.g3.kazu`, `math.g3.soroban`, `math.g3.add`, `math.g3.sub`, `math.g3.clock`, `math.g3.measure`, `math.g3.story`, `math.g3.order`, `math.g3.chart`, `math.g3.frac`, `math.g3.money`, `math.g3.groups` | 自動採点 |
 | 3 | 国語 | `japanese.g3.kokugo`, `japanese.g3.bun`, `japanese.g3.goi`, `japanese.g3.dokkai`, `japanese.g3.moji` | 自動採点 |
 | 3 | 社会・理科・外国語 | `social.g3.shakai`, `science.g3.rika`, `english.g3.eigo` | 自動採点＋活動カード |
-| 3 | 道徳・情報・総合・特別活動・キーボード | `moral.g3.doutoku`, `information.g3.jouhou`, `integrated.g3.sougou`, `special-activities.g3.tokubetsu`, `keyboard.g3.keyboard` | 自動採点＋活動カード |
+| 3 | 情報・総合・キーボード | `information.g3.jouhou`, `integrated.g3.sougou`, `keyboard.g3.keyboard` | 自動採点＋活動カード |
 | 3 | 思考トレーニング | `thinking.g3.logic-and-strategy` | 自動採点 |
 
 ### 九九・かけ算とひっ算
@@ -95,18 +97,26 @@
 | 4 | 外国語活動 | `english.g4.listen-speak` | 聞く・話す | 問題＋会話活動 | 外国語編 |
 | 5 | 外国語 | `english.g5.five-domains-foundation` | 五領域の基礎 | 問題＋会話活動 | 外国語編 |
 | 6 | 外国語 | `english.g6.five-domains-integration` | 五領域の活用 | 問題＋会話活動 | 外国語編 |
-| 5 | 家庭科 | `home-economics.g5.family-food` | 家族・生活時間・調理・食品安全 | 問題＋活動 | 家庭編 |
-| 5 | 家庭科 | `home-economics.g5.sewing-cleaning` | 裁縫・清掃・整理 | 問題＋活動 | 家庭編 |
-| 6 | 家庭科 | `home-economics.g6.meal-clothing-housing` | 献立・衣食住の選択 | 問題＋活動 | 家庭編 |
-| 6 | 家庭科 | `home-economics.g6.consumer-environment` | 買い物・消費者・環境 | 問題＋活動 | 家庭編 |
-| 4～6 | 道徳 | `moral.g4.values-dialogue`, `moral.g5.values-dialogue`, `moral.g6.values-dialogue` | 学年帯の内容項目、多面的な対話 | 問題＋振り返り | 解説一覧 |
 | 4～6 | 総合 | `integrated.g4.inquiry-cycle`, `integrated.g5.inquiry-cycle`, `integrated.g6.inquiry-cycle` | 課題設定・収集・整理・表現・振り返り | 問題＋活動 | 解説一覧 |
 | 4～6 | 情報 | `information.g4.information-programming`, `information.g5.information-programming`, `information.g6.information-programming` | 出典・著作権・個人情報・データ・プログラミング | 問題＋活動 | 解説一覧 |
-| 4～6 | 特別活動 | `special-activities.g4.school-role-career`, `special-activities.g5.school-role-career`, `special-activities.g6.school-role-career` | 学校生活・役割・キャリア | 問題＋振り返り | 解説一覧 |
+
+## 思考トレーニング（小学1～6年）
+
+各学年に5段階、各段階に6種類×4問＝24問、合計720問を用意する。既存の小学1～3年の単元IDは維持し、小学4～6年を追加する。
+
+| 学年 | 教科 | 単元ID | 内容 |
+|---|---|---|---|
+| 4 | 思考トレーニング | `thinking.g4.constraints-and-planning` | 条件整理・逆算・予算・作業順序・必勝手 |
+| 5 | 思考トレーニング | `thinking.g5.evidence-and-combinations` | 複数条件・組合せの限定・同時進行の計画 |
+| 6 | 思考トレーニング | `thinking.g6.deduction-and-strategy` | 情報不足の判断・多段階の逆算・最適化・相手の全応手を考える戦略 |
+
+6種類は「ならびの推理」「わりあての推理」「うしろから考える」「道すじをたどる」「組合せをしぼる」「かならずを考える」。低学年は具体物と小さな数で考え、角度・文字式・抽象的な集合の知識を前提としない。高学年には予算の上限、同時進行できる作業と待つ作業、石取りの作戦を含める。「きめられない」を不正解の埋め草にせず、情報不足の問題では正解にし、解説で異なる2通りを示す。
+
+解説は途中の手順と確かめ方を示す。テストは表示された問題文から条件を読み取り、並べ方・割当て・全組合せ・ゲームの全応手を別実装で検証する。問題数だけで教育効果を保証するものではない。
 
 ## 中学校1～3年の追加単元
 
-内部学年は小1～小6を1～6、中1～中3を7～9として連続的に表す。社会は学校ごとの履修順の違いに対応するため、アプリ内の標準順を「中1：地理基礎・古代中世、中2：日本の諸地域・近世近代、中3：現代史・公民」とする。技術・家庭も3年間を基礎・発展・統合の順に並べる。実験、発音、製作、調理、協働は知識問題に活動カードと振り返りを組み合わせる。
+内部学年は小1～小6を1～6、中1～中3を7～9として連続的に表す。社会は学校ごとの履修順の違いに対応するため、アプリ内の標準順を「中1：地理基礎・古代中世、中2：日本の諸地域・近世近代、中3：現代史・公民」とする。技術も3年間を基礎・発展・統合の順に並べる。実験、発音、製作、調理、協働は知識問題に活動カードと振り返りを組み合わせる。
 
 | 学年 | 教科 | 単元ID（教科レーン内の順序） | 内容 | 形式・評価 | 根拠 |
 |---|---|---|---|---|---|
@@ -124,11 +134,8 @@
 | 中3 | 社会 | `social.g9.contemporary-history`, `social.g9.civics` | 現代史、憲法・政治・経済・国際 | 問題・自動 | 中学校 社会編 |
 | 中1～3 | 外国語 | `english.g7.five-domains-foundation`, `english.g8.five-domains-development`, `english.g9.five-domains-integration` | 聞く・読む・話す（やり取り／発表）・書く | 問題＋会話活動 | 中学校 外国語編 |
 | 中1～3 | 技術 | `technology.g7.materials-biological-foundation`, `technology.g8.energy-information`, `technology.g9.integrated-problem-solving` | 材料・生物育成、エネルギー・情報、統合的問題解決 | 問題＋製作活動 | 中学校 技術・家庭編 |
-| 中1～3 | 家庭 | `home-economics.g7.family-food-foundation`, `home-economics.g8.clothing-housing-consumer`, `home-economics.g9.sustainable-family-project` | 家族・食、衣住・消費、持続可能な生活設計 | 問題＋実生活活動 | 中学校 技術・家庭編 |
-| 中1～3 | 道徳 | `moral.g7.values-dialogue`, `moral.g8.values-dialogue`, `moral.g9.values-dialogue` | 多面的・多角的な判断と対話 | 問題＋振り返り | 中学校 解説一覧 |
 | 中1～3 | 総合 | `integrated.g7.inquiry-project`, `integrated.g8.inquiry-project`, `integrated.g9.inquiry-project` | 課題設定・調査・協働・表現・評価 | 問題＋探究活動 | 中学校 解説一覧 |
 | 中1～3 | 情報 | `information.g7.data-programming-literacy`, `information.g8.data-programming-literacy`, `information.g9.data-programming-literacy` | 信頼性・権利・個人情報・データ・プログラミング | 問題＋制作活動 | 中学校 解説一覧 |
-| 中1～3 | 特別活動 | `special-activities.g7.school-career-citizenship`, `special-activities.g8.school-career-citizenship`, `special-activities.g9.school-career-citizenship` | 自治・役割・合意形成・キャリア | 問題＋振り返り | 中学校 解説一覧 |
 
 ## 漢字・ローマ字
 
