@@ -35,7 +35,7 @@ if (!$publishFullPath.StartsWith($artifactsFullPath, [System.StringComparison]::
     throw "Publish directory must stay inside the artifacts directory: $publishFullPath"
 }
 if (Test-Path $publishFullPath) {
-    Remove-Item -LiteralPath $publishFullPath -Recurse -Force
+    [System.IO.Directory]::Delete($publishFullPath, $true)
 }
 New-Item -ItemType Directory -Force -Path $publishFullPath, $objDir | Out-Null
 

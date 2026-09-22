@@ -16,7 +16,8 @@ internal sealed record CurriculumQuestion(
     string? ActivityPrompt = null,
     CurriculumQuestionDisplay? Display = null,
     bool WrittenArithmetic = false,
-    CurriculumFigure? Figure = null);
+    CurriculumFigure? Figure = null,
+    string? ReadingTarget = null);
 
 internal sealed record CurriculumUnit(
     string Id,
@@ -376,8 +377,9 @@ internal static partial class CurriculumPolicy
         string explanation,
         string? activity = null,
         CurriculumQuestionDisplay? display = null,
-        bool writtenArithmetic = false) =>
-        new(stage, prompt, answer, distractors, explanation, activity, display, writtenArithmetic);
+        bool writtenArithmetic = false,
+        string? readingTarget = null) =>
+        new(stage, prompt, answer, distractors, explanation, activity, display, writtenArithmetic, ReadingTarget: readingTarget);
 
     private static CurriculumQuestionDisplay D(
         string? prompt = null,

@@ -51,7 +51,7 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("shape-generator", "pickShape(p)"),
         ("division-generator", "pickDiv(p)"),
         ("fraction-generator", "pickFrac(p)"),
-        ("grade-aware-fraction-generator", "if(g<=2){const parts="),
+        ("grade-aware-fraction-generator", "const denominators=stage===1?[2]"),
         ("decimal-addition", "prompt:'0.'+a+' + 0.'+b+' は？'"),
         ("chart-generator", "pickChart(p)"),
         ("data-classification-activity", "同じ なかまごとに 分けて 数える"),

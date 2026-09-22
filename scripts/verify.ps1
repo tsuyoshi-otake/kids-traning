@@ -19,6 +19,32 @@ function Assert-SourceIconUnchanged([string]$Path, [string]$ExpectedHash, [datet
     }
 }
 
+function Invoke-PublishedSmokeTest([string]$Path, [string]$ExpectedVersion) {
+    $fileVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
+    if ($fileVersion.ProductVersion.Split('+')[0] -ne $ExpectedVersion) {
+        throw "Published executable version does not match ${ExpectedVersion}: $Path"
+    }
+
+    $smoke = Start-Process -FilePath $Path -ArgumentList "--smoke-test" -WindowStyle Hidden -PassThru
+    try {
+        if (!$smoke.WaitForExit(120000)) {
+            throw "Smoke test exceeded its 120-second timeout: $Path"
+        }
+        if ($smoke.ExitCode -ne 0) {
+            throw "Smoke test failed with exit code $($smoke.ExitCode): $Path"
+        }
+    }
+    finally {
+        if (!$smoke.HasExited) {
+            & taskkill.exe /PID $smoke.Id /T /F | Out-Null
+            if (!$smoke.WaitForExit(10000)) {
+                throw "Could not terminate timed-out smoke test: $Path"
+            }
+        }
+        $smoke.Dispose()
+    }
+}
+
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root "src\KidsTraining.App\KidsTraining.App.csproj"
 $publishDir = Join-Path $root "src\KidsTraining.App\bin\Release\net9.0-windows\win-x64\publish"
@@ -73,7 +99,7 @@ if (!$publishFullPath.StartsWith($rootFullPath, [System.StringComparison]::Ordin
     throw "Publish directory must stay inside the repository: $publishFullPath"
 }
 if (Test-Path $publishFullPath) {
-    Remove-Item -LiteralPath $publishFullPath -Recurse -Force
+    [System.IO.Directory]::Delete($publishFullPath, $true)
 }
 
 if (!(Test-Path $htmlTemplateSource) -or !(Test-Path $appDefinitionSource) -or !(Test-Path $runtimeScriptSource) -or !(Test-Path $fontCssSource)) {
@@ -194,10 +220,7 @@ if ($null -eq $icon) {
 }
 $icon.Dispose()
 
-$smoke = Start-Process -FilePath $publishedExe -ArgumentList "--smoke-test" -Wait -PassThru
-if ($smoke.ExitCode -ne 0) {
-    throw "Smoke test failed with exit code $($smoke.ExitCode)"
-}
+Invoke-PublishedSmokeTest $publishedExe $version
 
 & (Join-Path $root "scripts\build-msi.ps1") -Version $version
 if ($LASTEXITCODE -ne 0) {
@@ -230,10 +253,7 @@ if ((Get-FileSha256 $artifactsFavicon) -ne $sourceIconHash) {
     throw "Artifacts publish favicon must be copied from the tracked application icon"
 }
 
-$artifactsSmoke = Start-Process -FilePath (Join-Path $artifactsPublishDir "KidsTraining.App.exe") -ArgumentList "--smoke-test" -Wait -PassThru
-if ($artifactsSmoke.ExitCode -ne 0) {
-    throw "Artifacts smoke test failed with exit code $($artifactsSmoke.ExitCode)"
-}
+Invoke-PublishedSmokeTest (Join-Path $artifactsPublishDir "KidsTraining.App.exe") $version
 
 $generatedText = Get-Content -Raw -Encoding UTF8 $generatedWxs
 if ($generatedText -match "ProgramFilesFolder") {
@@ -278,6 +298,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 if (!(Test-Path $decompiledWxs)) {
     throw "Decompiled WXS was not created"
+}
+[xml]$decompiledDocument = Get-Content -Raw -Encoding UTF8 $decompiledWxs
+$decompiledPackage = $decompiledDocument.SelectSingleNode("/*[local-name()='Wix']/*[local-name()='Package']")
+if ($null -eq $decompiledPackage -or $decompiledPackage.Version -ne $version -or $decompiledPackage.Scope -ne "perUser") {
+    throw "Packaged MSI must match version $version and use per-user installation"
 }
 
 Write-Host "Verification passed."

@@ -188,8 +188,8 @@ internal static class Program
             "Markup",
             "LearningNotationPatch.cs"));
         Assert(
-            html.Contains("withRichText(source)", StringComparison.Ordinal) &&
-            html.Contains("withRichInline(source)", StringComparison.Ordinal) &&
+            html.Contains("withRichText(source,skipFurigana=false,protectedWords=[],assessmentReading=null)", StringComparison.Ordinal) &&
+            html.Contains("withRichInline(source,skipFurigana=false,protectedWords=[],assessmentReading=null)", StringComparison.Ordinal) &&
             html.Contains("questionRich(q,field,fallback)", StringComparison.Ordinal) &&
             html.Contains("questionChoiceRich(q,index,fallback,skipFurigana)", StringComparison.Ordinal) &&
             html.Contains("className:'kt-math kt-rich-math'", StringComparison.Ordinal),
@@ -1012,7 +1012,7 @@ internal static class Program
         Assert(
             html.Contains("['外国語','がいこくご'],['外国','がいこく'],['学級','がっきゅう'],['課題','かだい'],['必要','ひつよう']", StringComparison.Ordinal) &&
             html.Contains("['共通','きょうつう'],['目標','もくひょう'],['判断','はんだん'],['基準','きじゅん'],['共有','きょうゆう'],['一人','ひとり'],['担当','たんとう']", StringComparison.Ordinal) &&
-            html.Contains("surface==='残'&&after.startsWith('さ')", StringComparison.Ordinal),
+            html.Contains("残=のこ:さしすせそ", StringComparison.Ordinal),
             "common compound furigana can fall back to incorrect single-character readings");
         Assert(
             html.Contains("""<html lang="ja"><head>""", StringComparison.Ordinal) &&
@@ -1111,47 +1111,15 @@ internal static class Program
             subGeneratorSource.Contains(",mixed]", StringComparison.Ordinal),
             "mixed subtraction/addition is not assigned to subtraction stage 5");
 
-        var generatorFiles = new[]
-        {
-            "ArithmeticQuestionPatch.cs",
-            "SupplementalMathQuestionPatch.cs",
-            "ClockQuestionPatch.cs",
-            "JapaneseQuestionPatch.cs",
-            "KanjiCurriculumPatch.cs"
-        };
-        // Only the kanji a child can read on screen need furigana, so the commentary that
-        // explains why a generator is written the way it is does not count.
-        var generatorCharacters = CjkCharacters(string.Concat(
-            generatorFiles.Select(file => WithoutCommentary(File.ReadAllText(Path.Combine(markupRoot, file))))));
         var furiganaSource = File.ReadAllText(Path.Combine(markupRoot, "QuestionFuriganaPatch.cs"));
-        var curriculumSource = File.ReadAllText(Path.Combine(markupRoot, "KanjiCurriculumPatch.cs"));
         Assert(
-            // The stem, not the whole reading: 見 is read み when 見る already shows る.
-            furiganaSource.Contains("this.kanjiCurriculumEntries().map(entry=>[entry.k,entry.stem||entry.r])", StringComparison.Ordinal),
-            "canonical kanji readings are not included in the furigana dictionary");
-        var furiganaCharacters = CjkCharacters(furiganaSource)
-            .Union(CjkCharacters(curriculumSource))
-            .ToHashSet();
-        var missingCharacters = generatorCharacters
-            .Except(furiganaCharacters)
-            .OrderBy(static character => character)
-            .ToArray();
-        Assert(
-            missingCharacters.Length == 0,
-            "question generator CJK characters missing from furigana source: " + new string(missingCharacters));
-
-        static string WithoutCommentary(string source) =>
-            string.Join(
-                '\n',
-                source
-                    .Split('\n')
-                    .Where(static line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal)));
-
-        static HashSet<char> CjkCharacters(string source) =>
-            source
-                .Where(static character =>
-                    (character >= '\u4E00' && character <= '\u9FFF') || character == '々')
-                .ToHashSet();
+            // Assessment on/kun readings cannot determine the reading in prose.
+            !furiganaSource.Contains("entry.stem||entry.r", StringComparison.Ordinal) &&
+            furiganaSource.Contains("this.furiganaInflections()", StringComparison.Ordinal),
+            "prose furigana must use reviewed words and okurigana, not assessment stems");
+        // Actual words, contexts and visible-text coverage are exercised by the
+        // generated runtime audit. Merely seeing each character in a source file
+        // cannot prove that its reading in a sentence is correct.
     }
 
     // Marker checks cannot tell whether a generated question teaches the truth, so the

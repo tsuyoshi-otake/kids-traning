@@ -279,6 +279,13 @@ internal static partial class LearningMarkupPatcher
     white-space: normal;
   }
 
+  /* Ruby and its adjacent text must share inline line-breaking. The template's
+     flex button otherwise puts each annotation in a separate, unwrapped item. */
+  .kt-choice-button:has(ruby) {
+    display: block !important;
+    align-content: center;
+  }
+
   .kt-feedback-answer {
     display: grid;
     gap: var(--kt-space-3);

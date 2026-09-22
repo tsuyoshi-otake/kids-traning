@@ -85,7 +85,8 @@ internal static partial class LearningMarkupPatcher
     private static string BuildKanjiPictureQuestionScript()
     {
         return """
-if(g<=3&&stage>=1&&Math.random()<0.2){
+// The picture pool is mostly grade 1; grade 2 must use its own kanji targets.
+  if(g<=3&&g!==2&&stage>=1&&Math.random()<0.2){
   const P=[
     {id:'mountain',g:1,k:'山',label:'山の え',ex:'山が えがかれています。'},
     {id:'river',g:1,k:'川',label:'川の え',ex:'川が ながれています。'},

@@ -14,6 +14,8 @@
 
 import { readFileSync } from 'node:fs';
 import { auditThinkingQuestions } from './ThinkingQuestionAudit.mjs';
+import { auditQuestionQuality } from './QuestionQualityAudit.mjs';
+import { createFuriganaCorpusAudit } from './FuriganaCorpusAudit.mjs';
 
 const runtimePagePath = process.argv[2];
 if (!runtimePagePath) {
@@ -725,6 +727,8 @@ const TWO_TERM_ADDITION = /^\s*(\d+)\s*[+＋]\s*(\d+)\s*$/;
 
 let generated = 0;
 const UNITS = app.curriculumCatalog();
+auditQuestionQuality(app, UNITS, profileFor, observe, violated);
+const furiganaCorpus = createFuriganaCorpusAudit(app, UNITS);
 auditThinkingQuestions(app, observe, violated);
 observe('common IME romaji spellings are equivalent', 10);
 for (const [standard, ime] of [['shi', 'si'], ['chi', 'ti'], ['tsu', 'tu'], ['fu', 'hu'], ['sha', 'sya'], ['cha', 'tya'], ['ja', 'zya']]) {
@@ -1713,6 +1717,7 @@ for (const unit of UNITS) {
           continue;
         }
         generated += 1;
+        furiganaCorpus.record(question, { grade: unit.grade, unit: unit.id, stage, kind: 'generated' });
         const prompt = String(question.prompt);
         const answer = String(question.answer);
         const explanation = String(question.explanation || '');
@@ -2685,6 +2690,7 @@ for (const [kana, standard] of Object.entries(STANDARD_ROMAJI)) {
   }
 }
 
+const furiganaCorpusSummary = furiganaCorpus.finish(observe, violated);
 for (const [check, count] of observed) {
   if (count === 0) violated(check, 'the check never saw a matching question, so it protects nothing', '');
 }
@@ -2699,6 +2705,7 @@ const summary = [...observed.entries()]
 
 if (violations.size === 0 && emptyChecks.length === 0) {
   console.log(`generated-question audit passed: ${generated} questions across ${UNITS.length} units x ${STAGES.length} stages`);
+  console.log(furiganaCorpusSummary);
   console.log(summary);
   process.exit(0);
 }
