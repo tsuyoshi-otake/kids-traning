@@ -26,6 +26,30 @@ internal static partial class LearningMarkupPatcher
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(markup,
+            "\n    return {\n      isProfile:",
+            "\n    const calibQuestion=sc==='calib'&&S.calib?S.calib.items[S.calib.idx].q:null;" +
+            "const calibWrittenPlan=calibQuestion?this.writtenArithmeticPlan(calibQuestion.topic==='hissan'?{...calibQuestion,writtenArithmetic:true}:calibQuestion):null;" +
+            "const calibWrittenView=calibWrittenPlan?this.writtenArithmeticView(calibWrittenPlan,0):null;" +
+            "calibIsPlain=calibIsPlain&&!calibWrittenView;\n    return {\n      isProfile:",
+            StringComparison.Ordinal);
+
+        markup = ReplaceRequired(markup,
+            "calibChoices:calibChoices, calibIsKokugo:calibIsKokugo, calibIsPlain:calibIsPlain,",
+            "calibChoices:calibChoices, calibIsWritten:!!calibWrittenView, calibWrittenLines:calibWrittenView?calibWrittenView.lines:[], calibWrittenAria:calibWrittenView?calibWrittenView.aria:'', calibWrittenDensity:calibWrittenView?(calibWrittenView.lines.length>10?'ultra':calibWrittenView.lines.length>7?'dense':'normal'):'normal', calibIsKokugo:calibIsKokugo, calibIsPlain:calibIsPlain,",
+            StringComparison.Ordinal);
+
+        markup = ReplaceRequired(markup,
+            "        <div class=\"kt-choice-grid\" style=\"display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; width:1120px; max-width:100%;\">\n          <sc-for list=\"{{ calibChoices }}\"",
+            "        <sc-if value=\"{{ calibIsWritten }}\" hint-placeholder-val=\"{{ false }}\">\n" +
+            "          <div class=\"kt-written-step-board kt-calibration-written-board\" data-density=\"{{ calibWrittenDensity }}\" role=\"img\" aria-label=\"{{ calibWrittenAria }}\">\n" +
+            "            <sc-for list=\"{{ calibWrittenLines }}\" as=\"line\" hint-placeholder-count=\"6\"><div class=\"kt-written-step-line\" data-tone=\"{{ line.tone }}\" aria-hidden=\"true\">{{ line.text }}</div></sc-for>\n" +
+            "          </div>\n" +
+            "          <div class=\"kt-calibration-written-instruction\">こたえを えらんでね</div>\n" +
+            "        </sc-if>\n" +
+            "        <div class=\"kt-choice-grid\" style=\"display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; width:1120px; max-width:100%;\">\n          <sc-for list=\"{{ calibChoices }}\"",
+            StringComparison.Ordinal);
+
+        markup = ReplaceRequired(markup,
             "\n    const choiceSm=",
             "\n" + BuildWrittenArithmeticPadScript() + "\n    const choiceSm=",
             StringComparison.Ordinal);
@@ -250,6 +274,8 @@ internal static partial class LearningMarkupPatcher
   .kt-written-step-board{box-sizing:border-box;max-width:100%;min-height:190px;overflow-x:auto;background:#fffdf8;border:4px solid #f0e2c8;border-radius:26px;padding:18px 24px;box-shadow:0 5px 0 #ead9bd;color:#3a3326;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:clamp(29px,4.6vw,48px);font-weight:900;line-height:1.08;font-variant-numeric:tabular-nums;}
   .kt-written-step-board[data-density="dense"]{font-size:clamp(27px,3.5vw,38px);}
   .kt-written-step-board[data-density="ultra"]{font-size:clamp(22px,2.7vw,30px);}
+  .kt-calibration-written-board{min-height:0;margin:auto;}
+  .kt-calibration-written-instruction{font-size:20px;color:#9a8662;margin-top:10px;text-align:center;}
   .kt-written-step-line{width:max-content;min-width:0;margin-inline:auto;white-space:pre;text-align:left;}
   .kt-written-step-line[data-tone="marks"]{color:#b85e1f;line-height:.9;}
   .kt-written-step-line[data-tone="caption"]{width:100%;color:#b85e1f;font-family:'Zen Maru Gothic',sans-serif;font-size:.42em;line-height:1.5;text-align:center;}

@@ -360,6 +360,53 @@ const writtenCases = [
   { name: 'decimal long division', question: { topic: 'kazu', difficulty: 4, prompt: '3.6÷0.9は？', answer: '4' }, kind: 'division', expects: ['36', '9', '4', '36', '0'] },
   { name: 'remainder long division', question: { topic: 'div', difficulty: 5, prompt: '157 ÷ 9', answer: '17 あまり 4' }, kind: 'division', expects: ['1', '9', '6', '67', '7', '63', '4'] },
 ];
+const CALIB_WRITTEN_CHECK = 'placement check uses a blank written-arithmetic board for written questions';
+const calibBoardMarkup = page.includes('class="kt-written-step-board kt-calibration-written-board"') &&
+  page.includes('list="{{ calibWrittenLines }}"') && page.includes('value="{{ calibIsWritten }}"');
+observe(CALIB_WRITTEN_CHECK);
+if (!calibBoardMarkup) violated(CALIB_WRITTEN_CHECK, 'generated placement check has no written board', runtimePagePath);
+for (const question of [
+  { topic: 'hissan', difficulty: 2, prompt: '52 + 18', answer: '70' },
+  { topic: 'hissan', difficulty: 2, prompt: '52 - 18', answer: '34' },
+  ...writtenCases.map(sample => sample.question),
+  { topic: 'mul', difficulty: 2, prompt: '9 × 8', answer: '72' },
+  { topic: 'div', difficulty: 2, prompt: '72 ÷ 8', answer: '9' },
+]) {
+  observe(CALIB_WRITTEN_CHECK);
+  const calibApp = new app.constructor();
+  calibApp.props = calibApp.props || {};
+  calibApp.state.screen = 'calib';
+  calibApp.state.setupGrade = 2;
+  calibApp.state.calib = { items: [{ q: question, choices: [question.answer, '0', '1', '2'] }], idx: 0 };
+  try {
+    const view = calibApp.renderVals();
+    const written = question.topic === 'hissan' || writtenCases.some(sample => sample.question === question);
+    const lines = view.calibWrittenLines || [];
+    if (view.calibIsWritten !== written || view.calibIsPlain === written ||
+        (written && (!lines.some(line => line.tone === 'number') || !lines.some(line => line.tone === 'rule') ||
+          lines.some(line => line.tone === 'result' && line.text.trim()) || !view.calibWrittenAria)) ||
+        view.calibChoices.length !== 4) {
+      violated(CALIB_WRITTEN_CHECK, `${question.prompt} rendered incorrectly`, JSON.stringify({written:view.calibIsWritten,plain:view.calibIsPlain,lines,choices:view.calibChoices.length}));
+    }
+  } catch (error) {
+    violated(CALIB_WRITTEN_CHECK, `${question.prompt} threw ${error && error.message}`, String(error && error.stack));
+  }
+}
+for (const grade of [2, 3, 4, 5, 6]) {
+  const calibApp = new app.constructor();
+  calibApp.props = calibApp.props || {};
+  calibApp.state.setupGrade = grade;
+  const items = calibApp.buildCalib().filter(item => item.q.topic === 'hissan');
+  observe(CALIB_WRITTEN_CHECK, items.length);
+  for (const item of items) {
+    calibApp.state.screen = 'calib';
+    calibApp.state.calib = { items: [item], idx: 0 };
+    const view = calibApp.renderVals();
+    if (!view.calibIsWritten || view.calibIsPlain || !view.calibWrittenLines.some(line => line.tone === 'rule')) {
+      violated(CALIB_WRITTEN_CHECK, `grade ${grade} generated ${item.q.prompt} without a written board`, JSON.stringify(view.calibWrittenLines));
+    }
+  }
+}
 for (const [left, right, answer] of [[700,286,414],[802,467,335],[1000,1,999],[654,321,333],[52,18,34]]) {
   const plan=app.writtenArithmeticPlan({topic:'hissan',writtenArithmetic:true,prompt:`${left} - ${right}`});
   observe('subtraction regroups across zero without negative intermediate digits');
@@ -2349,6 +2396,29 @@ for (const question of hissanBank) {
 }
 if (carryAdds < 20 || borrowSubs < 20 || !sawThreeDigit || zeroHeavy < 1) {
   violated(DRILL_HISSAN_CHECK, `carry ${carryAdds}, borrow ${borrowSubs}, zero-heavy ${zeroHeavy}`, 'grade-2 written arithmetic coverage');
+}
+
+const DRILL_HISSAN_VIEW_CHECK = 'the 100-question written-arithmetic course stacks aligned operands and puts the input below the rule';
+observe(DRILL_HISSAN_VIEW_CHECK, 4);
+const hissanMarkup = ['kt-drill-hissan-row', '{{ drillView.hissanLeft }}', '{{ drillView.hissanRight }}',
+  'kt-drill-hissan-rule', 'kt-drill-hissan-result'].every(fragment => page.includes(fragment));
+if (!hissanMarkup) violated(DRILL_HISSAN_VIEW_CHECK, 'the generated page is missing the stacked operands, rule, or answer row', runtimePagePath);
+const hissanViewApp = new app.constructor();
+hissanViewApp.props = hissanViewApp.props || {};
+for (const [index, mode] of [[0, 'input'], [90, 'input'], [0, 'choice']]) {
+  try {
+    hissanViewApp.startDrill('h2', true, mode);
+    hissanViewApp.state.drill.idx = index;
+    const question = hissanBank[index];
+    const parts = /^(\d+) (＋|−) (\d+)$/.exec(question.text);
+    const view = hissanViewApp.renderVals().drillView;
+    if (!view.showHissan || view.showPlainPrompt || view.showAns || view.hissanLeft !== parts[1] ||
+        view.hissanOp !== parts[2] || view.hissanRight !== parts[3] || view.showHissanInput !== (mode === 'input')) {
+      violated(DRILL_HISSAN_VIEW_CHECK, `question ${question.no} in ${mode} mode has an incorrect written layout`, JSON.stringify(view));
+    }
+  } catch (error) {
+    violated(DRILL_HISSAN_VIEW_CHECK, `question ${index + 1} in ${mode} mode did not render`, String(error && error.stack));
+  }
 }
 
 const DRILL_DIV_CHECK = 'the division drill covers every ordered inverse of a multiplication fact';

@@ -405,6 +405,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       drillPad.push({label:'0',ariaLabel:'0',style:keyTile,onClick:()=>this.press('0')});
       drillPad.push({label:'OK',ariaLabel:'こたえる',style:keyOk,onClick:()=>this.drillSubmit()});
       const dChoices=this.drillChoices(d,dq),dPick=dChoices.length>0,dKanji=!!(dq&&dq.kind==='pick'),dWriting=d.answerMode==='writing';
+      const hissan=d.id==='h2'&&dq?/^(\d+) (＋|−) (\d+)$/.exec(String(dq.text)):null;
       // The pair is what has to be memorised, so it is shown in one fixed place: green while the
       // correct answer is echoed, red when the second mistake reveals it, and never anywhere else.
       const dEcho=d.echo&&typeof d.echo==='object'?d.echo:null,dPair=this.drillPair(d,dq)||{main:'',sub:''};
@@ -419,8 +420,10 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         headStyle:'background:'+(course.color||'#ff8a3d')+';',
         barStyle:'width:'+Math.round(this.clamp(seen/(total||1),0,1)*100)+'%; background:'+(course.color||'#ff8a3d')+';',
         prompt:dq?this.drillPrompt(dq):'', ansBox:S.input||'?',
+        showHissan:!!hissan, showPlainPrompt:!hissan, hissanLeft:hissan?hissan[1]:'',hissanOp:hissan?hissan[2]:'',hissanRight:hissan?hissan[3]:'',
+        hissanAria:hissan?hissan[1]+' '+hissan[2]+' '+hissan[3]+' の筆算':'',showHissanInput:!!hissan&&!dPick,
         ansStyle:dEcho?'background:#e8f7ec; border-color:#3aa655; color:#22683c;':(d.mark?'border-color:#e08a7a; color:#b23b23;':''),
-        showAns:!dPick, showAsk:dPick, askText:dWriting?'ただしい かんじを えらんでね':(dKanji?'よみかたを えらんでね':'こたえを 2つから えらんでね'),
+        showAns:!dPick&&!hissan, showAsk:dPick, askText:dWriting?'ただしい かんじを えらんでね':(dKanji?'よみかたを えらんでね':'こたえを 2つから えらんでね'),
         showPad:!dPick, showPick:dPick, pickAria:dWriting?'かんじの えらびもんだい':(dKanji?'よみかたの えらびもんだい':'こたえの 2たくもんだい'), picks:drillPicks,
         showHint:d.mark==='wrong', hint:d.hint||'',
         showEcho:!!dEcho, echoMain:dEcho?dEcho.main:'', echoSub:dEcho?dEcho.sub:'', echoHasSub:!!(dEcho&&dEcho.sub),
@@ -514,7 +517,19 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       <sc-if value="{{ drillView.playing }}" hint-placeholder-val="{{ true }}">
         <div class="kt-drill-body">
           <div class="kt-drill-stage">
-            <div class="kt-drill-prompt">{{ drillView.prompt }}</div>
+            <sc-if value="{{ drillView.showHissan }}" hint-placeholder-val="{{ false }}">
+              <div class="kt-drill-hissan" aria-label="{{ drillView.hissanAria }}">
+                <div class="kt-drill-hissan-row"><span aria-hidden="true"></span><span>{{ drillView.hissanLeft }}</span></div>
+                <div class="kt-drill-hissan-row"><span>{{ drillView.hissanOp }}</span><span>{{ drillView.hissanRight }}</span></div>
+                <div class="kt-drill-hissan-rule" aria-hidden="true"></div>
+                <sc-if value="{{ drillView.showHissanInput }}" hint-placeholder-val="{{ false }}">
+                  <div class="kt-drill-hissan-result" style="{{ drillView.ansStyle }}" aria-live="polite">{{ drillView.ansBox }}</div>
+                </sc-if>
+              </div>
+            </sc-if>
+            <sc-if value="{{ drillView.showPlainPrompt }}" hint-placeholder-val="{{ true }}">
+              <div class="kt-drill-prompt">{{ drillView.prompt }}</div>
+            </sc-if>
             <div class="kt-drill-answering">
               <sc-if value="{{ drillView.showAns }}" hint-placeholder-val="{{ true }}">
                 <div class="kt-drill-ans" style="{{ drillView.ansStyle }}">{{ drillView.ansBox }}</div>
@@ -622,6 +637,11 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-body{flex:1;display:flex;gap:28px;align-items:stretch;}
   .kt-drill-stage{flex:1;min-width:0;background:#fff;border:4px solid #f0e2c8;border-radius:26px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:18px;}
   .kt-drill-prompt{font-size:72px;font-weight:900;line-height:1.15;letter-spacing:2px;color:#3a3326;text-align:center;}
+  .kt-drill-hissan{width:calc(1em + 4ch);font-size:72px;font-weight:900;line-height:1.12;font-variant-numeric:tabular-nums;color:#3a3326;}
+  .kt-drill-hissan-row{display:grid;grid-template-columns:1em 4ch;align-items:baseline;}
+  .kt-drill-hissan-row span:last-child{text-align:right;}
+  .kt-drill-hissan-rule{border-top:5px solid currentColor;margin:3px 0 8px;}
+  .kt-drill-hissan-result{box-sizing:border-box;width:100%;min-height:1.25em;background:#fff7ec;border:4px dashed #d8c4a0;border-radius:14px;padding:0 6px;text-align:right;}
   .kt-drill-answering{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;}
   .kt-drill-ans{min-width:220px;background:#fff7ec;border:4px dashed #d8c4a0;border-radius:20px;padding:4px 24px;font-size:52px;font-weight:900;color:#3a3326;text-align:center;}
   /* The feedback slot keeps its height while it is empty, hinting, or showing the pair, so the
@@ -662,6 +682,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     .kt-drill-screen{padding:18px 26px 24px;}
     .kt-drill-side{width:250px;}
     .kt-drill-prompt{font-size:58px;}
+    .kt-drill-hissan{font-size:58px;}
     .kt-drill-pick-btn{font-size:34px;}
   }
 
@@ -673,6 +694,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     .kt-drill-card-title{font-size:17px;}
     .kt-drill-stage{gap:10px;}
     .kt-drill-prompt{font-size:56px;}
+    .kt-drill-hissan{font-size:56px;}
     .kt-drill-ans{font-size:42px;min-width:180px;}
     .kt-drill-feedback{min-height:220px;gap:8px;}
     .kt-drill-pair{min-width:260px;padding:8px 24px;}
