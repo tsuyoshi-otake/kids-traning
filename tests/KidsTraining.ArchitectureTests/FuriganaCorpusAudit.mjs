@@ -13,7 +13,8 @@ export function createFuriganaCorpusAudit(app, units) {
     else if (value && typeof value === 'object') for (const [key, item] of Object.entries(value)) capture(item, { ...origin, field: `${origin.field}.${key}` });
   };
   const record = (q, origin = {}) => {
-    for (const key of ['prompt', 'answer', 'choices', 'distractors', 'explanation', 'activityPrompt', 'pre', 'post', 'mean', 'display']) capture(q[key], { ...origin, field: key });
+    for (const key of ['prompt', 'answer', 'choices', 'distractors', 'explanation', 'activityPrompt', 'pre', 'post', 'mean', 'display'])
+      capture(q[key], { ...origin, field: key, assessmentTarget: key === 'prompt' ? q.readingTarget : undefined });
   };
   for (const unit of units) {
     const origin = { grade: unit.grade, unit: unit.id, kind: 'authored' };
@@ -54,7 +55,12 @@ export function createFuriganaCorpusAudit(app, units) {
       const remaining = collect(rendered);
       // Bare/quoted assessment kanji intentionally need no automatic pronunciation.
       if (text.length > 1 && !/いみ：\d年生で 習う 漢字/.test(text)) {
-        for (const match of remaining.replace(/「[一-龯々]」/g, '').matchAll(/[一-龯々]+/g)) {
+        let prose = remaining.replace(/「[一-龯々]」/g, '');
+        for (const source of textEntry.sources.values()) {
+          if (source.field === 'prompt' && source.assessmentTarget)
+            prose = prose.replaceAll(`「${source.assessmentTarget}」`, '');
+        }
+        for (const match of prose.matchAll(/[一-龯々]+/g)) {
           if (!unannotated.has(match[0])) unannotated.set(match[0], { surface: match[0], count: 0, contexts: [] });
           const entry = unannotated.get(match[0]);
           entry.count++;

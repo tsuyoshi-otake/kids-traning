@@ -1,4 +1,4 @@
-// Issue #81: expected Japanese readings and assessment semantics, independently of
+// Issues #81 and #83: expected Japanese readings and assessment semantics, independently of
 // the production vocabulary. Run against the assembled runtime via GeneratedQuestionAudit.
 import { furiganaContextFixtures } from './FuriganaContextFixtures.mjs';
 import { furiganaGradeSixFixtures } from './FuriganaGradeSixFixtures.mjs';
@@ -28,6 +28,9 @@ export function auditQuestionQuality(app, units, profileFor, observe, violated) 
     ['三十分', 'さんじゅっぷん'], ['十分ほど', 'じゅっぷんほど'], ['十分に', 'じゅうぶんに'],
     ['四時', 'よじ'], ['七時', 'しちじ'], ['九時', 'くじ'], ['4月', 'しがつ'], ['7月', 'しちがつ'], ['9月', 'くがつ'],
     ['一本', 'いっぽん'], ['三本', 'さんぼん'], ['六本', 'ろっぽん'], ['8本', 'はっぽん'], ['10本', 'じゅっぽん'],
+    ['1杯', 'いっぱい'], ['2杯', 'にはい'], ['3杯', 'さんばい'],
+    ['1軒', 'いっけん'], ['2軒', 'にけん'], ['3軒', 'さんげん'],
+    ['1着', 'いっちゃく'], ['2着', 'にちゃく'], ['3着', 'さんちゃく'],
     ['100本', 'ひゃっぽん'], ['300本', 'さんびゃっぽん'], ['1000本', 'せんぼん'], ['100匹', 'ひゃっぴき'], ['1000匹', 'せんびき'],
     ['一ぴき', 'いっぴき'], ['三びき', 'さんびき'], ['六ぴき', 'ろっぴき'], ['100分', 'ひゃっぷん'], ['1000分', 'せんぷん'],
     ['4年生', 'よねんせい'], ['2年生', 'にねんせい'], ['四年間', 'よねんかん'], ['14人', 'じゅうよにん'],
@@ -170,4 +173,76 @@ export function auditQuestionQuality(app, units, profileFor, observe, violated) 
     check('square explanations require both equal sides and right angles', q.explanation.includes('直角') && q.explanation.includes('4つ'), q.explanation);
   }
   check('square definition check observes actual questions', squares > 0, String(squares));
+
+  // Focused regressions for reviewed content fixes. These fixtures describe
+  // learner-visible requirements independently of the question source.
+  const bankQuestions = units.flatMap(unit => unit.questions.map(item => ({ unit, item })));
+  const fixedByGrade = (grade, predicate) => bankQuestions.filter(({ unit, item }) => unit.grade === grade && predicate(item));
+  for (const grade of [1, 2, 3]) {
+    const unit = units.find(u => u.grade === grade && u.generatorKey === 'goi');
+    check(`grade-${grade} vocabulary generator exists`, !!unit, String(unit?.id));
+    if (!unit) continue;
+    let feelings = 0, counters = 0;
+    for (let sample = 0; sample < 500; sample++) {
+      const q = app.genFor(unit.id, profileFor(grade), Math.min(5, 1 + sample % 5));
+      if (q.subtype === 'feeling-reason') {
+        feelings++;
+        check('emotion explanation has a grammatical reason', !/から.{0,5}ので|たのしみ 気もち/.test(q.explanation), q.explanation);
+      }
+      if (q.subtype === 'counter') {
+        counters++;
+        const counter = q.prompt.match(/「[123](?:本|冊|枚|匹|台|杯|個|羽|足|着|軒|人)」/)?.[0];
+        check('counter prompt and explanation state the counted word', !!counter && q.readingTarget === counter.slice(1, -1) && q.explanation.includes(counter) && q.explanation.includes(`「${q.answer}」`), JSON.stringify(q));
+        const prompt = app.questionRich(q, 'prompt', q.prompt);
+        check('counter assessment does not reveal the reading', visible(prompt) === q.prompt && !readings(prompt).some(ruby => visible(ruby) === q.readingTarget), JSON.stringify(q));
+      }
+    }
+    check(`grade-${grade} emotion and counter cases are generated`, feelings > 0 && counters > 0, `${feelings}/${counters}`);
+  }
+  const gradeOneShapes = units.find(u => u.grade === 1 && u.generatorKey === 'shape');
+  check('grade-1 shape generator exists', !!gradeOneShapes, String(gradeOneShapes?.id));
+  let gradeOneCombinations = 0;
+  if (gradeOneShapes) for (let sample = 0; sample < 500; sample++) {
+    const q = app.genFor(gradeOneShapes.id, profileFor(1), 3 + sample % 3);
+    if (q.prompt.includes('おなじ さんかくを 2まい')) {
+      gradeOneCombinations++;
+      check('grade-1 triangle combination does not illustrate its answer', q.answer === 'しかく' && !q.isShape && !q.shapeStyle, JSON.stringify(q));
+    }
+  }
+  check('grade-1 triangle-combination case is generated', gradeOneCombinations > 0, String(gradeOneCombinations));
+  for (const [grade, answer, forbidden] of [[2, '正方形', '長方形'], [3, '正三角形', '二等辺三角形']]) {
+    const unit = units.find(u => u.grade === grade && u.generatorKey === 'shape');
+    check(`grade-${grade} shape generator exists`, !!unit, String(unit?.id));
+    if (!unit) continue;
+    let seen = 0;
+    for (let sample = 0; sample < 1000; sample++) {
+      const q = app.genFor(unit.id, profileFor(grade), grade === 2 ? 3 : 4);
+      if (q.answer !== answer) continue;
+      seen++;
+      check(`${answer} distractors exclude ${forbidden}`, !q.choices.includes(forbidden), JSON.stringify(q));
+    }
+    check(`grade-${grade} ${answer} question is generated`, seen > 0, String(seen));
+  }
+  const kanjiEntries = app.kanjiCurriculumEntries();
+  const gradeOneTargets = app.drillBank('k1');
+  check('grade-1 kanji drill retains 100 displayed questions', gradeOneTargets.length === 100, String(gradeOneTargets.length));
+  for (const [bare, reading] of [['字', 'あざ'], ['千', 'ち'], ['天', 'あめ']])
+    check('grade-1 kanji drill excludes context-bound bare readings', !gradeOneTargets.some(q => q.text === bare && q.ans === reading), `${bare}:${reading}`);
+  for (const word of ['文字', '千円', '天気'])
+    check('grade-1 kanji drill includes contextual target words', gradeOneTargets.some(q => q.text === word), word);
+  const gradeTwoEntries = kanjiEntries.filter(entry => entry.g === 2);
+  const gradeTwoTargets = app.drillBank('k2');
+  check('grade-2 kanji drill retains 100 displayed questions', gradeTwoTargets.length === 100, String(gradeTwoTargets.length));
+  for (const [character, word, reading] of [['語', '語る', 'かたる'], ['図', '図る', 'はかる'], ['自', '自ら', 'みずから']]) {
+    check('grade-2 kun readings use reviewed contextual words', gradeTwoEntries.some(entry => entry.k === character && entry.kunWord === word), `${character}:${word}`);
+    check('grade-2 kanji drill shows full contextual word', gradeTwoTargets.some(q => q.text === word && q.ans === reading), `${word}:${reading}`);
+  }
+  for (const [surface, reading] of [['茨', 'いばら'], ['潟', 'かた'], ['梨', 'なし']])
+    check('grade-4 regional readings match reviewed curriculum', kanjiEntries.some(entry => entry.g === 4 && entry.k === surface && entry.r === reading), `${surface}: ${reading}`);
+  const handCrankQuestions = fixedByGrade(6, item => /手回し発電機/.test(item.prompt));
+  check('grade-6 hand-crank science question remains in the reviewed bank', handCrankQuestions.length > 0, String(handCrankQuestions.length));
+  for (const { unit, item } of handCrankQuestions) {
+    const q = app.pickCurriculumBank(unit, item.stage, item);
+    check('grade-6 hand-crank question asks what generated electricity becomes', q.prompt === '手回し発電機でつくった電気は、何に変えられる？' && q.answer === '光・音・運動・熱', JSON.stringify(q));
+  }
 }
