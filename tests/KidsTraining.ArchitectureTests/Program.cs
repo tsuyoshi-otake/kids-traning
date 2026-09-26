@@ -49,12 +49,17 @@ internal static class Program
         Run("Parent learning resets reach explicit terminal states", TestLearningResetServiceTerminals);
         Run("Update checks reach explicit terminal states", TestUpdateServiceTerminals);
         Run("Parent control server awaits actions and shuts down cleanly", TestParentControlServerLifecycle);
-        Run("Learning history snapshots stay bounded and PIN-free", TestLearningHistoryStore);
+        Run("Learning history snapshots round-trip and clear", LearningHistoryStoreTests.RoundTripAndClear);
+        Run("Learning history rejects credentials and ambiguous JSON", LearningHistoryStoreTests.RejectUnsafeSnapshots);
+        Run("Learning history enforces record and UTF-8 byte limits", LearningHistoryStoreTests.EnforceLimits);
+        Run("Learning history handles invalid and unavailable disk data", LearningHistoryStoreTests.ReadInvalidDiskData);
+        Run("Learning history preserves committed data after write failures", LearningHistoryStoreTests.WriteFailurePreservesSnapshot);
+        Run("Learning history supports concurrent store instances", LearningHistoryStoreTests.ConcurrentStores);
         Run("Single-instance requests reach the primary instance", TestSingleInstanceCoordinator);
 
         if (Failures.Count == 0)
         {
-            Console.WriteLine("Architecture tests passed: 24");
+            Console.WriteLine("Architecture tests passed: 29");
             return 0;
         }
 
@@ -1664,55 +1669,6 @@ internal static class Program
             Assert(
                 received.Wait(TimeSpan.FromSeconds(2)),
                 "the primary coordinator did not observe the secondary request");
-        }
-    }
-
-    private static void TestLearningHistoryStore()
-    {
-        var temporaryRoot = Path.Combine(Path.GetTempPath(), "KidsTraining.ArchitectureTests", Guid.NewGuid().ToString("N"));
-        var path = Path.Combine(temporaryRoot, "history.json");
-        try
-        {
-            var store = new JsonLearningHistoryStore(path);
-            const string snapshot = "{\"schemaVersion\":1,\"history\":[{\"outcome\":\"independent\"}]}";
-            store.WriteSnapshot(snapshot);
-            Assert(store.ReadSnapshot() == snapshot, "a valid learning-history snapshot was not persisted");
-
-            var rejected = false;
-            try
-            {
-                store.WriteSnapshot("{\"schemaVersion\":1,\"parentPin\":\"1234\"}");
-            }
-            catch (InvalidDataException)
-            {
-                rejected = true;
-            }
-
-            Assert(rejected && store.ReadSnapshot() == snapshot, "a PIN-bearing or invalid snapshot was accepted or replaced the prior export");
-            foreach (var invalidVersion in new[] { "0", "2", "1.5", "2147483648", "1e100", "\"1\"", "null", "true", "{}", "[]" })
-            {
-                rejected = false;
-                try
-                {
-                    store.WriteSnapshot("{\"schemaVersion\":" + invalidVersion + ",\"history\":[]}");
-                }
-                catch (InvalidDataException)
-                {
-                    rejected = true;
-                }
-
-                Assert(rejected && store.ReadSnapshot() == snapshot,
-                    $"invalid schema version {invalidVersion} was accepted or replaced the prior export");
-            }
-            store.Clear();
-            Assert(store.ReadSnapshot().Contains("\"history\": []", StringComparison.Ordinal), "clearing learning history did not produce an empty snapshot");
-        }
-        finally
-        {
-            if (Directory.Exists(temporaryRoot))
-            {
-                Directory.Delete(temporaryRoot, recursive: true);
-            }
         }
     }
 

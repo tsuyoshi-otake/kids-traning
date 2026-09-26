@@ -8,18 +8,22 @@ internal sealed class JsonLearningHistoryStore
     private const int SchemaVersion = 1;
     private const int MaximumHistoryRecords = 500;
     private const int MaximumPayloadBytes = 4 * 1024 * 1024;
+    // Bound synchronization memory while sharing exclusion across instances for a path.
+    // Windows replacements can conflict even when staging filenames are unique.
+    private static readonly object[] StorageGates = Enumerable.Range(0, 16).Select(_ => new object()).ToArray();
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,
     };
-    private readonly object gate = new();
+    private readonly object gate;
     private readonly string storagePath;
 
     public JsonLearningHistoryStore(string? storagePath = null)
     {
-        this.storagePath = string.IsNullOrWhiteSpace(storagePath)
+        this.storagePath = Path.GetFullPath(string.IsNullOrWhiteSpace(storagePath)
             ? AppPaths.LearningHistoryPath
-            : Path.GetFullPath(storagePath);
+            : storagePath);
+        gate = StorageGates[(uint)StringComparer.OrdinalIgnoreCase.GetHashCode(this.storagePath) % (uint)StorageGates.Length];
     }
 
     public string ReadSnapshot()
@@ -33,7 +37,16 @@ internal sealed class JsonLearningHistoryStore
 
             try
             {
-                var payload = File.ReadAllText(storagePath, Encoding.UTF8);
+                // Readers keep the opened snapshot while another store atomically replaces it.
+                // Disallow in-place writers so the length bound also holds during the read.
+                using var stream = new FileStream(storagePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+                if (stream.Length > MaximumPayloadBytes)
+                {
+                    return EmptySnapshot();
+                }
+
+                using var reader = new StreamReader(stream, Encoding.UTF8);
+                var payload = reader.ReadToEnd();
                 return IsValidSnapshot(payload) ? payload : EmptySnapshot();
             }
             catch (Exception exception)
@@ -59,9 +72,37 @@ internal sealed class JsonLearningHistoryStore
                 Directory.CreateDirectory(directory);
             }
 
-            var temporaryPath = storagePath + ".tmp";
-            File.WriteAllText(temporaryPath, payload, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            File.Move(temporaryPath, storagePath, overwrite: true);
+            // Training and tray adapters can own separate store instances for the same path.
+            // Each writer owns its staging file; the final rename publishes one whole snapshot.
+            var temporaryPath = storagePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            var ownsTemporaryFile = false;
+            try
+            {
+                using (var stream = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    ownsTemporaryFile = true;
+                    using var writer = new StreamWriter(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                    writer.Write(payload);
+                }
+
+                File.Move(temporaryPath, storagePath, overwrite: true);
+                ownsTemporaryFile = false;
+            }
+            finally
+            {
+                if (ownsTemporaryFile)
+                {
+                    try
+                    {
+                        File.Delete(temporaryPath);
+                    }
+                    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                    {
+                        // Preserve the original write failure if cleanup also fails.
+                        UpdateLogger.Error("Could not remove a temporary learning-history snapshot", exception);
+                    }
+                }
+            }
         }
     }
 
@@ -99,8 +140,7 @@ internal sealed class JsonLearningHistoryStore
                 !root.TryGetProperty("schemaVersion", out var schemaVersion) ||
                 schemaVersion.ValueKind != JsonValueKind.Number ||
                 !schemaVersion.TryGetInt32(out var version) || version != SchemaVersion ||
-                root.TryGetProperty("parentPin", out _) ||
-                root.TryGetProperty("password", out _))
+                !HasSafeProperties(root))
             {
                 return false;
             }
@@ -116,6 +156,37 @@ internal sealed class JsonLearningHistoryStore
         {
             return false;
         }
+    }
+
+    private static bool HasSafeProperties(JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var property in element.EnumerateObject())
+            {
+                if (!names.Add(property.Name) ||
+                    property.Name.Equals("parentPin", StringComparison.OrdinalIgnoreCase) ||
+                    property.Name.Equals("parentPassword", StringComparison.OrdinalIgnoreCase) ||
+                    property.Name.Equals("password", StringComparison.OrdinalIgnoreCase) ||
+                    !HasSafeProperties(property.Value))
+                {
+                    return false;
+                }
+            }
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+            {
+                if (!HasSafeProperties(item))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private static string EmptySnapshot() => JsonSerializer.Serialize(

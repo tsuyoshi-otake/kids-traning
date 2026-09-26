@@ -33,6 +33,8 @@ Run the dependency and use-case checks with:
 rtk dotnet run --project tests\KidsTraining.ArchitectureTests\KidsTraining.ArchitectureTests.csproj -c Release -- .
 ```
 
+The [learning-history storage contract](docs/learning-history-storage.md) documents snapshot validation, concurrent publication, failure recovery, and executable regression criteria.
+
 ## Runtime Behavior
 
 The fixed grade-1 and grade-2 kanji drills keep their 100-question courses and let the learner choose the direction before starting: select the correct reading for a shown kanji or word, or select the correct kanji spelling (including okurigana) for a shown reading. Isolated questions use only readings that are words on their own: kun-yomi such as `山`/`やま` and `休む`/`やすむ`, and free on-yomi such as numbers and `円`. Bound on-yomi such as `学`/`がく` stay inside compound word questions. Alongside those, the courses apply learned kanji in words such as `学校`, `青空`, `国語`, and `公園`. Grade 1 words use only grade-1 kanji; grade 2 words cumulatively use grade-1 and grade-2 kanji and never later-grade characters. The four choices contain exactly one correct answer and use the same canonical MEXT kanji bank as the rest of the Japanese curriculum.
