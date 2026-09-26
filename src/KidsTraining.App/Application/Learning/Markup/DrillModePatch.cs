@@ -149,7 +149,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     const rows=grade===1?[
       ['一年','いちねん'],['一日','いちにち'],['一人','ひとり'],['二人','ふたり'],['三人','さんにん'],['四月','しがつ'],['五月','ごがつ'],['六月','ろくがつ'],['七月','しちがつ'],['八月','はちがつ'],['九月','くがつ'],['十月','じゅうがつ'],
       ['上下','じょうげ'],['左右','さゆう'],['大小','だいしょう'],['火山','かざん'],['青空','あおぞら'],['夕日','ゆうひ'],['入口','いりぐち'],['出口','でぐち'],['人口','じんこう'],['学校','がっこう'],['先生','せんせい'],['学年','がくねん'],
-      ['正月','しょうがつ'],['文字','もじ'],['名字','みょうじ'],['本名','ほんみょう'],['小学校','しょうがっこう'],['中学校','ちゅうがっこう'],['大学','だいがく'],['男子','だんし'],['女子','じょし'],['王子','おうじ'],['手足','てあし'],['山林','さんりん'],
+      ['正月','しょうがつ'],['文字','もじ'],['天気','てんき'],['名字','みょうじ'],['本名','ほんみょう'],['小学校','しょうがっこう'],['中学校','ちゅうがっこう'],['大学','だいがく'],['男子','だんし'],['女子','じょし'],['王子','おうじ'],['手足','てあし'],['山林','さんりん'],
       ['森林','しんりん'],['水田','すいでん'],['川上','かわかみ'],['川下','かわしも'],['川口','かわぐち'],['小石','こいし'],['大木','たいぼく'],['小川','おがわ'],['青虫','あおむし'],['草木','くさき'],['花火','はなび'],['火花','ひばな'],
       ['竹林','ちくりん'],['糸口','いとぐち'],['目玉','めだま'],['目上','めうえ'],['目下','めした'],['手本','てほん'],['百円','ひゃくえん'],['千円','せんえん'],['休日','きゅうじつ'],['見学','けんがく'],['入学','にゅうがく'],['学力','がくりょく']
     ]:[
@@ -164,9 +164,10 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   drillStandaloneOnKey(e){return e&&e.k&&e.on?e.k+':'+e.on:'';}
   drillStandaloneOnKeys(){return new Set(['一:いち','二:に','三:さん','五:ご','六:ろく','七:しち','八:はち','九:きゅう','十:じゅう','百:ひゃく','千:せん','万:まん','円:えん','王:おう','本:ほん']);}
   drillStandaloneTargets(entries){
-    const freeOn=this.drillStandaloneOnKeys(),out=[];
+    // These valid but context-bound readings do not teach a useful isolated word to beginners.
+    const freeOn=this.drillStandaloneOnKeys(),contextualKun=new Set(['字','千','天']),out=[];
     for(const e of entries||[]){
-      if(e.kun)out.push({e:e,type:'kun',reading:e.kun,word:e.kunWord||e.k});
+      if(e.kun&&!contextualKun.has(e.k))out.push({e:e,type:'kun',reading:e.kun,word:e.kunWord||e.k});
       if(freeOn.has(this.drillStandaloneOnKey(e)))out.push({e:e,type:'on',reading:e.on,word:e.k});
     }
     return out;
@@ -174,7 +175,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   buildKanjiDrillBank(id){
     const grade=id==='k1'?1:2,entries=this.drillKanjiEntries(grade),list=[];
     const standalone=this.drillStandaloneTargets(entries);
-    const wordTargets=this.drillKanjiWords(grade).map(item=>({e:null,type:'word',reading:item.reading,word:item.word})),choiceTargets=standalone.concat(wordTargets);
+    const words=this.drillKanjiWords(grade),priority=grade===1?['文字','千円','天気']:[];
+    const wordTargets=words.filter(item=>priority.includes(item.word)).sort((a,b)=>priority.indexOf(a.word)-priority.indexOf(b.word)).concat(words.filter(item=>!priority.includes(item.word))).map(item=>({e:null,type:'word',reading:item.reading,word:item.word})),choiceTargets=standalone.concat(wordTargets);
     const uniqueReadings=Array.from(new Set(choiceTargets.map(target=>target.reading)));
     const ask=(sec,target,index)=>{
       const opts=[target.reading],base=Math.max(0,choiceTargets.findIndex(candidate=>candidate===target||(target.e&&candidate.e===target.e&&candidate.type===target.type)));
