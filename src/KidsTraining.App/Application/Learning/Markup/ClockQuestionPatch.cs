@@ -9,7 +9,19 @@ internal static partial class LearningMarkupPatcher
   minuteWord(m){return [0,1,3,4,6,8].indexOf(m%10)>=0?'ぷん':'ふん';}
   minuteText(m){return m+this.minuteWord(m);}
   clockExplain(h,m,ask,a){if(ask==='hour')return 'みじかい はり が '+h+' を さして いるね。こたえは '+a+'。';if(ask==='minute')return 'ながい はり が さす すうじ ×5 が ふん。'+(m/5)+'×5='+this.minuteText(m)+'。こたえは '+a+'。';return 'みじかい はり＝じ、ながい はり＝ふん。こたえは '+a+'。';}
-  pickTimeUnits(g){const eh=this.rand(1,10),em=[5,10,15,20][this.rand(0,3)],ed=[10,20,30][this.rand(0,2)];const elapsed=[eh+'時'+em+'分 の '+ed+'分後は？',eh+'時'+(em+ed)+'分',[eh+'時'+em+'分',(eh+1)+'時'+em+'分',eh+'時'+(em+ed-5)+'分'],em+'分に '+ed+'分を たすと '+(em+ed)+'分。'];const L=g>=3?[
+  pickTimeUnits(g){const eh=this.rand(1,10),em=[5,10,15,20][this.rand(0,3)],ed=[10,20,30][this.rand(0,2)];const elapsed=[eh+'時'+em+'分 の '+ed+'分後は？',eh+'時'+(em+ed)+'分',[eh+'時'+em+'分',(eh+1)+'時'+em+'分',eh+'時'+(em+ed-5)+'分'],em+'分に '+ed+'分を たすと '+(em+ed)+'分。'];
+    // No.7-8: なん分まえ・経過時間・午前と午後。
+    const bh=this.rand(1,10),bm=[25,30,40,50][this.rand(0,3)],bd=[10,15,20][this.rand(0,2)];
+    const before=[bh+'時'+bm+'分 の '+bd+'分前は？',bh+'時'+(bm-bd)+'分',[bh+'時'+bm+'分',(bh+1)+'時'+(bm-bd)+'分',bh+'時'+(bm-bd+5)+'分'],bh+'時'+bm+'分の '+bd+'分まえは '+bh+'時'+(bm-bd)+'分。','minutes-before'];
+    const h1=this.rand(7,10),h2=this.rand(1,8),hours=h2+12-h1;
+    const hoursElapsed=['午前'+h1+'時 から 午後'+h2+'時 まで 何時間？',hours+'時間',[(hours-1)+'時間',(hours+1)+'時間',(hours+2)+'時間'],'午後'+h2+'時は '+(h2+12)+'時。'+(h2+12)+'−'+h1+'='+hours+'時間。','elapsed-hours'];
+    const mh=this.rand(1,10),mm=[5,10,15,20][this.rand(0,3)],md=[10,20,30][this.rand(0,2)];
+    const minsElapsed=[mh+'時'+mm+'分 から '+mh+'時'+(mm+md)+'分 まで 何分？',md+'分',[(md+5)+'分',(md-5)+'分',(md+10)+'分'],(mm+md)+'−'+mm+'='+md+'分。','elapsed-minutes'];
+    const pm=this.rand(1,11);
+    const to24=['午後'+pm+'時 を 時刻で あらわすと？',(pm+12)+'時',[pm+'時',(pm+11)+'時',(pm+13)+'時'],'午後の 時こくは 12を たす。'+pm+'+12='+(pm+12)+'。','am-pm'];
+    const h24=this.rand(13,22);
+    const from24=[h24+'時 の 時刻を 午前・午後で いうと？','午後'+(h24-12)+'時',['午前'+(h24-12)+'時','午後'+(h24-11)+'時',(h24-12)+'時'],'午後の 時こくは 12を ひく。'+h24+'−12='+(h24-12)+'。','am-pm'];
+    const L=g>=3?[
     ['1分 は 何秒？','60秒',['30秒','100秒','10秒'],'1分 = 60秒。'],
     ['2分 は 何秒？','120秒',['60秒','100秒','200秒'],'1分=60秒 だから 2分=120秒。'],
     ['1時間 は 何分？','60分',['30分','100分','10分'],'1時間 = 60分。'],
@@ -19,8 +31,9 @@ internal static partial class LearningMarkupPatcher
     ['1時間 は 何分？','60分',['30分','100分','10分'],'1時間 = 60分。'],
     ['1日 は 何時間？','24時間',['12時間','20時間','10時間'],'1日 = 24時間。'],
     ['ごぜん は 何時間？','12時間',['10時間','24時間','6時間'],'ごぜんは 12時間、ごごも 12時間。'],
-    elapsed
-  ];const it=L[this.rand(0,L.length-1)];return{topic:'clock',mode:'choices',prompt:it[0],answer:it[1],choices:this.pick4(it[1],it[2]),explanation:it[3]};}
+    elapsed,
+    ...(g>=2?[before,hoursElapsed,minsElapsed,to24,from24]:[])
+  ];const it=L[this.rand(0,L.length-1)];return{topic:'clock',mode:'choices',subtype:it[4],prompt:it[0],answer:it[1],choices:this.pick4(it[1],it[2]),explanation:it[3]};}
   pickWeekday(stage){const days=['月曜日','火曜日','水曜日','木曜日','金曜日','土曜日','日曜日'],short=['月','火','水','木','金','土','日'],base=this.rand(0,6),direction=stage===2&&Math.random()<.5?-1:1,steps=stage<=2?1:(stage<=4?this.rand(2,3):[4,5,6,8,9,10][this.rand(0,5)]),answerIndex=(base+direction*steps%7+7)%7,answer=days[answerIndex],pool=days.filter(x=>x!==answer);let prompt,explanation;if(stage<=1){prompt=days[base]+' の つぎの ようびは？';explanation=days[base]+' の つぎは '+answer+'。';}else if(stage===2&&direction<0){prompt=days[base]+' の まえの ようびは？';explanation=days[base]+' の まえは '+answer+'。';}else{prompt=days[base]+' の '+steps+'日'+(direction<0?'まえ':'あと')+'は 何曜日？';explanation=short.join('→')+' の じゅんに '+steps+'日 '+(direction<0?'もどる':'すすむ')+'と '+answer+'。';}return{topic:'clock',mode:'choices',subtype:'weekday',prompt:prompt,answer:answer,choices:this.pick4(answer,pool),explanation:explanation};}
   pickClock(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'clock');if(Math.random()<(stage>=3?.3:.2))return this.pickWeekday(stage);if(g>=2&&stage>=5&&Math.random()<0.7)return this.pickTimeUnits(g);if(g>=2&&stage===4&&Math.random()<0.2)return this.pickTimeUnits(g);const hourStr=x=>((x-1+12)%12+1)+'じ';const kinds=stage<=1?['hour','hour']:stage===2?['hour','hour','half']:stage===3?['hour','half','minute']:(g>=2?['hour','half','minute','both']:['hour','hour','half','minute']);const k=kinds[this.rand(0,kinds.length-1)];let h=this.rand(1,12),m=0,ask='hour',prompt='なんじ？',a='',pool=[];
     if(k==='hour'){m=0;ask='hour';prompt='とけいを よもう ・ なんじ？';a=h+'じ';pool=[hourStr(h+1),hourStr(h-1),hourStr(h+2),hourStr(h+3)];}
@@ -51,6 +64,24 @@ internal static partial class LearningMarkupPatcher
     Q.push(()=>{const m=this.rand(2,8),cm=this.rand(1,9)*10,total=m*100+cm;return mc(m+'m'+cm+'cm は 何cm？',total+'cm',[(m*10+cm)+'cm',(total+10)+'cm',(total-10)+'cm'],m+'m = '+(m*100)+'cm。あわせて '+total+'cm。');});
     Q.push(()=>{const l=this.rand(2,8),dl=this.rand(1,9),total=l*10+dl;return mc(l+'L'+dl+'dL は 何dL？',total+'dL',[(l+dl)+'dL',(l*100+dl)+'dL',(total-1)+'dL'],l+'L = '+(l*10)+'dL。あわせて '+total+'dL。');});
     }
+    if(g===2&&stage>=3){const cmmm=t=>t%10===0?(t/10)+'cm':Math.floor(t/10)+'cm'+(t%10)+'mm';
+    // No.9-10: mm を cm・mm に かえて よむ（46mm = 4cm6mm）。
+    Q.push(()=>{const c=this.rand(1,9),d=this.rand(1,9),t=c*10+d,q=mc(t+'mm は 何cm何mm？',c+'cm'+d+'mm',[(c+1)+'cm'+d+'mm',c+'cm',t+'cm'],'10mm で 1cm。'+t+'mm = '+c+'cm'+d+'mm。');q.subtype='mm-cmmm';return q;});
+    // No.10: cm・mm の たしざん・ひきざん。
+    Q.push(()=>{const t1=this.rand(11,59),t2=this.rand(11,Math.min(59,99-t1)),t=t1+t2,q=mc(cmmm(t1)+' + '+cmmm(t2)+' は？',cmmm(t),[cmmm(t+10),cmmm(t+20),t+'mm'],cmmm(t1)+' と '+cmmm(t2)+' を あわせて '+cmmm(t)+'。');q.subtype='cmmm-add';return q;});
+    Q.push(()=>{const t1=this.rand(22,99),t2=this.rand(11,t1-11),t=t1-t2,q=mc(cmmm(t1)+' - '+cmmm(t2)+' は？',cmmm(t),[cmmm(t+10),cmmm(t+20),t+'mm'],'mm に なおして ひくと '+t+'mm = '+cmmm(t)+'。');q.subtype='cmmm-sub';return q;});
+    }
+    if(g===2&&stage>=5){
+    // No.30: dL を L・dL に かえる（15dL = 1L5dL）。
+    Q.push(()=>{const l=this.rand(1,8),d=this.rand(1,9),t=l*10+d,q=mc(t+'dL は 何L何dL？',l+'L'+d+'dL',[(l+1)+'L'+d+'dL',l+'L',t+'L'],'10dL で 1L。'+t+'dL = '+l+'L'+d+'dL。');q.subtype='dl-ldl';return q;});
+    // No.31: L・dL の たしざん・ひきざん。
+    Q.push(()=>{const a=this.rand(2,9),b=this.rand(11-a,9),t=a+b,q=mc(a+'dL + '+b+'dL は？','1L'+(t-10)+'dL',[t+'dL','2L'+(t-10)+'dL','1L'+t+'dL'],'10dL で 1L。'+t+'dL = 1L'+(t-10)+'dL。');q.subtype='dl-add';return q;});
+    Q.push(()=>{const d=this.rand(1,9),q=mc('1L - '+d+'dL は？',(10-d)+'dL',[(11-d)+'dL',((11-d)*100)+'mL','1L'+d+'dL'],'1L = 10dL。10−'+d+'='+(10-d)+'dL。');q.subtype='dl-sub';return q;});
+    // No.30: mL と L・dL の かえ算（2L = 2000mL、3dL = 300mL、1500mL = 1L5dL）。
+    Q.push(()=>{const k=this.rand(2,9),q=mc(k+'L は 何mL？',(k*1000)+'mL',[(k*100)+'mL',(k*10)+'mL',(k*1000+100)+'mL'],'1L = 1000mL。'+k+'L = '+(k*1000)+'mL。');q.subtype='l-ml';return q;});
+    Q.push(()=>{const k=this.rand(2,9),q=mc(k+'dL は 何mL？',(k*100)+'mL',[(k*10)+'mL',(k*1000)+'mL',(k*100+10)+'mL'],'1dL = 100mL。'+k+'dL = '+(k*100)+'mL。');q.subtype='dl-ml';return q;});
+    Q.push(()=>{const l=this.rand(1,8),d=this.rand(1,9),t=l*10+d,q=mc((t*100)+'mL は 何L何dL？',l+'L'+d+'dL',[(l+1)+'L'+d+'dL',l+'L'+(d+10)+'dL',t+'dL'],'100mL で 1dL、10dL で 1L。'+(t*100)+'mL = '+l+'L'+d+'dL。');q.subtype='ml-ldl';return q;});
+    }
     if(g>=3){
     Q.push(()=>mc('1km は 何m？','1000m',['100m','10m','10000m'],'1km = 1000m。'));
     Q.push(()=>{const k=this.rand(2,9);return mc(k+'km は 何m？',(k*1000)+'m',[(k*100)+'m',(k*10)+'m',(k*10000)+'m'],'1km = 1000m。'+k+'km = '+(k*1000)+'m。');});
@@ -66,10 +97,18 @@ internal static partial class LearningMarkupPatcher
     [()=>{const n=this.rand(11,20);return mc(n+' の 1つ まえは？',n-1,[n+1,n-2,n+10],n+' の 1つ まえは '+(n-1)+'。');},()=>{let a=this.rand(1,20),b=this.rand(1,20);while(a===b)b=this.rand(1,20);return cmp(a,b);},()=>{const start=this.rand(10,15),step=Math.random()<.5?1:2,answer=start+step*2;return{...mc(start+'、'+(start+step)+'、□、'+(start+step*3)+'　□は？',answer,[answer-step,answer+step,answer+1,answer-1,answer+2*step],step+'ずつ ふえる ならび。□は '+answer+'。'),subtype:'number-sequence'};}],
     [()=>{const t=this.rand(1,9),o=this.rand(0,9),n=t*10+o;return mc('10が '+t+'こ と 1が '+o+'こで？',n,[n+10,n-1,t+o],'10が '+t+'こで '+(t*10)+'。あわせて '+n+'。');},()=>{const n=this.rand(21,119);return mc(n+' の つぎの 数は？',n+1,[n-1,n+10,n+100],n+' の つぎは '+(n+1)+'。');}],
     [()=>{const n=this.rand(2,12)*10;return mc('10を '+(n/10)+'こ あつめた 数は？',n,[n/10,n+1,n-10],'10が '+(n/10)+'こで '+n+'。');},()=>{let a=this.rand(21,120),b=this.rand(21,120);while(a===b)b=this.rand(21,120);return cmp(a,b);}]
-  ];return this.pickStage(stage,buckets,0);}if(g===2){const buckets=[
-    [()=>{const h=this.rand(1,9),t=this.rand(0,9),o=this.rand(0,9),n=h*100+t*10+o;return mc('100が '+h+'こ、10が '+t+'こ、1が '+o+'こで？',n,[n+100,n+10,h+t+o],'くらいを あわせると '+n+'。');}],
-    [()=>{const n=this.rand(101,998);return mc(n+' の つぎの 数は？',n+1,[n-1,n+10,n+100],n+' の つぎは '+(n+1)+'。');},()=>{let a=this.rand(100,999),b=this.rand(100,999);while(a===b)b=this.rand(100,999);return cmp(a,b);}],
-    [()=>{const t=this.rand(11,99);return mc('10を '+t+'こ あつめた 数は？',t*10,[t*100,t+10,t*10+10],'10が '+t+'こで '+(t*10)+'。');}],
+  ];return this.pickStage(stage,buckets,0);}if(g===2){const kj=n=>{const k='一二三四五六七八九',h=Math.floor(n/100),t=Math.floor(n%100/10),o=n%10;return (h?(h>1?k[h-1]:'')+'百':'')+(t?(t>1?k[t-1]:'')+'十':'')+(o?k[o-1]:'');};const buckets=[
+    [()=>{const h=this.rand(1,9),t=this.rand(0,9),o=this.rand(0,9),n=h*100+t*10+o;return mc('100が '+h+'こ、10が '+t+'こ、1が '+o+'こで？',n,[n+100,n+10,h+t+o],'くらいを あわせると '+n+'。');},
+    // No.26: 漢字の 数を 数字に おきかえる。
+    ()=>{const h=this.rand(1,9),t=this.rand(0,9),o=this.rand(0,9),n=h*100+t*10+o,w=kj(n),q=mc('「'+w+'」を すうじで かくと？',n,[n+100,Math.max(1,n-100),h*10+t],'百・十・一の くらいを あわせると '+n+'。');q.subtype='kanji-num';q.readingTarget=w;return q;}],
+    [()=>{const n=this.rand(101,998);return mc(n+' の つぎの 数は？',n+1,[n-1,n+10,n+100],n+' の つぎは '+(n+1)+'。');},()=>{let a=this.rand(100,999),b=this.rand(100,999);while(a===b)b=this.rand(100,999);return cmp(a,b);},
+    // No.27: 数直線に そった ならび（10・100 きざみ）。
+    ()=>{const step=Math.random()<.5?10:100,start=Math.random()<.5?this.rand(2,6)*step:this.rand(11,60)*10,miss=start+step*2,q=mc('数直線の ならび '+start+'、'+(start+step)+'、□、'+(start+step*3)+'　□は？',miss,[miss+step,miss-step,miss+1],step+'ずつ ふえる ならび。□は '+miss+'。');q.subtype='number-line';return q;}],
+    [()=>{const t=this.rand(11,99);return mc('10を '+t+'こ あつめた 数は？',t*10,[t*100,t+10,t*10+10],'10が '+t+'こで '+(t*10)+'。');},
+    // No.26: 1000の でき方（100を 10こ、999の つぎ、900+100）。
+    ()=>{const q=mc('100を 10こ あつめた 数は？',1000,[100,10000,110],'100が 10こで 1000。');q.subtype='make-1000';return q;},
+    ()=>{const q=mc('999 の つぎの 数は？',1000,[998,1099,909],'999 の つぎは 1000。');q.subtype='make-1000';return q;},
+    ()=>{const h=this.rand(1,9)*100,q=mc(h+' と '+(1000-h)+' で？',1000,[1000-h-100,1000-h+100,h],'1000 に あと '+(1000-h)+'。あわせて 1000。');q.subtype='make-1000';return q;}],
     [()=>{const th=this.rand(1,9),h=this.rand(0,9),n=th*1000+h*100;return mc('1000が '+th+'こ と 100が '+h+'こで？',n,[n+1000,n+100,th*100+h],'あわせて '+n+'。');}],
     [()=>{const n=this.rand(1001,9998);return mc(n+' の つぎの 数は？',n+1,[n-1,n+10,n+100],n+' の つぎは '+(n+1)+'。');}]
   ];return this.pickStage(stage,buckets,0);}const buckets=[
@@ -159,6 +198,10 @@ internal static partial class LearningMarkupPatcher
     }
     const kind=this.rand(0,2);
     if(kind<2){const index=kind===0?maxI:minI;return chart('いちばん '+(kind===0?'多い':'少ない')+'のは どれ？',items[index][0],items.map(it=>it[0]),items[index][0]+' が '+counts[index]*scale+unit+' で いちばん '+(kind===0?'多い':'少ない')+'。');}
+    if(stage>=3&&Math.random()<.2){
+      const total=counts.reduce((a,b)=>a+b,0)*scale;
+      return chart('表の 数を ぜんぶ あわせると？',total,[total+scale,Math.max(scale,total-scale),total-2*scale],counts.map((c,i)=>items[i][0]+' '+c*scale).join('＋')+'='+total+unit+'。',{isTable:true,tableRows:items.map((it,i)=>({label:it[0],value:counts[i]*scale+unit})),activityPrompt:mission,subtype:'chart-total'});
+    }
     const t=this.rand(0,3),answer=counts[t]*scale;
     return chart(items[t][0]+' は いくつ？',answer,[answer+scale,Math.max(1,answer-scale),answer+2*scale],'ますを 数えると '+counts[t]+'こ。1ます '+scale+unit+' だから '+answer+unit+'。');
   }
@@ -172,6 +215,17 @@ internal static partial class LearningMarkupPatcher
     if(g>=2&&stage>=2){
     Q.push(()=>{const known=this.rand(8,24),hidden=this.rand(3,16),total=known+hidden;return{topic:'story',mode:'choices',isTape:true,tapeParts:[known+'','□'],prompt:'テープ図の ぜんぶが '+total+'。□は いくつ？',answer:''+hidden,choices:this.pick4(''+hidden,[hidden+1,Math.max(1,hidden-1),known,total].map(String)),explanation:total+'−'+known+'='+hidden+'。'};});
     Q.push(()=>{const total=this.rand(18,40),used=this.rand(3,total-5),left=total-used;return{topic:'story',mode:'choices',isTape:true,tapeParts:[used+'',left+''],prompt:'ぜんぶで '+total+'。はじめの ぶぶんが '+used+'なら、のこりは？',answer:''+left,choices:this.pick4(''+left,[left+1,Math.max(1,left-1),used,total].map(String)),explanation:total+'−'+used+'='+left+'。'};});
+    // No.3/42: 二けたと 十の まとまりの ぶんしょうもんだい。
+    Q.push(()=>{const a=this.rand(21,69),b=this.rand(1,7)*10;return{topic:'story',mode:'num',subtype:'story-tens',prompt:it[0]+'が '+a+it[1]+'。あと '+b+it[1]+' かいました。ぜんぶで なん'+it[1]+'？',answer:''+(a+b),explanation:'あわせる ときは たしざん。'+a+'+'+b+'='+(a+b)+'。'};});
+    Q.push(()=>{const a=this.rand(41,99),b=this.rand(1,Math.floor((a-1)/10))*10;return{topic:'story',mode:'num',subtype:'story-tens',prompt:it[0]+'が '+a+it[1]+'。'+b+it[1]+' つかいました。のこりは なん'+it[1]+'？',answer:''+(a-b),explanation:'のこりを もとめる ときは ひきざん。'+a+'−'+b+'='+(a-b)+'。'};});
+    // No.43: 二けたどうしを あわせる ぶんしょうもんだい。
+    Q.push(()=>{const a=this.rand(11,49),b=this.rand(11,49);return{topic:'story',mode:'num',subtype:'story-combine',prompt:'1くみが '+a+'人、2くみが '+b+'人。あわせて 何人？',answer:''+(a+b),explanation:'あわせる ときは たしざん。'+a+'+'+b+'='+(a+b)+'。'};});
+    // No.42: まとめて ふえる ぶんしょうもんだい（バスに 10人、つぎに 4人と 2人）。
+    Q.push(()=>{const a=this.rand(8,30),b=this.rand(2,9),c=this.rand(2,9);return{topic:'story',mode:'num',subtype:'story-group',prompt:'バスに '+a+'人 のっていました。つぎの バスていで '+b+'人と '+c+'人が のりました。ぜんぶで 何人？',answer:''+(a+b+c),explanation:'ふえた ぶんを まとめて たす。'+a+'+'+b+'+'+c+'='+(a+b+c)+'。'};});
+    }
+    if(g>=2&&stage>=3){
+    // No.22-25: はじめの かずを さかのぼって もとめる 逆思考（テープ図）。
+    Q.push(()=>{const used=this.rand(4,18),left=this.rand(6,30),total=used+left;return{topic:'story',mode:'choices',isTape:true,tapeParts:[used+'',left+''],subtype:'story-reverse',prompt:'テープ図の ぜんぶが □。'+used+it[1]+' つかうと のこりが '+left+it[1]+'。ぜんぶは なん'+it[1]+'？',answer:''+total,choices:this.pick4(''+total,[total+1,Math.max(1,total-1),total+10,Math.max(1,left-used)].map(String)),explanation:'つかった 分と のこりを あわせると ぜんぶ。'+used+'+'+left+'='+total+'。'};});
     }
     if(g>=2&&stage>=3&&this.topicComplete(p,'mul'))Q.push(()=>{const a=this.rand(2,9),b=this.rand(2,9);return{topic:'story',mode:'choices',prompt:'1さらに '+it[0]+'が '+a+it[1]+'ずつ、'+b+'さら分。あう しきは？',answer:a+'×'+b,choices:this.pick4(a+'×'+b,[a+'＋'+b,a+'−'+b,a+'÷'+b]),explanation:'同じ数ずつ あるときは かけざん。しきは '+a+'×'+b+'。'};});
     if(g>=3&&stage>=4){
