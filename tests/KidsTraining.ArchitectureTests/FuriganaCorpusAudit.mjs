@@ -58,7 +58,11 @@ export function createFuriganaCorpusAudit(app, units) {
         let prose = remaining.replace(/「[一-龯々]」/g, '');
         for (const source of textEntry.sources.values()) {
           if (source.field === 'prompt' && source.assessmentTarget)
-            prose = prose.replaceAll(`「${source.assessmentTarget}」`, '');
+            // Parts of a long target (e.g. a kanji numeral) may already carry
+            // vocabulary furigana; what remains inside the quotes is then a
+            // fragment of the target rather than the whole surface.
+            prose = prose.replace(/「([一-龯々 ]+)」/g, (span, inner) =>
+              inner.split(/\s+/).filter(Boolean).every(frag => source.assessmentTarget.includes(frag)) ? ' ' : span);
         }
         for (const match of prose.matchAll(/[一-龯々]+/g)) {
           if (!unannotated.has(match[0])) unannotated.set(match[0], { surface: match[0], count: 0, contexts: [] });

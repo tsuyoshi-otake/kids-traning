@@ -972,11 +972,24 @@ for (const unit of writtenUnits) {
   for (let stage = 1; stage <= 5; stage += 1) {
     for (let sample = 0; sample < 80; sample += 1) {
       const q = app.genFor(unit.id, profile, stage);
-      let valid = q.writtenArithmetic === true && q.difficulty === stage;
+      let valid = (q.writtenArithmetic === true || q.subtype === 'check') && q.difficulty === stage;
+      if (q.subtype === 'check') {
+        // No.14/20: たしかめ算 — the shown result must be reproduced by the check expression.
+        const m = String(q.prompt).match(/^(\d+) ([+\-]) (\d+) = (\d+) の たしかめ　(\d+) \+ (\d+) は？$/);
+        valid &&= !!m && (m[2] === '+' ? Number(m[1]) + Number(m[3]) : Number(m[1]) - Number(m[3])) === Number(m[4])
+          && Number(m[5]) + Number(m[6]) === Number(q.answer)
+          && Number(q.answer) === Number(m[2] === '+' ? m[4] : m[1])
+          && (q.op === '＋' ? stage === 2 : stage === 3);
+      } else {
       if (unit.grade === 2 && stage === 1) valid &&= q.a >= 10 && q.a < 100 && q.b >= 10 && q.b < 100 && (q.op === '＋' ? carryCount(q.a, q.b) === 0 : borrowCount(q.a, q.b) === 0);
       if (unit.grade === 2 && stage === 2) valid &&= q.op === '＋' && carryCount(q.a, q.b) >= 1;
       if (unit.grade === 2 && stage === 3) valid &&= q.op === '−' && borrowCount(q.a, q.b) >= 1;
-      if (unit.grade === 2 && stage >= 4) valid &&= q.a >= 100 && q.b >= 100 && (stage < 5 || (q.op === '＋' ? carryCount(q.a, q.b) >= 2 : borrowCount(q.a, q.b) >= 2));
+      if (unit.grade === 2 && stage >= 4 && q.b >= 100) valid &&= q.a >= 100 && (stage < 5 || (q.op === '＋' ? carryCount(q.a, q.b) >= 2 : borrowCount(q.a, q.b) >= 2));
+      // No.34-36/40: 答えが 三桁に なる 加算（二桁＋二桁、三桁＋一・二桁）。
+      if (unit.grade === 2 && stage === 4 && q.b < 100) valid &&= q.op === '＋' && q.a + q.b >= 100 && q.a + q.b <= 999;
+      // No.37-39: 百のくらいを ふくむ 減算（三桁−一・二桁、100 - 8 型）。
+      if (unit.grade === 2 && stage === 5 && q.b < 100) valid &&= q.op === '−' && q.a >= 100 && q.b < q.a && borrowCount(q.a, q.b) >= 1;
+      }
       if (unit.grade === 3 && stage === 1) valid &&= q.a >= 100 && q.b >= 100 && (q.op === '＋' || q.op === '−');
       if (unit.grade === 3 && stage === 2) valid &&= q.op === 'mul' && q.a >= 10 && q.a < 100 && q.b < 10;
       if (unit.grade === 3 && stage === 3) valid &&= q.op === 'mul' && q.a >= 100 && q.b < 10;
@@ -986,6 +999,63 @@ for (const unit of writtenUnits) {
         break;
       }
     }
+  }
+}
+// Issue #85 — 2年上 workbook (No.2-44): every listed problem type must be reachable
+// through the real grade-2 generators at the stage where it is taught.
+const CHECK_G2_WORKBOOK = 'grade 2 generators cover the 2年上 workbook problem types';
+{
+  const g2profile = beginnerAtGrade(2);
+  const toCmMm = (t) => (t % 10 === 0 ? `${t / 10}cm` : `${Math.floor(t / 10)}cm${t % 10}mm`);
+  const parseCmMm = (text) => { const m = String(text).match(/^(\d+)cm(?:(\d+)mm)?$/); return m ? Number(m[1]) * 10 + Number(m[2] || 0) : NaN; };
+  const parseLDl = (text) => { const m = String(text).match(/^(?:(\d+)L)?(?:(\d+)dL)?$/); return m && (m[1] || m[2]) ? Number(m[1] || 0) * 10 + Number(m[2] || 0) : NaN; };
+  const cases = [
+    ['math.g2.add', 4, 'round-ten', 240, (q) => (q.n1 + q.n2) % 10 === 0 && q.n1 >= 10 && q.n1 < 100 && q.n2 >= 1 && q.n2 <= 9 && q.answer === String(q.n1 + q.n2), '16 + 4'],
+    ['math.g2.add', 4, 'tens-add-100', 240, (q) => q.n1 % 10 === 0 && q.n2 % 10 === 0 && q.n1 + q.n2 > 100 && q.answer === String(q.n1 + q.n2), '70 + 60'],
+    ['math.g2.add', 5, 'hundreds-add', 240, (q) => q.n1 % 100 === 0 && q.n2 % 100 === 0 && q.n1 + q.n2 <= 1000 && q.answer === String(q.n1 + q.n2), '500 + 200'],
+    ['math.g2.add', 5, 'paren-add', 240, (q) => { const m = String(q.prompt).match(/^(\d+) \+ \((\d+) \+ (\d+)\)$/); return !!m && Number(q.answer) === Number(m[1]) + Number(m[2]) + Number(m[3]) && (Number(m[2]) + Number(m[3])) % 10 === 0; }, '16 + (8 + 2)'],
+    ['math.g2.sub', 3, 'tens-sub-one', 240, (q) => q.a % 10 === 0 && q.b >= 1 && q.b <= 9 && q.answer === String(q.a - q.b), '40 - 7'],
+    ['math.g2.sub', 4, 'tens-sub-100', 240, (q) => q.a % 10 === 0 && q.a > 100 && q.b % 10 === 0 && q.b < q.a && q.answer === String(q.a - q.b), '130 - 50'],
+    ['math.g2.sub', 5, 'hundreds-sub', 240, (q) => q.a % 100 === 0 && q.b % 100 === 0 && q.b < q.a && q.answer === String(q.a - q.b), '1000 - 600'],
+    ['math.g2.hissan', 2, 'check', 120, (q) => q.op === '＋' && /の たしかめ/.test(String(q.prompt)), '48 + 27 の たしかめ'],
+    ['math.g2.hissan', 3, 'check', 120, (q) => q.op === '−' && /の たしかめ/.test(String(q.prompt)), '72 - 48 の たしかめ'],
+    ['math.g2.clock', 5, 'minutes-before', 800, (q) => { const m = String(q.prompt).match(/^(\d+)時(\d+)分 の (\d+)分前は？$/); return !!m && q.answer === `${m[1]}時${Number(m[2]) - Number(m[3])}分` && Number(m[2]) > Number(m[3]); }, '3時40分 の 10分前は？'],
+    ['math.g2.clock', 5, 'elapsed-hours', 800, (q) => { const m = String(q.prompt).match(/^午前(\d+)時 から 午後(\d+)時 まで 何時間？$/); return !!m && q.answer === `${Number(m[2]) + 12 - Number(m[1])}時間`; }, '午前8時 から 午後3時'],
+    ['math.g2.clock', 5, 'elapsed-minutes', 800, (q) => { const m = String(q.prompt).match(/^(\d+)時(\d+)分 から (\d+)時(\d+)分 まで 何分？$/); return !!m && q.answer === `${Number(m[3]) * 60 + Number(m[4]) - Number(m[1]) * 60 - Number(m[2])}分`; }, '9時10分 から 9時40分'],
+    ['math.g2.measure', 5, 'mm-cmmm', 500, (q) => { const m = String(q.prompt).match(/^(\d+)mm は 何cm何mm？$/); return !!m && q.answer === toCmMm(Number(m[1])) && Number(m[1]) % 10 !== 0; }, '46mm は 4cm6mm'],
+    ['math.g2.measure', 5, 'cmmm-add', 500, (q) => { const m = String(q.prompt).match(/^(\d+cm(?:\d+mm)?) \+ (\d+cm(?:\d+mm)?) は？$/); return !!m && q.answer === toCmMm(parseCmMm(m[1]) + parseCmMm(m[2])); }, '2cm3mm + 4cm5mm'],
+    ['math.g2.measure', 5, 'cmmm-sub', 500, (q) => { const m = String(q.prompt).match(/^(\d+cm(?:\d+mm)?) - (\d+cm(?:\d+mm)?) は？$/); return !!m && parseCmMm(m[1]) > parseCmMm(m[2]) && q.answer === toCmMm(parseCmMm(m[1]) - parseCmMm(m[2])); }, '4cm5mm - 2cm8mm'],
+    ['math.g2.measure', 5, 'dl-ldl', 500, (q) => { const m = String(q.prompt).match(/^(\d+)dL は 何L何dL？$/); return !!m && q.answer === `${Math.floor(Number(m[1]) / 10)}L${Number(m[1]) % 10}dL`; }, '15dL は 1L5dL'],
+    ['math.g2.measure', 5, 'dl-add', 500, (q) => { const m = String(q.prompt).match(/^(\d+)dL \+ (\d+)dL は？$/); return !!m && q.answer === `1L${Number(m[1]) + Number(m[2]) - 10}dL` && parseLDl(q.answer) === Number(m[1]) + Number(m[2]); }, '3dL + 8dL'],
+    ['math.g2.measure', 5, 'dl-sub', 500, (q) => { const m = String(q.prompt).match(/^1L - (\d+)dL は？$/); return !!m && q.answer === `${10 - Number(m[1])}dL`; }, '1L - 4dL'],
+    ['math.g2.measure', 5, 'ldl-mixed', 500, (q) => { const m = String(q.prompt).match(/^(\d+L\d+dL) ([+\-]) (\d+L\d+dL|\d+L|\d+dL) は？$/); if (!m) return false; const t = m[2] === '+' ? parseLDl(m[1]) + parseLDl(m[3]) : parseLDl(m[1]) - parseLDl(m[3]); return t >= 10 && q.answer === (t % 10 === 0 ? `${t / 10}L` : `${Math.floor(t / 10)}L${t % 10}dL`); }, '4L2dL + 1L3dL / 1L3dL - 3dL'],
+    ['math.g2.measure', 5, 'l-ml', 500, (q) => { const m = String(q.prompt).match(/^(\d+)L は 何mL？$/); return !!m && q.answer === `${Number(m[1]) * 1000}mL`; }, '2L は 2000mL'],
+    ['math.g2.measure', 5, 'dl-ml', 500, (q) => { const m = String(q.prompt).match(/^(\d+)dL は 何mL？$/); return !!m && q.answer === `${Number(m[1]) * 100}mL`; }, '3dL は 300mL'],
+    ['math.g2.measure', 5, 'ml-ldl', 500, (q) => { const m = String(q.prompt).match(/^(\d+)mL は 何L何dL？$/); return !!m && q.answer === `${Math.floor(Number(m[1]) / 1000)}L${(Number(m[1]) % 1000) / 100}dL`; }, '1500mL は 1L5dL'],
+    ['math.g2.kazu', 1, 'kanji-num', 240, (q) => /^「[一二三四五六七八九十百]+」を すうじで かくと？$/.test(String(q.prompt)) && q.readingTarget && Number(q.answer) >= 100 && Number(q.answer) <= 999, '「三百五十二」を すうじで'],
+    ['math.g2.kazu', 2, 'number-line', 240, (q) => { const m = String(q.prompt).match(/^数直線の ならび (\d+)、(\d+)、□、(\d+)　□は？$/); if (!m) return false; const step = Number(m[2]) - Number(m[1]); return step > 0 && Number(m[3]) - Number(m[2]) === 2 * step && Number(q.answer) === Number(m[2]) + step; }, '240、250、□、270'],
+    ['math.g2.kazu', 3, 'make-1000', 240, (q) => q.answer === '1000', '100を 10こ / 999の つぎ'],
+    ['math.g2.story', 2, 'story-tens', 300, (q) => Number(q.answer) > 0 && /なん(?:こ|本|まい|さつ)？$/.test(String(q.prompt)), '34本 + 30本'],
+    ['math.g2.story', 2, 'story-combine', 300, (q) => { const m = String(q.prompt).match(/^1くみが (\d+)人、2くみが (\d+)人。あわせて 何人？$/); return !!m && Number(q.answer) === Number(m[1]) + Number(m[2]); }, '24人 + 35人'],
+    ['math.g2.story', 2, 'story-group', 300, (q) => { const m = String(q.prompt).match(/^バスに (\d+)人 のっていました。つぎの バスていで (\d+)人と (\d+)人が のりました。ぜんぶで 何人？$/); return !!m && Number(q.answer) === Number(m[1]) + Number(m[2]) + Number(m[3]); }, '10人に 4人と 2人'],
+    ['math.g2.story', 3, 'story-reverse', 300, (q) => q.isTape === true && Array.isArray(q.tapeParts) && Number(q.answer) === q.tapeParts.reduce((s, p) => s + Number(p), 0) && /ぜんぶは なん/.test(String(q.prompt)), 'つかった+のこり=ぜんぶ'],
+    ['math.g2.chart', 3, 'chart-total', 600, (q) => q.isChart === true && q.isTable === true && Number(q.answer) === (q.rows || []).reduce((s, r) => s + r.count, 0) * (q.chartScale || 1), '表の 数の 合計'],
+    ['math.g2.order', 2, 'paren-add', 200, (q) => { const m = String(q.prompt).match(/^\(?(\d+)\)? \+ \(\)?(\d+)\)? \+ \(\)?(\d+)\)? は？$/) || String(q.prompt).match(/^(\d+) \+ \((\d+) \+ (\d+)\) は？$/) || String(q.prompt).match(/^\((\d+) \+ (\d+)\) \+ (\d+) は？$/); return !!m && Number(q.answer) === Number(m[1]) + Number(m[2]) + Number(m[3]); }, '(4 + 5) + 7'],
+    ['math.g2.order', 4, 'expr-cmp', 240, (q) => { const m = String(q.prompt).match(/^(\d+) ([+\-]) (\d+) □ (\d+)　□に はいる しるしは？$/); if (!m) return false; const lv = m[2] === '+' ? Number(m[1]) + Number(m[3]) : Number(m[1]) - Number(m[3]); const rv = Number(m[4]); return q.answer === (lv === rv ? '＝' : lv > rv ? '＞' : '＜'); }, '60 + 70 □ 120'],
+  ];
+  observe(CHECK_G2_WORKBOOK, cases.length);
+  for (const [unitId, stage, subtype, draws, validate, example] of cases) {
+    const seen = [];
+    for (let i = 0; i < draws; i += 1) {
+      const q = app.genFor(unitId, g2profile, stage);
+      if (q.subtype === subtype) seen.push(q);
+    }
+    if (!seen.length) {
+      violated(CHECK_G2_WORKBOOK, `${unitId} stage ${stage} never produced ${subtype}`, example);
+      continue;
+    }
+    const bad = seen.find((q) => !validate(q));
+    if (bad) violated(CHECK_G2_WORKBOOK, `${unitId} stage ${stage} produced an invalid ${subtype}`, JSON.stringify(bad));
   }
 }
 const originalSettings = app.state.settings;
@@ -1902,6 +1972,13 @@ for (const unit of UNITS) {
               'decimal or fraction arithmetic leaked into the grade-2 question bank',
               `${context} | ${explanation}`,
             );
+          }
+        }
+
+        if (topic === 'clock' && grade === 2) {
+          observe('grade-2 clock stays within the 12-hour clock');
+          if (/^(1[3-9]|2[0-3])時/.test(answer) || /時刻で あらわす|午前・午後で いうと|24時間制/.test(prompt)) {
+            violated('grade-2 clock stays within the 12-hour clock', `${prompt} -> ${answer}`, context);
           }
         }
 

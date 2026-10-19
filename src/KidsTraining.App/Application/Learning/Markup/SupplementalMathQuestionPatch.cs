@@ -30,10 +30,15 @@ internal static partial class LearningMarkupPatcher
     [()=>{const a=this.rand(5,30),same=Math.random()<.25,b=same?a:this.rand(5,30);return cmp(''+a,''+b,a,b);}],
     // a=b=c だと 部分和が ぜんぶ 同じに なって 3たくに つぶれるので、
     // かならず ちがう 数（ans±1・ans+2）を うしろに たしておく。
-    [()=>{const a=this.rand(1,9),b=this.rand(1,9),c=this.rand(1,9),ans=a+b+c;return{topic:'order',mode:'choices',prompt:a+' + ('+b+' + '+c+') は？',answer:''+ans,choices:this.pick4(''+ans,[a+b,a+c,b+c,ans+1,ans-1,ans+2].map(String)),explanation:'（ ）の なかを さきに。'+b+'+'+c+'='+(b+c)+'、'+a+'+'+(b+c)+'='+ans+'。'};}],
+    [()=>{const a=this.rand(1,9),b=this.rand(1,9),c=this.rand(1,9),ans=a+b+c;return{topic:'order',mode:'choices',subtype:'paren-add',prompt:a+' + ('+b+' + '+c+') は？',answer:''+ans,choices:this.pick4(''+ans,[a+b,a+c,b+c,ans+1,ans-1,ans+2].map(String)),explanation:'（ ）の なかを さきに。'+b+'+'+c+'='+(b+c)+'、'+a+'+'+(b+c)+'='+ans+'。'};},
+    // No.44: （ ）が 前に ある 形（(4+5)+7）。たし算は どこから まとめても おなじ。
+    ()=>{const a=this.rand(1,9),b=this.rand(1,9),c=this.rand(1,9),ans=a+b+c;return{topic:'order',mode:'choices',subtype:'paren-add',prompt:'('+a+' + '+b+') + '+c+' は？',answer:''+ans,choices:this.pick4(''+ans,[a+b,a+c,b+c,ans+1,ans-1,ans+2].map(String)),explanation:'（ ）の なかを さきに。'+a+'+'+b+'='+(a+b)+'、'+(a+b)+'+'+c+'='+ans+'。'};}],
     // c=1 だと a−b と ans+1 が 同じ 数に なるので、こちらも 予備の distractor を おく。
     [()=>{const b=this.rand(1,6),c=this.rand(1,6),a=this.rand(b+c+1,25),ans=a-(b+c);return{topic:'order',mode:'choices',prompt:a+' − ('+b+' + '+c+') は？',answer:''+ans,choices:this.pick4(''+ans,[a-b+c,a-b,ans+1,ans-1,ans+2].map(String)),explanation:'（ ）の なかを さきに。'+b+'+'+c+'='+(b+c)+'、'+a+'−'+(b+c)+'='+ans+'。'};}],
-    [()=>{const a=this.rand(2,9),b=this.rand(1,9),c=this.rand(2,9),d=this.rand(1,9);return cmp(a+' + '+b,c+' + '+d,a+b,c+d);}],
+    [()=>{const a=this.rand(2,9),b=this.rand(1,9),c=this.rand(2,9),d=this.rand(1,9);return cmp(a+' + '+b,c+' + '+d,a+b,c+d);},
+    // No.28-29: しきと 数の くらべ（60 + 70 □ 120、140 - 60 □ 90）。
+    ()=>{const a=this.rand(2,9)*10,b=this.rand(1,9)*10,lv=a+b,rv=Math.random()<.25?lv:this.rand(8,19)*10;const q=cmp(a+' + '+b,''+rv,lv,rv);q.subtype='expr-cmp';return q;},
+    ()=>{const a=this.rand(12,19)*10,b=this.rand(1,9)*10,lv=a-b,rv=Math.random()<.25?lv:this.rand(4,16)*10;const q=cmp(a+' - '+b,''+rv,lv,rv);q.subtype='expr-cmp';return q;}],
     // b=c だと 「a − b」と「a − c」が 同じ しきに なるので、
     // かならず ちがう しき「a + b」も 用意する。'c + b' は 正解と 同じ 意味に なるので だめ。
     [()=>{const b=this.rand(2,7),c=this.rand(1,6),a=this.rand(b+c+2,30),inside=b+c,ans=a-inside;return{topic:'order',mode:'choices',prompt:a+' − ('+b+' + '+c+')　さいしょに けいさんするのは？',answer:b+' + '+c,choices:this.pick4(b+' + '+c,[a+' − '+b,a+' − '+c,a+' − '+inside,a+' + '+b]),explanation:'（ ）の なかの '+b+'+'+c+' を さいしょに けいさんする。こたえは '+ans+'。'};}]

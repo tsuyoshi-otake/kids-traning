@@ -11,7 +11,17 @@ genAdd(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'add'),make=(a,
     [()=>{let a=this.rand(10,89);if(a%10===9)a-=1;const b=this.rand(1,9-a%10);return make(a,b);},()=>{const a=this.rand(1,8)*10,b=this.rand(1,9-a/10)*10,ans=a+b;return make(a,b,{prompt:a+' + '+b,answer:ans,explanation:'10のまとまりで かんがえる。'+a+' + '+b+' = '+ans+'。'});},()=>{const a=this.rand(10,50),b=this.rand(1,9),total=a+b;return{topic:'add',mode:'num',subtype:'missing-add',prompt:a+' + □ = '+total,answer:''+b,explanation:total+' から '+a+' を ひくと '+b+'。'};},()=>make(10,2,{prompt:'10 + 2',answer:12,explanation:'10 + 2 = 12。'}),()=>make(10,5,{prompt:'10 + 5',answer:15,explanation:'10 + 5 = 15。'})],
     [()=>{let a=this.rand(18,89);if(a%10===0)a+=1;const b=this.rand(Math.max(2,10-a%10),9);return make(a,b);},()=>{const x=this.rand(1,9),y=this.rand(1,9),z=this.rand(1,9),s=x+y+z;return make(x+y,z,{prompt:x+' + '+y+' + '+z,answer:s,explanation:'まえから じゅんに。'+x+'+'+y+'='+(x+y)+'、'+(x+y)+'+'+z+'='+s+'。'});} ],
     g<=1?[()=>{const x=this.rand(3,9),y=this.rand(3,9),z=this.rand(2,9),s=x+y+z;return make(x+y,z,{prompt:x+' + '+y+' + '+z,answer:s,explanation:'まえから じゅんに。'+x+'+'+y+'='+(x+y)+'、'+(x+y)+'+'+z+'='+s+'。'});},()=>{const a=this.rand(0,20);return make(a,0,{prompt:a+' + 0',answer:a,explanation:'0を たしても 数は '+a+'の まま。'});}]:[()=>makeHissan(),()=>makeHissan(58,29),()=>makeHissan(68,22),()=>makeHissan(35,25),()=>makeHissan(19,43)]
-  ];return this.pickStage(stage,buckets,0);}
+  ];if(g>=2){buckets[3].push(
+    // No.5: つぎの 何十に なる 二桁＋一桁（16 + 4 = 20）。
+    ()=>{const a=this.rand(2,8)*10+this.rand(1,9),b=10-a%10,q=make(a,b);q.subtype='round-ten';q.explanation='きりのいい かずに なるまで たす。'+a+' + '+b+' = '+(a+b)+'。';return q;},
+    // No.28-29: こたえが 100を こえる 何十＋何十（70 + 60 = 130）。
+    ()=>{const a=this.rand(2,9)*10,b=this.rand(11-a/10,9)*10,q=make(a,b);q.subtype='tens-add-100';q.explanation='10の まとまりで かんがえる。'+a+' + '+b+' = '+(a+b)+'。';return q;}
+  );buckets[4].push(
+    // No.28-29: 何百＋何百（500 + 200、200 + 800 = 1000 まで）。
+    ()=>{const a=this.rand(1,9)*100,b=this.rand(1,10-a/100)*100,q=make(a,b);q.subtype='hundreds-add';q.explanation='100の まとまりで かんがえる。'+a+' + '+b+' = '+(a+b)+'。';return q;},
+    // No.44: （ ）を さきに けいさんする。16 + (8 + 2) のように 何十に まとまる 組に する。
+    ()=>{const a=this.rand(11,88),b=Math.random()<.5?this.rand(1,9):this.rand(1,8)*10+this.rand(1,9),c=10-b%10,ans=a+b+c;return{topic:'add',mode:'num',subtype:'paren-add',n1:a,n2:b+c,prompt:a+' + ('+b+' + '+c+')',answer:''+ans,explanation:'（ ）の なかを さきに。'+b+' + '+c+' = '+(b+c)+'、'+a+' + '+(b+c)+' = '+ans+'。'};}
+  );}return this.pickStage(stage,buckets,0);}
 """;
     }
 
@@ -35,9 +45,9 @@ genSub(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'sub'),make=(a,
   const upperGradeBuckets=[
     [basic],
     [()=>{const a=this.rand(11,18),b=this.rand(1,Math.max(1,a%10));return make(a,b);},()=>{const a=this.rand(5,18),b=this.rand(1,a-1),answer=a-b;return{topic:'sub',mode:'num',subtype:'missing-sub',prompt:a+' - □ = '+answer,answer:''+b,explanation:a+' から '+answer+' になるには '+b+' を ひく。'};}],
-    [()=>{let a=this.rand(21,89);if(a%10===0)a++;const b=this.rand(1,a%10);return make(a,b);},()=>{const a=this.rand(2,9)*10,b=this.rand(1,a/10-1)*10;return make(a,b);},()=>{const b=this.rand(2,9),answer=this.rand(10,40),a=answer+b;return{topic:'sub',mode:'num',subtype:'missing-sub',prompt:'□ - '+b+' = '+answer,answer:''+a,explanation:answer+' に '+b+' を たすと '+a+'。'};}],
-    [()=>{const a=this.rand(30,99),b=this.rand(a%10+1,Math.min(19,a-1));return make(a,b);},()=>{const x=this.rand(12,28),y=this.rand(1,8),z=this.rand(1,Math.max(1,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});},()=>({topic:'sub',mode:'num',prompt:'9 - 3 - 2',answer:'4',explanation:'まえから じゅんに。9−3=6、6−2=4。'})],
-    [makeHissan]
+    [()=>{let a=this.rand(21,89);if(a%10===0)a++;const b=this.rand(1,a%10);return make(a,b);},()=>{const a=this.rand(2,9)*10,b=this.rand(1,a/10-1)*10;return make(a,b);},()=>{const a=this.rand(2,9)*10,b=this.rand(1,9),q=make(a,b);q.subtype='tens-sub-one';q.explanation='10の まとまりから '+b+' を ひく。'+a+' - '+b+' = '+(a-b)+'。';return q;},()=>{const b=this.rand(2,9),answer=this.rand(10,40),a=answer+b;return{topic:'sub',mode:'num',subtype:'missing-sub',prompt:'□ - '+b+' = '+answer,answer:''+a,explanation:answer+' に '+b+' を たすと '+a+'。'};}],
+    [()=>{const a=this.rand(30,99),b=this.rand(a%10+1,Math.min(19,a-1));return make(a,b);},()=>{const a=this.rand(11,19)*10,b=this.rand(1,9)*10,q=make(a,b);q.subtype='tens-sub-100';q.explanation='10の まとまりで かんがえる。'+a+' - '+b+' = '+(a-b)+'。';return q;},()=>{const x=this.rand(12,28),y=this.rand(1,8),z=this.rand(1,Math.max(1,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});},()=>({topic:'sub',mode:'num',prompt:'9 - 3 - 2',answer:'4',explanation:'まえから じゅんに。9−3=6、6−2=4。'})],
+    [makeHissan,()=>{const a=this.rand(2,10)*100,b=this.rand(1,a/100-1)*100,q=make(a,b);q.subtype='hundreds-sub';q.explanation='100の まとまりで かんがえる。'+a+' - '+b+' = '+(a-b)+'。';return q;}]
   ];
   return this.pickStage(stage,g<=1?gradeOneBuckets:upperGradeBuckets,0);}
 """;
@@ -49,10 +59,22 @@ genSub(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'sub'),make=(a,
 genHissan(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'hissan'),tag=(q,d)=>{q.difficulty=d;q.writtenArithmetic=true;return q;},add=(a,b,d)=>tag({topic:'hissan',mode:'num',op:'＋',a:a,b:b,prompt:a+' + '+b,answer:''+(a+b),explanation:'くらいを そろえて、右の くらいから じゅんに たす。'+a+' + '+b+' = '+(a+b)+'。'},d),sub=(a,b,d)=>tag({topic:'hissan',mode:'num',op:'−',a:a,b:b,prompt:a+' - '+b,answer:''+(a-b),explanation:'くらいを そろえて、右の くらいから じゅんに ひく。'+a+' - '+b+' = '+(a-b)+'。'},d),mul=(a,b,d)=>tag({topic:'hissan',mode:'num',op:'mul',a:a,b:b,prompt:a+' × '+b,answer:''+(a*b),explanation:'くらいを そろえて、右の くらいから じゅんに かける。'+a+' × '+b+' = '+(a*b)+'。'},d),choose=items=>items[this.rand(0,items.length-1)](),find=(factory,test,fallback)=>{for(let i=0;i<40;i++){const pair=factory();if(test(pair[0],pair[1]))return pair;}return fallback;},carry=(a,b)=>{let count=0,incoming=0;while(a||b||incoming){const total=a%10+b%10+incoming;if(total>=10)count++;incoming=total>=10?1:0;a=Math.floor(a/10);b=Math.floor(b/10);}return count;},borrow=(a,b)=>{let count=0,loan=0;while(a||b){let digit=a%10-loan;const take=b%10;loan=0;if(digit<take){count++;loan=1;}a=Math.floor(a/10);b=Math.floor(b/10);}return count;};
   const gradeTwo=[
     [()=>{const pair=find(()=>[this.rand(21,87),this.rand(11,Math.min(87,99))],(a,b)=>a+b<=99&&carry(a,b)===0,[42,35]);return add(pair[0],pair[1],1);},()=>{const pair=find(()=>{const a=this.rand(32,98);return[a,this.rand(11,a-1)];},(a,b)=>borrow(a,b)===0,[86,43]);return sub(pair[0],pair[1],1);}],
-    [()=>{const pair=find(()=>[this.rand(24,79),this.rand(16,79)],(a,b)=>a+b<=99&&carry(a,b)>=1,[48,27]);return add(pair[0],pair[1],2);}],
-    [()=>{const pair=find(()=>{const a=this.rand(31,98);return[a,this.rand(12,a-1)];},(a,b)=>borrow(a,b)>=1,[72,48]);return sub(pair[0],pair[1],3);}],
-    [()=>{const pair=find(()=>[this.rand(123,799),this.rand(111,799)],(a,b)=>a+b<=999&&carry(a,b)>=1,[368,457]);return add(pair[0],pair[1],4);},()=>{const pair=find(()=>{const a=this.rand(301,999);return[a,this.rand(111,a-1)];},(a,b)=>borrow(a,b)>=1,[704,286]);return sub(pair[0],pair[1],4);}],
-    [()=>{const pair=find(()=>[this.rand(248,799),this.rand(178,699)],(a,b)=>a+b<=999&&carry(a,b)>=2,[468,357]);return add(pair[0],pair[1],5);},()=>{const pair=find(()=>{const a=this.rand(401,999);return[a,this.rand(112,a-1)];},(a,b)=>borrow(a,b)>=2,[802,467]);return sub(pair[0],pair[1],5);},()=>sub(700,286,5)]
+    [()=>{const pair=find(()=>[this.rand(24,79),this.rand(16,79)],(a,b)=>a+b<=99&&carry(a,b)>=1,[48,27]);return add(pair[0],pair[1],2);},
+    // No.14: たし算の たしかめ — たす 数を いれかえて おなじ こたえに なるか 見る。
+    ()=>{const pair=find(()=>[this.rand(24,79),this.rand(16,79)],(a,b)=>a+b<=99,[48,27]),a=pair[0],b=pair[1],s=a+b;return{topic:'hissan',mode:'num',subtype:'check',op:'＋',a:a,b:b,difficulty:2,prompt:a+' + '+b+' = '+s+' の たしかめ　'+b+' + '+a+' は？',answer:''+s,explanation:'たす 数を いれかえても こたえは おなじ。'+b+' + '+a+' = '+s+'。'};}],
+    [()=>{const pair=find(()=>{const a=this.rand(31,98);return[a,this.rand(12,a-1)];},(a,b)=>borrow(a,b)>=1,[72,48]);return sub(pair[0],pair[1],3);},
+    // No.20: ひき算の たしかめ — こたえと ひく 数を たすと もとの 数に もどる。
+    ()=>{const pair=find(()=>{const a=this.rand(31,98);return[a,this.rand(12,a-1)];},(a,b)=>a-b>0,[72,48]),a=pair[0],b=pair[1],r=a-b;return{topic:'hissan',mode:'num',subtype:'check',op:'−',a:a,b:b,difficulty:3,prompt:a+' - '+b+' = '+r+' の たしかめ　'+r+' + '+b+' は？',answer:''+a,explanation:'ひきざんは たしざんで たしかめる。'+r+' + '+b+' = '+a+'。'};}],
+    [()=>{const pair=find(()=>[this.rand(123,799),this.rand(111,799)],(a,b)=>a+b<=999&&carry(a,b)>=1,[368,457]);return add(pair[0],pair[1],4);},()=>{const pair=find(()=>{const a=this.rand(301,999);return[a,this.rand(111,a-1)];},(a,b)=>borrow(a,b)>=1,[704,286]);return sub(pair[0],pair[1],4);},
+    // No.34-35: こたえが 三桁に なる 二桁＋二桁（46 + 92 = 138）。
+    ()=>{const pair=find(()=>[this.rand(41,99),this.rand(41,99)],(a,b)=>a+b>=100,[96,92]);return add(pair[0],pair[1],4);},
+    // No.40: 三桁＋一・二桁（528 + 28、503 + 7）。
+    ()=>{const a=this.rand(101,979),b=this.rand(1,Math.min(89,999-a));return add(a,b,4);}],
+    [()=>{const pair=find(()=>[this.rand(248,799),this.rand(178,699)],(a,b)=>a+b<=999&&carry(a,b)>=2,[468,357]);return add(pair[0],pair[1],5);},()=>{const pair=find(()=>{const a=this.rand(401,999);return[a,this.rand(112,a-1)];},(a,b)=>borrow(a,b)>=2,[802,467]);return sub(pair[0],pair[1],5);},()=>sub(700,286,5),
+    // No.37-39: 三桁−一・二桁（105 - 16、148 - 83）。百のくらいからの くりさがりを ふくむ。
+    ()=>{const pair=find(()=>{const a=this.rand(101,989);return[a,this.rand(1,Math.min(99,a-1))];},(a,b)=>borrow(a,b)>=1,[103,96]);return sub(pair[0],pair[1],5);},
+    // No.38: きりの よい 百から ひく（100 - 8、300 - 92）。
+    ()=>sub(this.rand(1,9)*100,this.rand(1,99),5)]
   ];
   const gradeThree=[
     [()=>{const pair=find(()=>[this.rand(123,899),this.rand(111,699)],(a,b)=>a+b<=999&&carry(a,b)>=1,[368,457]);return add(pair[0],pair[1],1);},()=>{const a=this.rand(321,999),b=this.rand(111,a-1);return sub(a,b,1);}],
