@@ -77,6 +77,14 @@ internal static partial class LearningMarkupPatcher
     // No.31: L・dL の たしざん・ひきざん。
     Q.push(()=>{const a=this.rand(2,9),b=this.rand(11-a,9),t=a+b,q=mc(a+'dL + '+b+'dL は？','1L'+(t-10)+'dL',[t+'dL','2L'+(t-10)+'dL','1L'+t+'dL'],'10dL で 1L。'+t+'dL = 1L'+(t-10)+'dL。');q.subtype='dl-add';return q;});
     Q.push(()=>{const d=this.rand(1,9),q=mc('1L - '+d+'dL は？',(10-d)+'dL',[(11-d)+'dL',((11-d)*100)+'mL','1L'+d+'dL'],'1L = 10dL。10−'+d+'='+(10-d)+'dL。');q.subtype='dl-sub';return q;});
+    // No.31: L・dL の まじった たしざん・ひきざん（4L2dL + 1L3dL、2L5dL + 5dL = 3L、9L5dL - 7L2dL、1L3dL - 3dL = 1L、5L6dL - 1L）。
+    const ldl=t=>t<10?t+'dL':t%10===0?(t/10)+'L':Math.floor(t/10)+'L'+(t%10)+'dL';
+    Q.push(()=>{const aL=this.rand(1,7),aD=this.rand(1,9),bL=Math.random()<.5?this.rand(1,7-aL):0,bD=Math.random()<.4?10-aD:this.rand(1,9),a=aL*10+aD,b=bL*10+bD,t=a+b,q=mc(ldl(a)+' + '+ldl(b)+' は？',ldl(t),[ldl(t+10),ldl(t>=21?t-10:t+20),ldl(t+1),ldl(t-1),bL?ldl(aL*10+aD+bD):ldl(t+2)],'dL に なおすと '+a+'dL + '+b+'dL = '+t+'dL = '+ldl(t)+'。');q.subtype='ldl-mixed';return q;});
+    Q.push(()=>{const aL=this.rand(2,9),aD=this.rand(1,9),a=aL*10+aD,form=this.rand(0,2);let b;
+      if(form===0){const bD=this.rand(0,9),maxL=bD>aD?aL-2:aL-1,bL=maxL>=1?this.rand(1,maxL):0;b=bL*10+bD;}
+      else if(form===1)b=aD;
+      else b=this.rand(1,aL-1)*10;
+      const t=a-b,q=mc(ldl(a)+' - '+ldl(b)+' は？',ldl(t),[ldl(t+10),ldl(t>=21?t-10:t+20),ldl(t+1),ldl(t-1),ldl(t+2)],'dL に なおして ひくと '+a+'dL - '+b+'dL = '+t+'dL = '+ldl(t)+'。');q.subtype='ldl-mixed';return q;});
     // No.30: mL と L・dL の かえ算（2L = 2000mL、3dL = 300mL、1500mL = 1L5dL）。
     Q.push(()=>{const k=this.rand(2,9),q=mc(k+'L は 何mL？',(k*1000)+'mL',[(k*100)+'mL',(k*10)+'mL',(k*1000+100)+'mL'],'1L = 1000mL。'+k+'L = '+(k*1000)+'mL。');q.subtype='l-ml';return q;});
     Q.push(()=>{const k=this.rand(2,9),q=mc(k+'dL は 何mL？',(k*100)+'mL',[(k*10)+'mL',(k*1000)+'mL',(k*100+10)+'mL'],'1dL = 100mL。'+k+'dL = '+(k*100)+'mL。');q.subtype='dl-ml';return q;});
