@@ -1022,7 +1022,6 @@ const CHECK_G2_WORKBOOK = 'grade 2 generators cover the 2年上 workbook problem
     ['math.g2.clock', 5, 'minutes-before', 800, (q) => { const m = String(q.prompt).match(/^(\d+)時(\d+)分 の (\d+)分前は？$/); return !!m && q.answer === `${m[1]}時${Number(m[2]) - Number(m[3])}分` && Number(m[2]) > Number(m[3]); }, '3時40分 の 10分前は？'],
     ['math.g2.clock', 5, 'elapsed-hours', 800, (q) => { const m = String(q.prompt).match(/^午前(\d+)時 から 午後(\d+)時 まで 何時間？$/); return !!m && q.answer === `${Number(m[2]) + 12 - Number(m[1])}時間`; }, '午前8時 から 午後3時'],
     ['math.g2.clock', 5, 'elapsed-minutes', 800, (q) => { const m = String(q.prompt).match(/^(\d+)時(\d+)分 から (\d+)時(\d+)分 まで 何分？$/); return !!m && q.answer === `${Number(m[3]) * 60 + Number(m[4]) - Number(m[1]) * 60 - Number(m[2])}分`; }, '9時10分 から 9時40分'],
-    ['math.g2.clock', 5, 'am-pm', 800, (q) => { const to = String(q.prompt).match(/^午後(\d+)時 を 時刻で あらわすと？$/); const from = String(q.prompt).match(/^(\d+)時 の 時刻を 午前・午後で いうと？$/); if (to) return q.answer === `${Number(to[1]) + 12}時`; return !!from && q.answer === `午後${Number(from[1]) - 12}時`; }, '午後3時 ↔ 15時'],
     ['math.g2.measure', 5, 'mm-cmmm', 500, (q) => { const m = String(q.prompt).match(/^(\d+)mm は 何cm何mm？$/); return !!m && q.answer === toCmMm(Number(m[1])) && Number(m[1]) % 10 !== 0; }, '46mm は 4cm6mm'],
     ['math.g2.measure', 5, 'cmmm-add', 500, (q) => { const m = String(q.prompt).match(/^(\d+cm(?:\d+mm)?) \+ (\d+cm(?:\d+mm)?) は？$/); return !!m && q.answer === toCmMm(parseCmMm(m[1]) + parseCmMm(m[2])); }, '2cm3mm + 4cm5mm'],
     ['math.g2.measure', 5, 'cmmm-sub', 500, (q) => { const m = String(q.prompt).match(/^(\d+cm(?:\d+mm)?) - (\d+cm(?:\d+mm)?) は？$/); return !!m && parseCmMm(m[1]) > parseCmMm(m[2]) && q.answer === toCmMm(parseCmMm(m[1]) - parseCmMm(m[2])); }, '4cm5mm - 2cm8mm'],
@@ -1973,6 +1972,13 @@ for (const unit of UNITS) {
               'decimal or fraction arithmetic leaked into the grade-2 question bank',
               `${context} | ${explanation}`,
             );
+          }
+        }
+
+        if (topic === 'clock' && grade === 2) {
+          observe('grade-2 clock stays within the 12-hour clock');
+          if (/^(1[3-9]|2[0-3])時/.test(answer) || /時刻で あらわす|午前・午後で いうと|24時間制/.test(prompt)) {
+            violated('grade-2 clock stays within the 12-hour clock', `${prompt} -> ${answer}`, context);
           }
         }
 

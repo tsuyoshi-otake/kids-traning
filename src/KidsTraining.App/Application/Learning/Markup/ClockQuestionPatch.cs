@@ -13,14 +13,10 @@ internal static partial class LearningMarkupPatcher
     // No.7-8: なん分まえ・経過時間・午前と午後。
     const bh=this.rand(1,10),bm=[25,30,40,50][this.rand(0,3)],bd=[10,15,20][this.rand(0,2)];
     const before=[bh+'時'+bm+'分 の '+bd+'分前は？',bh+'時'+(bm-bd)+'分',[bh+'時'+bm+'分',(bh+1)+'時'+(bm-bd)+'分',bh+'時'+(bm-bd+5)+'分'],bh+'時'+bm+'分の '+bd+'分まえは '+bh+'時'+(bm-bd)+'分。','minutes-before'];
-    const h1=this.rand(7,10),h2=this.rand(1,8),hours=h2+12-h1;
+    const h1=this.rand(8,10),h2=this.rand(1,8),hours=h2+12-h1;
     const hoursElapsed=['午前'+h1+'時 から 午後'+h2+'時 まで 何時間？',hours+'時間',[(hours-1)+'時間',(hours+1)+'時間',(hours+2)+'時間'],'午後'+h2+'時は '+(h2+12)+'時。'+(h2+12)+'−'+h1+'='+hours+'時間。','elapsed-hours'];
     const mh=this.rand(1,10),mm=[5,10,15,20][this.rand(0,3)],md=[10,20,30][this.rand(0,2)];
     const minsElapsed=[mh+'時'+mm+'分 から '+mh+'時'+(mm+md)+'分 まで 何分？',md+'分',[(md+5)+'分',(md-5)+'分',(md+10)+'分'],(mm+md)+'−'+mm+'='+md+'分。','elapsed-minutes'];
-    const pm=this.rand(1,11);
-    const to24=['午後'+pm+'時 を 時刻で あらわすと？',(pm+12)+'時',[pm+'時',(pm+11)+'時',(pm+13)+'時'],'午後の 時こくは 12を たす。'+pm+'+12='+(pm+12)+'。','am-pm'];
-    const h24=this.rand(13,22);
-    const from24=[h24+'時 の 時刻を 午前・午後で いうと？','午後'+(h24-12)+'時',['午前'+(h24-12)+'時','午後'+(h24-11)+'時',(h24-12)+'時'],'午後の 時こくは 12を ひく。'+h24+'−12='+(h24-12)+'。','am-pm'];
     const L=g>=3?[
     ['1分 は 何秒？','60秒',['30秒','100秒','10秒'],'1分 = 60秒。'],
     ['2分 は 何秒？','120秒',['60秒','100秒','200秒'],'1分=60秒 だから 2分=120秒。'],
@@ -32,7 +28,7 @@ internal static partial class LearningMarkupPatcher
     ['1日 は 何時間？','24時間',['12時間','20時間','10時間'],'1日 = 24時間。'],
     ['ごぜん は 何時間？','12時間',['10時間','24時間','6時間'],'ごぜんは 12時間、ごごも 12時間。'],
     elapsed,
-    ...(g>=2?[before,hoursElapsed,minsElapsed,to24,from24]:[])
+    ...(g>=2?[before,hoursElapsed,minsElapsed]:[])
   ];const it=L[this.rand(0,L.length-1)];return{topic:'clock',mode:'choices',subtype:it[4],prompt:it[0],answer:it[1],choices:this.pick4(it[1],it[2]),explanation:it[3]};}
   pickWeekday(stage){const days=['月曜日','火曜日','水曜日','木曜日','金曜日','土曜日','日曜日'],short=['月','火','水','木','金','土','日'],base=this.rand(0,6),direction=stage===2&&Math.random()<.5?-1:1,steps=stage<=2?1:(stage<=4?this.rand(2,3):[4,5,6,8,9,10][this.rand(0,5)]),answerIndex=(base+direction*steps%7+7)%7,answer=days[answerIndex],pool=days.filter(x=>x!==answer);let prompt,explanation;if(stage<=1){prompt=days[base]+' の つぎの ようびは？';explanation=days[base]+' の つぎは '+answer+'。';}else if(stage===2&&direction<0){prompt=days[base]+' の まえの ようびは？';explanation=days[base]+' の まえは '+answer+'。';}else{prompt=days[base]+' の '+steps+'日'+(direction<0?'まえ':'あと')+'は 何曜日？';explanation=short.join('→')+' の じゅんに '+steps+'日 '+(direction<0?'もどる':'すすむ')+'と '+answer+'。';}return{topic:'clock',mode:'choices',subtype:'weekday',prompt:prompt,answer:answer,choices:this.pick4(answer,pool),explanation:explanation};}
   pickClock(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'clock');if(Math.random()<(stage>=3?.3:.2))return this.pickWeekday(stage);if(g>=2&&stage>=5&&Math.random()<0.7)return this.pickTimeUnits(g);if(g>=2&&stage===4&&Math.random()<0.2)return this.pickTimeUnits(g);const hourStr=x=>((x-1+12)%12+1)+'じ';const kinds=stage<=1?['hour','hour']:stage===2?['hour','hour','half']:stage===3?['hour','half','minute']:(g>=2?['hour','half','minute','both']:['hour','hour','half','minute']);const k=kinds[this.rand(0,kinds.length-1)];let h=this.rand(1,12),m=0,ask='hour',prompt='なんじ？',a='',pool=[];
