@@ -563,7 +563,7 @@ internal static class Program
             html.Contains("aria-label=\"{{ drillModeView.firstAria }}\"", StringComparison.Ordinal) &&
             html.Contains("aria-label=\"{{ drillModeView.secondAria }}\"", StringComparison.Ordinal) &&
             html.Contains("firstAria:kanjiMode?'1ばん、読みを選ぶ':'1ばん、数字を入力'", StringComparison.Ordinal) &&
-            html.Contains("secondAria:kanjiMode?'2ばん、漢字を選ぶ':'2ばん、2つから選ぶ'", StringComparison.Ordinal),
+            html.Contains("secondAria:kanjiMode?'2ばん、漢字を選ぶ':'2ばん、こたえをえらぶ'", StringComparison.Ordinal),
             "the arithmetic and kanji drills do not offer keyboard-reachable answer-mode choices before starting");
         Assert(
             html.Contains("title:'たしざん・ひきざん'", StringComparison.Ordinal) &&
@@ -600,9 +600,18 @@ internal static class Program
             html.Contains("drillNumericChoices(d,q)", StringComparison.Ordinal) &&
             html.Contains("drillChoiceOrder(total,seed)", StringComparison.Ordinal) &&
             html.Contains("choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder", StringComparison.Ordinal) &&
-            html.Contains("this.drillChoicePosition(d,q)===0?[answer,distractor]:[distractor,answer]", StringComparison.Ordinal) &&
+            html.Contains("options.splice(this.drillChoicePosition(d,q,count),0,answer)", StringComparison.Ordinal) &&
             html.Contains("d.answerMode==='choice'?this.drillNumericChoices(d,q):[]", StringComparison.Ordinal),
-            "the arithmetic drill does not build stable shuffled two-choice answer positions");
+            "the arithmetic drill does not build stable shuffled answer positions");
+        // The dial that scales each question's option count lives in the same course record:
+        // two consecutive first-attempt correct answers step it up, a first-attempt miss
+        // steps it down, and the whole record is validated on every read (issue #87).
+        Assert(
+            html.Contains("drillOptionCount(d,q)", StringComparison.Ordinal) &&
+            html.Contains("drillBumpOption(d,q,correct)", StringComparison.Ordinal) &&
+            html.Contains("opts[no]={c:count,s:streak}", StringComparison.Ordinal) &&
+            html.Contains("this.drillOptionCount(next,this.drillQuestionAt(next,next.idx))", StringComparison.Ordinal),
+            "the arithmetic drill does not adapt per-question option counts from first-attempt results");
         Assert(
             html.Contains("drillKanjiWritingChoices(d,q)", StringComparison.Ordinal) &&
             html.Contains("d.answerMode!=='writing'", StringComparison.Ordinal) &&

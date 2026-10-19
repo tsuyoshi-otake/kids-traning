@@ -2420,6 +2420,180 @@ for (const courseId of ['g1', 'g2', 'd3', 'h2']) {
   }
 }
 
+// Issue #87: each arithmetic question carries its own option count (2-6) plus a streak of
+// consecutive first-attempt correct answers, persisted inside the course record. Two in a
+// row raise the count by one, a first-attempt miss lowers it by one, so a mastered fact
+// asks for sharper recognition while a shaky one stays friendly.
+const DRILL_STEP_CHECK = 'each drill question steps its own option count between 2 and 6 with first-attempt results';
+const DRILL_SIX_CHECK = 'every arithmetic drill question offers six valid unique options at count 6';
+const DRILL_POSITION_CHECK = 'the drill answer position spreads evenly across every option count';
+const DRILL_STABLE_CHECK = 'a wrong first try does not change the options of the question on screen';
+const DRILL_RECORD_CHECK = 'drill progress persists per-question option counts and drops invalid data';
+
+observe(DRILL_SIX_CHECK, 400);
+observe(DRILL_POSITION_CHECK, 20);
+for (const courseId of ['g1', 'g2', 'd3', 'h2']) {
+  const bank = app.drillBank(courseId);
+  for (const count of [2, 3, 4, 5, 6]) {
+    const seed = courseId.charCodeAt(0) * 7919 + count;
+    const drill = { id: courseId, answerMode: 'choice', choiceSeed: seed, choiceOrder: app.drillChoiceOrder(bank.length, seed), count: count };
+    const positions = new Array(count).fill(0);
+    for (const question of bank) {
+      const choices = app.drillNumericChoices(drill, question);
+      const correctAt = choices.indexOf(question.ans);
+      if (choices.length !== count || correctAt < 0) {
+        violated(DRILL_POSITION_CHECK, `${courseId} question ${question.no} offers ${JSON.stringify(choices)} at count ${count}`, question.text);
+        continue;
+      }
+      positions[correctAt] += 1;
+      if (count !== 6) continue;
+      if (new Set(choices).size !== 6 || choices.filter((choice) => choice === question.ans).length !== 1 ||
+          choices.some((choice) => !Number.isInteger(choice) || choice < 0)) {
+        violated(DRILL_SIX_CHECK, `${courseId} question ${question.no} offers ${JSON.stringify(choices)}`, question.text);
+        continue;
+      }
+      const wrong = choices.filter((choice) => choice !== question.ans);
+      const fact = /^(\d+) × (\d+)$/.exec(question.text);
+      if (courseId === 'g2' && fact) {
+        const left = Number(fact[1]), right = Number(fact[2]);
+        for (const distractor of wrong) {
+          const row = distractor / left;
+          if (!Number.isInteger(row) || row < 1 || row > 9 || row === right) {
+            violated(DRILL_SIX_CHECK, `${courseId} question ${question.no} distractor ${distractor} is not a same-row fact`, question.text);
+          }
+        }
+      } else {
+        const allowed = new Set(courseId === 'd3' ? [1, 2, 3, 4, 5] : [1, 2, 3, 4, 5, 10, 20]);
+        for (const distractor of wrong) {
+          if (!allowed.has(Math.abs(distractor - question.ans))) {
+            violated(DRILL_SIX_CHECK, `${courseId} question ${question.no} distractor ${distractor} is not a plausible near miss`, question.text);
+          }
+        }
+      }
+    }
+    if (Math.max(...positions) - Math.min(...positions) > 1) {
+      violated(DRILL_POSITION_CHECK, `${courseId} count ${count} puts the answer at ${positions.join(' / ')}`, 'expected a near-even spread');
+    }
+  }
+}
+
+// Drive the real run the way a child would, restarting the course between attempts: the
+// first question's dial must climb on its own while every other question stays at two.
+observe(DRILL_STEP_CHECK, 10);
+drillStorage.clear();
+app.state.screen = 'start';
+const stepOpt = (no) => (app.readDrillProgress().g1.opts[no] || { c: 2, s: 0 });
+const stepCorrect = () => {
+  app.startDrill('g1', true, 'choice');
+  const question = app.drillQuestion();
+  app.drillChoose(app.drillChoices(app.state.drill, question).find((choice) => choice === question.ans));
+  app.drillFlushEcho();
+};
+stepCorrect();
+if (stepOpt(1).c !== 2 || stepOpt(1).s !== 1) {
+  violated(DRILL_STEP_CHECK, `one correct answer recorded ${JSON.stringify(stepOpt(1))}`, 'expected count 2 streak 1');
+}
+stepCorrect();
+if (stepOpt(1).c !== 3 || stepOpt(1).s !== 0) {
+  violated(DRILL_STEP_CHECK, `two consecutive correct answers recorded ${JSON.stringify(stepOpt(1))}`, 'expected count 3 streak 0');
+}
+app.startDrill('g1', true, 'choice');
+if (app.drillChoices(app.state.drill, app.drillQuestion()).length !== 3) {
+  violated(DRILL_STEP_CHECK, 'a question at count 3 did not offer three options', '');
+}
+for (let round = 0; round < 6; round += 1) stepCorrect();
+if (stepOpt(1).c !== 6) {
+  violated(DRILL_STEP_CHECK, `eight consecutive correct answers reached ${JSON.stringify(stepOpt(1))}`, 'expected count 6');
+}
+app.startDrill('g1', true, 'choice');
+if (app.drillChoices(app.state.drill, app.drillQuestion()).length !== 6) {
+  violated(DRILL_STEP_CHECK, 'a question at count 6 did not offer six options', '');
+}
+stepCorrect();
+stepCorrect();
+if (stepOpt(1).c !== 6 || JSON.stringify(JSON.parse(drillStorage.get('kt_drill_v1')).g1.opts['1']) !== JSON.stringify({ c: 6, s: 0 })) {
+  violated(DRILL_STEP_CHECK, `the dial did not stay persisted at six: ${JSON.stringify(stepOpt(1))}`, drillStorage.get('kt_drill_v1'));
+}
+if (stepOpt(2).c !== 2 || stepOpt(3).c !== 2) {
+  violated(DRILL_STEP_CHECK, 'questions that were never answered left their dial', JSON.stringify(app.readDrillProgress().g1.opts));
+}
+
+// A first-attempt miss steps the same question down, persists at once, and never lets the
+// options on screen change while the question is still up.
+observe(DRILL_STABLE_CHECK, 4);
+app.startDrill('g1', true, 'choice');
+const stableQuestion = app.drillQuestion(), stableBefore = app.drillChoices(app.state.drill, stableQuestion);
+app.drillChoose(stableBefore.find((choice) => choice !== stableQuestion.ans));
+const stableAfter = app.drillChoices(app.state.drill, app.drillQuestion());
+if (stableBefore.length !== 6 || stableAfter.length !== 6 || JSON.stringify(stableAfter) !== JSON.stringify(stableBefore)) {
+  violated(DRILL_STABLE_CHECK, 'a wrong first try changed the on-screen options', JSON.stringify([stableBefore, stableAfter]));
+}
+if (stepOpt(1).c !== 5 || stepOpt(1).s !== 0) {
+  violated(DRILL_STEP_CHECK, `a first-attempt miss left ${JSON.stringify(stepOpt(1))}`, 'expected count 5 streak 0');
+}
+app.drillChoose(stableAfter.find((choice) => choice === stableQuestion.ans));
+app.drillFlushEcho();
+if (stepOpt(1).c !== 5) {
+  violated(DRILL_STEP_CHECK, 'a retry moved the dial a second time', JSON.stringify(stepOpt(1)));
+}
+
+// The re-queued "again" pass must not touch the record: a revealed question that is later
+// answered correctly in the same run keeps only its first-pass miss, while a question seen
+// for the first time does record its result.
+app.startDrill('g1', true, 'choice');
+const requeueChoices = app.drillChoices(app.state.drill, app.drillQuestion());
+if (requeueChoices.length !== 5) {
+  violated(DRILL_STEP_CHECK, `a restarted question at count 5 offered ${requeueChoices.length} options`, 'expected the lowered count to persist');
+}
+app.drillChoose(requeueChoices.find((choice) => choice !== app.drillQuestion().ans));
+app.drillChoose(requeueChoices.find((choice) => choice !== app.drillQuestion().ans));
+app.drillNext();
+let requeueGuard = 0;
+while (!app.state.drill.done && requeueGuard < 200) {
+  requeueGuard += 1;
+  app.drillChoose(app.drillQuestion().ans);
+  app.drillFlushEcho();
+}
+if (stepOpt(1).c !== 4 || stepOpt(1).s !== 0) {
+  violated(DRILL_STEP_CHECK, `the again pass moved the dial to ${JSON.stringify(stepOpt(1))}`, 'expected count 4 streak 0');
+}
+if (stepOpt(2).s !== 1) {
+  violated(DRILL_STEP_CHECK, 'a first-pass correct answer was not recorded', JSON.stringify(stepOpt(2)));
+}
+// Missing the same question at count 2 must stay at 2; it takes three more misses to get
+// there from count 4.
+for (let round = 0; round < 3; round += 1) {
+  app.startDrill('g1', true, 'choice');
+  const lowQuestion = app.drillQuestion();
+  app.drillChoose(app.drillChoices(app.state.drill, lowQuestion).find((choice) => choice !== lowQuestion.ans));
+}
+if (stepOpt(1).c !== 2) {
+  violated(DRILL_STEP_CHECK, `a miss at count 2 left ${JSON.stringify(stepOpt(1))}`, 'expected the count to stay at 2');
+}
+
+// Records saved before the dial existed, and records holding malformed dials, behave as an
+// empty dial: invalid entries are dropped but valid neighbours survive.
+observe(DRILL_RECORD_CHECK, 4);
+drillStorage.clear();
+drillStorage.set('kt_drill_v1', JSON.stringify({ g1: { idx: 0, perfect: 0, mistakes: 0, runs: 0, best: 0 } }));
+if (Object.keys(app.readDrillProgress().g1.opts).length !== 0) {
+  violated(DRILL_RECORD_CHECK, 'a legacy record without dials was not treated as empty', '');
+}
+drillStorage.set('kt_drill_v1', JSON.stringify({ g1: {
+  idx: 0, perfect: 0, mistakes: 0, runs: 0, best: 0,
+  opts: { '1': { c: 9, s: 0 }, '2': { c: 4, s: 7 }, '3': 'junk', '4': { c: 4, s: 1 }, '5': [4, 0], '101': { c: 3, s: 0 }, '0': { c: 3, s: 0 }, '-2': { c: 3, s: 0 }, 'abc': { c: 3, s: 0 } },
+} }));
+const cleanedOpts = app.readDrillProgress().g1.opts;
+if (JSON.stringify(cleanedOpts) !== JSON.stringify({ '4': { c: 4, s: 1 } })) {
+  violated(DRILL_RECORD_CHECK, `invalid stored dials survived as ${JSON.stringify(cleanedOpts)}`, 'expected only the valid entry');
+}
+app.startDrill('g1', false, 'choice');
+if (app.drillChoices(app.state.drill, app.drillQuestion()).length !== 2) {
+  violated(DRILL_RECORD_CHECK, 'a dropped dial still changed the options shown', '');
+}
+app.exitDrill();
+drillStorage.clear();
+
 // Complements of ten and subtraction from ten are the facts the course exists to drill, so
 // each of the nine pairs has to appear more than once and in a missing-number form as well.
 const gradeOneBank = app.drillBank('g1');

@@ -125,14 +125,24 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     {id:'k2',grade:2,total:100,badge:'2年生',title:'かんじ・ことば',sub:'1・2年生で ならった 漢字の ことばを 100もん',color:'#b07ae0',edge:'#8d55c4',shade:'#f4ecff'}
   ];}
   drillCourse(id){const list=this.drillCourses();for(let i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
-  drillDefaultRecord(){return {idx:0,perfect:0,mistakes:0,runs:0,best:0};}
+  drillDefaultRecord(){return {idx:0,perfect:0,mistakes:0,runs:0,best:0,opts:{}};}
   readDrillProgress(){
     let raw=null;try{raw=localStorage.getItem(this.drillStorageKey());}catch(e){raw=null;}
     let data=null;try{data=raw?JSON.parse(raw):null;}catch(e){data=null;}
     const src=data&&typeof data==='object'?data:{},whole=v=>{const n=Math.floor(Number(v));return Number.isFinite(n)&&n>0?n:0;},out={};
     this.drillCourses().forEach(c=>{
-      const row=src[c.id]&&typeof src[c.id]==='object'?src[c.id]:{};
-      out[c.id]={idx:this.clamp(whole(row.idx),0,c.total),perfect:this.clamp(whole(row.perfect),0,c.total),mistakes:whole(row.mistakes),runs:whole(row.runs),best:this.clamp(whole(row.best),0,c.total)};
+      const row=src[c.id]&&typeof src[c.id]==='object'?src[c.id]:{},opts={};
+      if(row.opts&&typeof row.opts==='object'&&!Array.isArray(row.opts)){
+        for(const key of Object.keys(row.opts)){
+          const no=Math.floor(Number(key)),entry=row.opts[key];
+          // Each question carries its own option count (2-6) and a 0/1 streak of
+          // consecutive first-attempt correct answers; anything else is dropped.
+          if(!Number.isInteger(no)||no<1||no>c.total)continue;
+          if(!entry||typeof entry!=='object'||!Number.isInteger(entry.c)||entry.c<2||entry.c>6||!Number.isInteger(entry.s)||entry.s<0||entry.s>1)continue;
+          opts[no]={c:entry.c,s:entry.s};
+        }
+      }
+      out[c.id]={idx:this.clamp(whole(row.idx),0,c.total),perfect:this.clamp(whole(row.perfect),0,c.total),mistakes:whole(row.mistakes),runs:whole(row.runs),best:this.clamp(whole(row.best),0,c.total),opts:opts};
     });
     return out;
   }
@@ -140,7 +150,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   saveDrillProgress(d,countRun){
     if(!d)return;const course=this.drillCourse(d.id);if(!course)return;
     const total=course.total,progress=this.readDrillProgress(),prev=progress[d.id]||this.drillDefaultRecord(),finished=d.idx>=total;
-    progress[d.id]={idx:finished?0:this.clamp(d.idx,0,total),perfect:finished?0:d.perfect,mistakes:finished?0:d.mistakes,runs:prev.runs+(countRun?1:0),best:countRun?Math.max(prev.best,d.perfect):prev.best};
+    progress[d.id]={idx:finished?0:this.clamp(d.idx,0,total),perfect:finished?0:d.perfect,mistakes:finished?0:d.mistakes,runs:prev.runs+(countRun?1:0),best:countRun?Math.max(prev.best,d.perfect):prev.best,opts:d.opts&&typeof d.opts==='object'?d.opts:{}};
     this.writeDrillProgress(progress);
   }
   drillBank(id){if(!this._drillBanks)this._drillBanks={};if(!this._drillBanks[id])this._drillBanks[id]=this.buildDrillBank(id);return this._drillBanks[id];}
@@ -269,20 +279,47 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   selectDrillCourse(id){const course=this.drillCourse(id);if(!course)return;this.sfx('select');this.setState({screen:'drill-mode',drillCourseChoice:id});}
   cancelDrillMode(){this.sfx('tap');this.setState({screen:'start',drillCourseChoice:''});}
   drillChoiceOrder(total,seed){
-    const count=Math.max(0,Math.floor(Number(total)||0)),order=[];for(let i=0;i<count;i++)order.push(i%2);
+    // Slots cycle through 0..59 (the lcm of every possible option count, 2-6) before the
+    // seeded shuffle, so the correct position spreads evenly no matter how many choices a
+    // question currently offers.
+    const count=Math.max(0,Math.floor(Number(total)||0)),order=[];for(let i=0;i<count;i++)order.push(i%60);
     let state=(Number(seed)>>>0)||0x6d2b79f5,next=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return state>>>0;};
     for(let i=order.length-1;i>0;i--){const j=next()%(i+1),value=order[i];order[i]=order[j];order[j]=value;}
     return order;
   }
-  drillChoicePosition(d,q){const order=d&&Array.isArray(d.choiceOrder)?d.choiceOrder:[];if(order.length)return order[Math.max(0,Number(q&&q.no)-1)%order.length];return this.drillChoiceOrder(2,(Number(q&&q.no)||1)*2654435761)[0];}
+  drillChoicePosition(d,q,count){
+    const size=Math.max(1,Math.floor(Number(count))||1),index=Math.max(0,Number(q&&q.no)-1),order=d&&Array.isArray(d.choiceOrder)?d.choiceOrder:[];
+    if(order.length)return order[index%order.length]%size;
+    return this.drillChoiceOrder(index+1,(Number(q&&q.no)||1)*2654435761)[index]%size;
+  }
+  drillOptionCount(d,q){
+    const opts=d&&typeof d.opts==='object'?d.opts:null,row=opts?opts[Math.floor(Number(q&&q.no))]:null;
+    return row&&Number.isInteger(row.c)?this.clamp(row.c,2,6):2;
+  }
+  drillBumpOption(d,q,correct){
+    // One step on a question's own dial: two consecutive first-attempt correct answers
+    // raise its option count by one (max 6), a first-attempt miss lowers it (min 2).
+    const no=Math.floor(Number(q&&q.no)),opts=Object.assign({},(d&&d.opts&&typeof d.opts==='object')?d.opts:{});
+    if(!Number.isInteger(no)||no<1)return opts;
+    const row=opts[no]||{c:2,s:0};let count=Number.isInteger(row.c)?this.clamp(row.c,2,6):2,streak=Number.isInteger(row.s)?row.s:0;
+    if(correct){streak+=1;if(streak>=2){count=Math.min(6,count+1);streak=0;}}
+    else{count=Math.max(2,count-1);streak=0;}
+    opts[no]={c:count,s:streak};
+    return opts;
+  }
   drillNumericChoices(d,q){
     if(!d||!q||q.kind!=='num')return [];
     const answer=Number(q.ans);if(!Number.isFinite(answer))return [];
-    let distractor=null;
-    if(d.id==='g2'&&String(q.text).indexOf('□')<0){const match=/^(\d+) × (\d+)$/.exec(String(q.text));if(match){const left=Number(match[1]),right=Number(match[2]),near=right<9?right+1:right-1;distractor=left*near;}}
-    if(d.id==='d3'&&String(q.text).indexOf('□')<0){const match=/^(\d+) ÷ (\d+)$/.exec(String(q.text));if(match){const left=Number(match[1]),right=Number(match[2]),near=answer<9?answer+1:answer-1;if(near>0)distractor=near;}}
-    if(!Number.isFinite(distractor)||distractor===answer||distractor<0){distractor=Number(q.no)%2===0&&answer>0?answer-1:answer+1;}
-    return this.drillChoicePosition(d,q)===0?[answer,distractor]:[distractor,answer];
+    const count=this.clamp(Math.floor(Number.isFinite(d.count)?d.count:this.drillOptionCount(d,q)),2,6),pool=[],seen=new Set([answer]);
+    const push=value=>{if(Number.isInteger(value)&&value>=0&&!seen.has(value)){seen.add(value);pool.push(value);}};
+    const fact=/^(\d+) × (\d+)$/.exec(String(q.text));
+    if(d.id==='g2'&&fact){const left=Number(fact[1]),right=Number(fact[2]);for(let step=1;step<=8;step++){if(right+step<=9)push(left*(right+step));if(right-step>=1)push(left*(right-step));}}
+    if(d.id==='d3')for(let step=1;step<=3;step++){push(answer+step);push(answer-step);}
+    for(let step=1;step<=5;step++){push(answer+step);push(answer-step);}
+    push(answer+10);push(answer-10);push(answer+20);push(answer-20);
+    const options=pool.slice(0,Math.max(0,count-1));
+    options.splice(this.drillChoicePosition(d,q,count),0,answer);
+    return options;
   }
   drillKanjiWritingChoices(d,q){
     if(!d||!q||(d.id!=='k1'&&d.id!=='k2'))return [];
@@ -304,10 +341,11 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     if(idx>=bank.length)idx=0;
     const fresh=restart||idx===0;
     const mode=id==='k1'||id==='k2'?(answerMode==='writing'?'writing':'reading'):(answerMode==='choice'?'choice':'input'),choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder(bank.length,choiceSeed);
-    if(fresh){progress[id]={idx:0,perfect:0,mistakes:0,runs:saved.runs,best:saved.best};this.writeDrillProgress(progress);}
+    if(fresh){progress[id]={idx:0,perfect:0,mistakes:0,runs:saved.runs,best:saved.best,opts:saved.opts};this.writeDrillProgress(progress);}
     this.clearDrillEcho();
     this.sfx('select');
-    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,answerMode:mode,choiceSeed:choiceSeed,choiceOrder:choiceOrder,idx:idx,miss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:false,echo:null}});
+    const opts=Object.assign({},saved.opts);
+    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,answerMode:mode,choiceSeed:choiceSeed,choiceOrder:choiceOrder,idx:idx,miss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:false,echo:null,opts:opts,count:this.drillOptionCount({opts:opts},bank[idx])}});
   }
   drillAdvance(patch){
     const d=this.state.drill;if(!d)return;
@@ -316,6 +354,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     const again=Array.isArray(next.again)?next.again:[],countRun=!d.counted&&next.idx>=total;
     if(countRun)next.counted=true;
     next.done=next.idx>=total+again.length;
+    next.count=this.drillOptionCount(next,this.drillQuestionAt(next,next.idx));
     this.saveDrillProgress(next,countRun);
     if(next.done)this.sfx('clear');
     this.setState({drill:next,input:''});
@@ -341,14 +380,20 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     const raw=String(value==null?'':value);if(!raw.length)return;
     if(this.drillMatches(q,raw)){
       const clean=d.miss===0,firstPass=d.idx<this.drillBank(d.id).length;
+      // Only the first pass of the first attempt moves a question's dial; retries and the
+      // re-queued "again" questions leave the record alone, and the on-screen count stays
+      // frozen in d.count until the question is replaced.
+      const opts=firstPass&&clean&&q.kind==='num'?this.drillBumpOption(d,q,true):d.opts;
       this.sfx(clean&&d.streak>=4?'combo':'correct');
-      this.setState({drill:Object.assign({},d,{mark:'',hint:'',echo:this.drillPair(d,q)})});
-      this.scheduleDrillAdvance({perfect:d.perfect+(clean&&firstPass?1:0),streak:clean?d.streak+1:0});
+      this.setState({drill:Object.assign({},d,{mark:'',hint:'',opts:opts,echo:this.drillPair(d,q)})});
+      this.scheduleDrillAdvance({perfect:d.perfect+(clean&&firstPass?1:0),streak:clean?d.streak+1:0,opts:opts});
       return;
     }
     this.sfx('wrong');
-    const miss=d.miss+1,revealed=miss>=2;
-    this.setState({input:'',drill:Object.assign({},d,{miss:miss,mistakes:d.mistakes+1,mark:revealed?'answer':'wrong',hint:q.hint,revealed:revealed,streak:0})});
+    const miss=d.miss+1,revealed=miss>=2,firstMiss=miss===1&&q.kind==='num'&&d.idx<this.drillBank(d.id).length;
+    const nextDrill=Object.assign({},d,{miss:miss,mistakes:d.mistakes+1,mark:revealed?'answer':'wrong',hint:q.hint,revealed:revealed,streak:0,opts:firstMiss?this.drillBumpOption(d,q,false):d.opts});
+    this.setState({input:'',drill:nextDrill});
+    if(firstMiss)this.saveDrillProgress(nextDrill,false);
   }
   drillNext(){
     const d=this.state.drill;if(!d||!d.revealed)return;
@@ -360,7 +405,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   askDrillReset(id){this.sfx('tap');this.setState({drillAsk:this.state.drillAsk===id?'':id});}
   confirmDrillReset(id){
     const progress=this.readDrillProgress(),prev=progress[id]||this.drillDefaultRecord();
-    progress[id]={idx:0,perfect:0,mistakes:0,runs:prev.runs,best:prev.best};
+    progress[id]={idx:0,perfect:0,mistakes:0,runs:prev.runs,best:prev.best,opts:{}};
     this.writeDrillProgress(progress);this.sfx('select');this.setState({drillAsk:''});
   }
 """.TrimEnd('\r', '\n');
@@ -395,7 +440,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       drillModeView={
         badge:modeCourse.badge||'',title:modeCourse.title||'',headStyle:'background:'+(modeCourse.color||'#ff8a3d')+';',
         firstAria:kanjiMode?'1ばん、読みを選ぶ':'1ばん、数字を入力',firstSymbol:kanjiMode?'漢 → かん':'123',firstName:kanjiMode?'よみを えらぶ':'すうじを 入力',firstHelp:kanjiMode?'かんじの よみかたを 4つから':'じぶんで こたえを いれる',
-        secondAria:kanjiMode?'2ばん、漢字を選ぶ':'2ばん、2つから選ぶ',secondSymbol:kanjiMode?'かん → 漢':'A / B',secondName:kanjiMode?'かんじを えらぶ':'2つから えらぶ',secondHelp:kanjiMode?'ただしい かきかたを 4つから':'ただしい こたえを えらぶ',
+        secondAria:kanjiMode?'2ばん、漢字を選ぶ':'2ばん、こたえをえらぶ',secondSymbol:kanjiMode?'かん → 漢':'A / B',secondName:kanjiMode?'かんじを えらぶ':'えらんで こたえる',secondHelp:kanjiMode?'ただしい かきかたを 4つから':'ただしい こたえを えらぶ',
         onFirst:()=>this.startDrill(modeCourse.id,false,kanjiMode?'reading':'input'),onSecond:()=>this.startDrill(modeCourse.id,false,kanjiMode?'writing':'choice'),onBack:()=>this.cancelDrillMode()
       };
     }
@@ -425,8 +470,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         showHissan:!!hissan, showPlainPrompt:!hissan, hissanLeft:hissan?hissan[1]:'',hissanOp:hissan?hissan[2]:'',hissanRight:hissan?hissan[3]:'',
         hissanAria:hissan?hissan[1]+' '+hissan[2]+' '+hissan[3]+' の筆算':'',showHissanInput:!!hissan&&!dPick,
         ansStyle:dEcho?'background:#e8f7ec; border-color:#3aa655; color:#22683c;':(d.mark?'border-color:#e08a7a; color:#b23b23;':''),
-        showAns:!dPick&&!hissan, showAsk:dPick, askText:dWriting?'ただしい かんじを えらんでね':(dKanji?'よみかたを えらんでね':'こたえを 2つから えらんでね'),
-        showPad:!dPick, showPick:dPick, pickAria:dWriting?'かんじの えらびもんだい':(dKanji?'よみかたの えらびもんだい':'こたえの 2たくもんだい'), picks:drillPicks,
+        showAns:!dPick&&!hissan, showAsk:dPick, askText:dWriting?'ただしい かんじを えらんでね':(dKanji?'よみかたを えらんでね':'こたえを '+dChoices.length+'つから えらんでね'),
+        showPad:!dPick, showPick:dPick, pickStyle:dChoices.length>4?'grid-template-columns:repeat(3,minmax(0,1fr));':'', pickAria:dWriting?'かんじの えらびもんだい':(dKanji?'よみかたの えらびもんだい':'こたえの '+dChoices.length+'たくもんだい'), picks:drillPicks,
         showHint:d.mark==='wrong', hint:d.hint||'',
         showEcho:!!dEcho, echoMain:dEcho?dEcho.main:'', echoSub:dEcho?dEcho.sub:'', echoHasSub:!!(dEcho&&dEcho.sub),
         showAnswer:!!d.revealed, answerMain:dPair.main, answerSub:dPair.sub, answerHasSub:!!dPair.sub,
@@ -538,8 +583,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
               </sc-if>
               <sc-if value="{{ drillView.showPick }}" hint-placeholder-val="{{ false }}">
                 <div class="kt-drill-ask">{{ drillView.askText }}</div>
-                <div class="kt-drill-pick" aria-label="{{ drillView.pickAria }}">
-                  <sc-for list="{{ drillView.picks }}" as="p" hint-placeholder-count="4">
+                <div class="kt-drill-pick" style="{{ drillView.pickStyle }}" aria-label="{{ drillView.pickAria }}">
+                  <sc-for list="{{ drillView.picks }}" as="p" hint-placeholder-count="6">
                     <div class="kt-drill-pick-btn" role="button" tabindex="0" style="{{ p.style }}" aria-label="{{ p.ariaLabel }}" onclick="{{ p.onClick }}"><span class="kt-drill-pick-no">{{ p.no }}</span><span>{{ p.label }}</span></div>
                   </sc-for>
                 </div>
@@ -661,8 +706,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-streak{flex:none;background:#fff6db;border:3px solid #ffd24a;border-radius:18px;padding:4px 12px;text-align:center;font-size:16px;font-weight:900;color:#7a5d00;white-space:nowrap;}
   .kt-drill-ask{font-size:20px;font-weight:700;color:#6b5e45;}
   .kt-drill-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-content:start;}
-  /* The choices sit directly under the question in two columns: two-choice arithmetic fills one row
-     and the four-choice kanji questions fill a 2x2 block, so both stay in a single glance. */
+  /* The choices sit directly under the question in a grid: up to four fill two columns, and five
+     or six switch to three columns so the whole set still fits the screen in a single glance. */
   .kt-drill-pick{width:100%;max-width:720px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
   .kt-drill-pick-btn{position:relative;min-height:84px;display:flex;align-items:center;justify-content:center;background:#fff;border:4px solid #f0e2c8;border-radius:20px;padding:8px 44px;font-size:38px;font-weight:900;color:#3a3326;box-shadow:0 4px 0 #ecd9b9;cursor:pointer;overflow-wrap:anywhere;}
   .kt-drill-pick-no{position:absolute;left:12px;top:50%;transform:translateY(-50%);background:#fff3e0;border-radius:12px;padding:0 10px;font-size:16px;font-weight:900;color:#a1855a;}
