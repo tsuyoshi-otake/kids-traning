@@ -4,7 +4,7 @@ internal static partial class LearningMarkupPatcher
 {
     private static string PatchSoroban(string markup)
     {
-        markup = ReplaceBlock(markup, "  pickSoroban(p){", "\n  pickSeikatsu(p){", BuildSorobanScript());
+        markup = ReplaceBlock(markup, "  pickSoroban(p){", "\n  pickShakai(p){", BuildSorobanScript());
         markup = ReplaceRequired(markup, "dataFigure:S.screen===", "sorobanView:S.screen==='quiz'&&S.session?this.sorobanView(this.cur()):null, dataFigure:S.screen===", StringComparison.Ordinal);
         markup = ReplaceRequired(markup, "      {{ dataFigure }}", "      {{ sorobanView }}\n      {{ dataFigure }}", StringComparison.Ordinal);
         markup = ReplaceRequired(markup, "this._answerBusy=false;return {hsStep:0", "this._answerBusy=false;return {sbBoard:null,sbStep:0,sbMiss:0,sbMoved:false,sbHint:'',hsStep:0", StringComparison.Ordinal);
