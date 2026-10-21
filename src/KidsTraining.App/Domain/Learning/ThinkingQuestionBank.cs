@@ -33,16 +33,33 @@ internal static class ThinkingQuestionBank
         Choice(stage, family, prompt, answer.ToString(),
             new[] { answer + 1, Math.Max(0, answer - 1), answer + 2, answer + 3 }.Select(value => value.ToString()), explanation);
 
+    // Lehmer-code permutation: ranks 0..n!-1 cover every ordering, so a stage/variant
+    // seed gives each puzzle a different arrangement instead of reusing a handful.
+    private static T[] Permute<T>(IReadOnlyList<T> values, int rank)
+    {
+        var items = values.ToArray();
+        for (var i = items.Length - 1; i > 0; i--)
+        {
+            var swap = rank % (i + 1);
+            (items[i], items[swap]) = (items[swap], items[i]);
+            rank /= i + 1;
+        }
+        return items;
+    }
+
+    private static int PermutationCount(int length) => length <= 1 ? 1 : length * PermutationCount(length - 1);
+
     private static CurriculumQuestion Order(int grade, int stage, int variant)
     {
+        var seed = (stage - 1) * 4 + variant;
         string[] cards = grade == 1 && stage <= 3 ? ["あか", "あお", "きいろ"] : ["あか", "あお", "きいろ", "みどり"];
-        var ordered = cards.Skip(variant % cards.Length).Concat(cards.Take(variant % cards.Length)).ToArray();
-        if (variant == 3) Array.Reverse(ordered);
+        var permutations = PermutationCount(cards.Length);
+        var ordered = Permute(cards, seed);
         var incomplete = stage >= 4 && variant == 3;
         var clues = Enumerable.Range(0, ordered.Length - 1)
             .Where(index => !incomplete || index != ordered.Length - 2)
             .Select(index => $"{ordered[index]}は {ordered[index + 1]}より 左。").Reverse().ToArray();
-        var position = incomplete ? ordered.Length : 1 + (stage + variant - 1) % ordered.Length;
+        var position = incomplete ? ordered.Length : 1 + (seed % permutations + seed / permutations) % ordered.Length;
         var answer = incomplete ? "きめられない" : ordered[position - 1];
         var alternate = ordered.Take(ordered.Length - 2).Concat(new[] { ordered[^1], ordered[^2] });
         var explanation = incomplete
@@ -50,24 +67,25 @@ internal static class ThinkingQuestionBank
             : $"てがかりを つなぐと、左から {string.Join(" → ", ordered)}。左から {position}ばんめは {answer}です。てがかりに 書かれた じゅんではなく、ならびを 作って たしかめよう。";
         return Choice(stage, "ならびの推理",
             $"{string.Join("・", cards)}の カードを 1まいずつ、横1列に ならべます。{string.Join("", clues)}左から {position}ばんめは？ てがかりだけでは きまらないときは「きめられない」を えらぼう。",
-            answer, cards.Append("きめられない"), explanation);
+            answer, new[] { "きめられない" }.Concat(cards), explanation);
     }
 
     private static CurriculumQuestion Assignment(int grade, int stage, int variant)
     {
         var count = grade == 1 && stage <= 3 ? 3 : 4;
-        string[] allNames = ["うさぎ", "ねこ", "いぬ", "くま"];
-        string[] allItems = ["りんご", "みかん", "ぶどう", "もも"];
-        var names = allNames.Take(count).ToArray();
-        var items = allItems.Take(count).ToArray();
-        var assigned = items.Skip(variant % count).Concat(items.Take(variant % count)).ToArray();
-        if (variant == 3) Array.Reverse(assigned);
+        string[][] nameSets = [["うさぎ", "ねこ", "いぬ", "くま"], ["きりん", "ぞう", "さる", "らいおん"]];
+        string[][] itemSets = [["りんご", "みかん", "ぶどう", "もも"], ["パン", "ケーキ", "ドーナツ", "クッキー"]];
+        var seed = (stage - 1) * 4 + variant;
+        var setIndex = (seed / PermutationCount(count)) % nameSets.Length;
+        var names = nameSets[setIndex].Take(count).ToArray();
+        var items = itemSets[setIndex].Take(count).ToArray();
+        var assigned = Permute(items, seed);
         var clues = Enumerable.Range(1, count - 1)
             .Select(index => $"{names[index]}は {string.Join("・", assigned.Take(index))}を えらびません。").ToArray();
-        var target = stage <= 2 ? count - 1 - variant % 2 : variant % (count - 1);
+        var target = stage <= 2 ? count - 1 - seed % 2 : seed % count;
         var steps = Enumerable.Range(0, count).Reverse().Select(index => $"{names[index]}は {assigned[index]}");
         return Choice(stage, "わりあての推理",
-            $"{string.Join("・", names)}が、{string.Join("・", items)}を 1こずつ えらびます。同じ くだものは えらべません。{string.Join("", clues)}{names[target]}が えらぶのは？",
+            $"{string.Join("・", names)}が、{string.Join("・", items)}を 1こずつ えらびます。同じ ものは えらべません。{string.Join("", clues)}{names[target]}が えらぶのは？",
             assigned[target], items.Append("きめられない"),
             $"えらべない ものが 多い人から しらべよう。{string.Join(" → ", steps)}の じゅんに きまります。すでに えらばれた ものを けすと、{names[target]}は {assigned[target]}です。");
     }
@@ -112,7 +130,7 @@ internal static class ThinkingQuestionBank
         if (grade >= 4 && stage >= 3) return ProjectPlan(grade, stage, variant);
         if (grade <= 2)
         {
-            var start = 2 + variant + stage + (grade - 1) * 3;
+            var start = 4 + ((stage - 1) * 4 + variant) % 13;
             var right = grade + stage % 2;
             var left = 1 + variant % 2;
             var destination = start + right - left;
@@ -137,12 +155,13 @@ internal static class ThinkingQuestionBank
     {
         if (grade >= 4) return Budget(grade, stage, variant);
         // Powers-of-two offsets make all six pair sums different.
-        var offset = grade <= 2 ? variant + (grade - 1) * 2 : grade + stage + variant;
+        var seed = (stage - 1) * 4 + variant;
+        var offset = grade + (seed / 6) % 6;
         var cards = new[] { 1, 2, 4, 8 }.Select(value => value + offset).ToArray();
         var pairs = (from left in Enumerable.Range(0, 4)
                      from right in Enumerable.Range(left + 1, 3 - left)
                      select (Left: cards[left], Right: cards[right])).ToArray();
-        var chosen = pairs[(stage + variant) % pairs.Length];
+        var chosen = pairs[seed % pairs.Length];
         var target = chosen.Left + chosen.Right;
         string Label((int Left, int Right) pair) => $"{pair.Left}と{pair.Right}";
         return Choice(stage, "組合せをしぼる",
@@ -164,9 +183,10 @@ internal static class ThinkingQuestionBank
                 $"ふくろに あかい玉が {red}こ、あおい玉が {blue}こ あります。中を 見ずに 1こずつ 取り、もどしません。どんな じゅんでも {color}を 1こ以上 手に入れるには、少なくとも 何こ 取ればよい？",
                 other + 1, $"ほしい色が さいごまで 出ない ばあいを 考えよう。ほかの色が {other}こ つづいても、その次は かならず {color}です。だから {other + 1}こ。{other}こだけだと、ぜんぶ ほかの色かもしれません。");
         }
+        var seed = (stage - 1) * 4 + variant;
         var maximum = 2 + (grade + stage + variant) % 3;
         var take = 1 + variant % maximum;
-        var stones = (maximum + 1) * (1 + (stage - 3) + variant) + take;
+        var stones = (maximum + 1) * (1 + (seed % 5)) + take;
         return Number(stage, "かならずを考える",
             $"石が {stones}こ あります。2人で 交代に、1回に 1〜{maximum}こ 取ります。さいごの 石を 取った人が 勝ち。あなたが 先です。相手が どう取っても 勝てるように、はじめに 何こ 取る？",
             take, $"はじめに {take}こ取り、{stones - take}こを 相手に のこします。その後は 相手と 自分の 取る数の 合計を {maximum + 1}こに そろえます。相手が xこなら 自分は {maximum + 1}−xこ。毎回1〜{maximum}この 範囲で 取れて、さいごを 自分が 取れます。");

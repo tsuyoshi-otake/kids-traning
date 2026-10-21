@@ -145,6 +145,9 @@ export function auditThinkingQuestions(app, observe, violated) {
       if (items.length !== 24 || families.size !== 6 || new Set(items.map(item => item.prompt)).size !== 24)
         violated('reasoning stages offer six families with distinct puzzles', `${unit.id} stage ${stage}`, JSON.stringify(items));
     }
+    observe('every reasoning puzzle is unique across the whole bank', 1);
+    if (new Set(unit.questions.map(item => item.prompt)).size !== unit.questions.length)
+      violated('every reasoning puzzle is unique across the whole bank', `${unit.id} has repeated prompts`, '');
     for (const item of unit.questions) {
       const check = 'every reasoning answer is independently solved from its displayed clues';
       observe(check);
@@ -155,6 +158,10 @@ export function auditThinkingQuestions(app, observe, violated) {
           generated.choices.length !== 4 || new Set(generated.choices).size !== 4 ||
           generated.choices.filter(value => String(value) === expected).length !== 1 || !item.explanation)
           violated(check, `expected ${expected}, got ${item.answer}`, item.prompt);
+        // きめられない must be on the board for every ordering puzzle, determined or not —
+        // otherwise its presence alone tells the child the clues cannot decide.
+        if (item.prompt.startsWith('【ならびの推理】') && !generated.choices.includes('きめられない'))
+          violated(check, 'determined puzzle hides the undecidable option', item.prompt);
         if (unit.grade <= 2 && /90|180|倍する|で わる|相手が x/.test(item.prompt + item.explanation))
           violated(check, 'later-grade prerequisites in a lower-grade puzzle', item.prompt);
       } catch (error) { violated(check, error.message, item.prompt); }

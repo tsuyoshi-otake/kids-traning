@@ -19,9 +19,16 @@ pickKokugo(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'kokugo');c
   // Distractors must differ in reading, not just in glyph. 日 and 火 are both read ひ,
   // so offering both makes two choices correct. Widen to learned grades when the
   // current-grade slice cannot supply three readings that differ from the answer.
-  const narrow=this.shuffle(use.filter(x=>x.r!==it.r&&W(x)!==W(it))),others=narrow.length>=3?narrow:this.shuffle(pool.filter(x=>x.r!==it.r&&W(x)!==W(it)));
+  // A distractor must also not be another valid reading of the target itself (姉→あね
+  // must not offer し), nor — in kanji-choice — a word the shown reading also fits.
+  // On/kun alternates count only for a bare kanji: 広い still reads just ひろい.
+  const byKanji=new Map(this.kanjiCurriculumEntries().map(e=>[e.k,e]));
+  const readsOfWord=(w,fallback)=>{const e=byKanji.get(w);return e?[e.r,e.on,e.kun]:[fallback];};
+  const choose=stage>=5||(stage>=3&&Math.random()<0.5);
+  const bad=choose?x=>readsOfWord(W(x),x.r).includes(it.r)||W(x)===W(it):x=>readsOfWord(W(it),it.r).includes(x.r)||W(x)===W(it);
+  const narrow=this.shuffle(use.filter(x=>!bad(x))),others=narrow.length>=3?narrow:this.shuffle(pool.filter(x=>!bad(x)));
   const take=(seed,valueOf)=>{const seen=new Set([seed]),picks=[];for(const x of others){if(picks.length>=3)break;const v=valueOf(x);if(seen.has(v))continue;seen.add(v);picks.push(v);}return this.shuffle([seed].concat(picks));};
-  const choose=stage>=5||(stage>=3&&Math.random()<0.5);if(choose){return{topic:'kokugo',mode:'choices',isKokugo:true,kanjiGrade:it.g,subtype:'kanji-choice',pre:it.pre,word:it.r,post:it.post,mean:'あう かんじを えらぼう',prompt:it.pre+it.r+it.post,answer:W(it),choices:take(W(it),W),explanation:'「'+it.r+'」は 「'+W(it)+'」と 書くよ。いみ：'+it.mean};}return{topic:'kokugo',mode:'choices',isKokugo:true,kanjiGrade:it.g,subtype:'reading',pre:it.pre,word:W(it),post:it.post,mean:it.mean,prompt:it.pre+W(it)+it.post,answer:it.r,choices:take(it.r,x=>x.r),explanation:'「'+W(it)+'」は 「'+it.r+'」と よむよ。いみ：'+it.mean};}
+  if(choose){return{topic:'kokugo',mode:'choices',isKokugo:true,kanjiGrade:it.g,subtype:'kanji-choice',pre:it.pre,word:it.r,post:it.post,mean:'あう かんじを えらぼう',prompt:it.pre+it.r+it.post,answer:W(it),choices:take(W(it),W),explanation:'「'+it.r+'」は 「'+W(it)+'」と 書くよ。いみ：'+it.mean};}return{topic:'kokugo',mode:'choices',isKokugo:true,kanjiGrade:it.g,subtype:'reading',pre:it.pre,word:W(it),post:it.post,mean:it.mean,prompt:it.pre+W(it)+it.post,answer:it.r,choices:take(it.r,x=>x.r),explanation:'「'+W(it)+'」は 「'+it.r+'」と よむよ。いみ：'+it.mean};}
   pickMoji(p){const stage=this.topicStage(p,'moji');const alphabet=[
     ['A','エー'],['B','ビー'],['C','シー'],['D','ディー'],['E','イー'],['F','エフ'],['G','ジー'],['H','エイチ'],['I','アイ'],['J','ジェイ'],['K','ケー'],['L','エル'],['M','エム'],['N','エヌ'],['O','オー'],['P','ピー'],['Q','キュー'],['R','アール'],['S','エス'],['T','ティー'],['U','ユー'],['V','ブイ'],['W','ダブリュー'],['X','エックス'],['Y','ワイ'],['Z','ゼット']
   ];const hira=[
