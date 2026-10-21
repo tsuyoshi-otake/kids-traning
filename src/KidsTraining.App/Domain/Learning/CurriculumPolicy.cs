@@ -52,7 +52,7 @@ internal static partial class CurriculumPolicy
     [
         "add", "sub", "mul", "clock", "kokugo", "hissan", "moji", "measure", "kazu", "shape", "div",
         "frac", "chart", "story", "bun", "goi", "dokkai", "eigo", "money", "groups", "order", "keyboard",
-        "soroban", "seikatsu", "shakai", "rika", "gijutsu", "sougou", "jouhou", "thinking"
+        "soroban", "shakai", "rika", "gijutsu", "sougou", "thinking"
     ];
 
     private static readonly IReadOnlyList<CurriculumUnit> Units = BuildUnits();
@@ -153,14 +153,10 @@ internal static partial class CurriculumPolicy
 
         AddLegacyLane("math", 1, MathematicsSource, "kazu", "shape", "add", "sub", "clock", "measure", "story", "money", "groups", "chart");
         AddLegacyLane("japanese", 1, JapaneseSource, "moji", "bun", "kokugo", "goi", "dokkai");
-        AddLegacyLane("life", 1, GeneralSource, "seikatsu");
-        AddLegacyLane("information", 1, GeneralSource, "jouhou");
         AddLegacyLane("keyboard", 1, GeneralSource, "keyboard");
 
         AddLegacyLane("math", 2, MathematicsSource, "chart", "clock", "add", "sub", "measure", "hissan", "story", "kazu", "money", "order", "groups", "mul", "shape", "frac");
         AddLegacyLane("japanese", 2, JapaneseSource, "kokugo", "bun", "goi", "dokkai", "moji");
-        AddLegacyLane("life", 2, GeneralSource, "seikatsu");
-        AddLegacyLane("information", 2, GeneralSource, "jouhou");
         AddLegacyLane("keyboard", 2, GeneralSource, "keyboard");
 
         AddLegacyLane("math", 3, MathematicsSource, "mul", "div", "shape", "hissan", "kazu", "soroban", "add", "sub", "clock", "measure", "story", "order", "chart", "frac", "money", "groups");
@@ -168,7 +164,6 @@ internal static partial class CurriculumPolicy
         AddLegacyLane("social", 3, SocialSource, "shakai");
         AddLegacyLane("science", 3, ScienceSource, "rika");
         AddLegacyLane("english", 3, EnglishSource, "eigo");
-        AddLegacyLane("information", 3, GeneralSource, "jouhou");
         AddLegacyLane("integrated", 3, GeneralSource, "sougou");
         AddLegacyLane("keyboard", 3, GeneralSource, "keyboard");
 
@@ -414,12 +409,10 @@ internal static partial class CurriculumPolicy
         "order" => "式の順序",
         "keyboard" => "キーボード",
         "soroban" => "そろばん",
-        "seikatsu" => "生活",
         "shakai" => "社会",
         "rika" => "理科",
         "gijutsu" => "技術",
         "sougou" => "総合",
-        "jouhou" => "情報",
         "thinking" => "思考トレーニング",
         _ => topic
     };

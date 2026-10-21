@@ -702,7 +702,7 @@ if (!shouldAppendNumericQuestionMark({ mode: 'num', topic: 'add', prompt: '12 + 
 const TOPICS = [
   'add', 'sub', 'hissan', 'mul', 'clock', 'kokugo', 'moji', 'measure', 'kazu', 'shape',
   'div', 'frac', 'chart', 'story', 'bun', 'goi', 'dokkai', 'eigo', 'money', 'groups',
-  'order', 'soroban', 'seikatsu', 'shakai', 'rika', 'gijutsu', 'jouhou', 'sougou',
+  'order', 'soroban', 'shakai', 'rika', 'gijutsu', 'sougou',
   'keyboard', 'thinking',
 ];
 const STAGES = [1, 2, 3, 4, 5];

@@ -4,7 +4,7 @@
 
 登録学校学年は保護者向けの表示・記録属性であり、出題上限ではない。通常モードは登録学年にかかわらず小学1年から開始し、「登録学年の単元を優先する」をONにした場合だけ登録学年から開始する。どちらのモードでも教科別の順序を保ちながら、現在学年の有効な全単元が難易度5を合格して定着確認へ入るまで次学年を解放しない。無効な単元は完了条件から除外し、上位学年の履歴や保存セッションは進級ゲートを迂回できない。1日・3日・7日後の定着確認は、すでに解放された同一学年内の学習を妨げない。
 
-特別活動・家庭科（中学校の家庭分野を含む）・道徳は全学年で出題・選択設定・進級条件から除外する。過去の履歴と獲得済みXP・星は保持する。削除科目を含む保存セッションは再開せず開始画面へ戻す。
+特別活動・家庭科（中学校の家庭分野を含む）・道徳・生活・情報活用は全学年で出題・選択設定・進級条件から除外する。過去の履歴と獲得済みXP・星は保持する。削除科目を含む保存セッションは再開せず開始画面へ戻す。
 
 ## 根拠資料
 
@@ -31,16 +31,16 @@
 |---|---|---|---|
 | 1 | 算数 | `math.g1.kazu`, `math.g1.shape`, `math.g1.add`, `math.g1.sub`, `math.g1.clock`, `math.g1.measure`, `math.g1.story`, `math.g1.money`, `math.g1.groups`, `math.g1.chart` | 自動採点 |
 | 1 | 国語 | `japanese.g1.moji`, `japanese.g1.bun`, `japanese.g1.kokugo`, `japanese.g1.goi`, `japanese.g1.dokkai` | 自動採点 |
-| 1 | 生活・情報・キーボード | `life.g1.seikatsu`, `information.g1.jouhou`, `keyboard.g1.keyboard` | 自動採点＋既存活動 |
+| 1 | キーボード | `keyboard.g1.keyboard` | 自動採点＋既存活動 |
 | 1 | 思考トレーニング | `thinking.g1.patterns-and-logic` | 自動採点 |
 | 2 | 算数 | `math.g2.chart`, `math.g2.clock`, `math.g2.add`, `math.g2.sub`, `math.g2.measure`, `math.g2.hissan`, `math.g2.story`, `math.g2.kazu`, `math.g2.money`, `math.g2.order`, `math.g2.groups`, `math.g2.mul`, `math.g2.shape`, `math.g2.frac` | 自動採点 |
 | 2 | 国語 | `japanese.g2.kokugo`, `japanese.g2.bun`, `japanese.g2.goi`, `japanese.g2.dokkai`, `japanese.g2.moji` | 自動採点 |
-| 2 | 生活・情報・キーボード | `life.g2.seikatsu`, `information.g2.jouhou`, `keyboard.g2.keyboard` | 自動採点＋既存活動 |
+| 2 | キーボード | `keyboard.g2.keyboard` | 自動採点＋既存活動 |
 | 2 | 思考トレーニング | `thinking.g2.patterns-and-space` | 自動採点 |
 | 3 | 算数 | `math.g3.mul`, `math.g3.div`, `math.g3.shape`, `math.g3.hissan`, `math.g3.kazu`, `math.g3.soroban`, `math.g3.add`, `math.g3.sub`, `math.g3.clock`, `math.g3.measure`, `math.g3.story`, `math.g3.order`, `math.g3.chart`, `math.g3.frac`, `math.g3.money`, `math.g3.groups` | 自動採点 |
 | 3 | 国語 | `japanese.g3.kokugo`, `japanese.g3.bun`, `japanese.g3.goi`, `japanese.g3.dokkai`, `japanese.g3.moji` | 自動採点 |
 | 3 | 社会・理科・外国語 | `social.g3.shakai`, `science.g3.rika`, `english.g3.eigo` | 自動採点＋活動カード |
-| 3 | 情報・総合・キーボード | `information.g3.jouhou`, `integrated.g3.sougou`, `keyboard.g3.keyboard` | 自動採点＋活動カード |
+| 3 | 総合・キーボード | `integrated.g3.sougou`, `keyboard.g3.keyboard` | 自動採点＋活動カード |
 | 3 | 思考トレーニング | `thinking.g3.logic-and-strategy` | 自動採点 |
 
 ### 九九・かけ算とひっ算
@@ -120,7 +120,6 @@
 | 5 | 外国語 | `english.g5.five-domains-foundation` | 五領域の基礎 | 問題＋会話活動 | 外国語編 |
 | 6 | 外国語 | `english.g6.five-domains-integration` | 五領域の活用 | 問題＋会話活動 | 外国語編 |
 | 4～6 | 総合 | `integrated.g4.inquiry-cycle`, `integrated.g5.inquiry-cycle`, `integrated.g6.inquiry-cycle` | 課題設定・収集・整理・表現・振り返り | 問題＋活動 | 解説一覧 |
-| 4～6 | 情報 | `information.g4.information-programming`, `information.g5.information-programming`, `information.g6.information-programming` | 出典・著作権・個人情報・データ・プログラミング | 問題＋活動 | 解説一覧 |
 
 ## 思考トレーニング（小学1～6年）
 
@@ -157,7 +156,6 @@
 | 中1～3 | 外国語 | `english.g7.five-domains-foundation`, `english.g8.five-domains-development`, `english.g9.five-domains-integration` | 聞く・読む・話す（やり取り／発表）・書く | 問題＋会話活動 | 中学校 外国語編 |
 | 中1～3 | 技術 | `technology.g7.materials-biological-foundation`, `technology.g8.energy-information`, `technology.g9.integrated-problem-solving` | 材料・生物育成、エネルギー・情報、統合的問題解決 | 問題＋製作活動 | 中学校 技術・家庭編 |
 | 中1～3 | 総合 | `integrated.g7.inquiry-project`, `integrated.g8.inquiry-project`, `integrated.g9.inquiry-project` | 課題設定・調査・協働・表現・評価 | 問題＋探究活動 | 中学校 解説一覧 |
-| 中1～3 | 情報 | `information.g7.data-programming-literacy`, `information.g8.data-programming-literacy`, `information.g9.data-programming-literacy` | 信頼性・権利・個人情報・データ・プログラミング | 問題＋制作活動 | 中学校 解説一覧 |
 
 ## 漢字・ローマ字
 

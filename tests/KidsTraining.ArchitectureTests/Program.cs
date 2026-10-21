@@ -221,127 +221,6 @@ internal static class Program
 
     private static void TestCurriculumPolicy(string repositoryRoot)
     {
-#if false
-        Assert(
-            Math.Abs(LearningDefaults.BeginnerMastery - 0.05) < double.Epsilon,
-            "beginner mastery is not represented as a structured domain value");
-        Assert(CurriculumPolicy.NormalizeGrade(0) == 1, "grades below the implemented range were not clamped");
-        Assert(CurriculumPolicy.NormalizeGrade(6) == 3, "grades above the implemented range were not clamped");
-        Assert(CurriculumPolicy.IsAvailable(1, "kokugo"), "grade 1 Japanese was unexpectedly locked");
-        Assert(CurriculumPolicy.IsAvailable(1, "chart"), "grade 1 math strands were unexpectedly locked");
-        Assert(CurriculumPolicy.IsAvailable(1, "money") && CurriculumPolicy.IsAvailable(1, "groups"), "grade 1 foundations are incomplete");
-        Assert(
-            CurriculumPolicy.IsAvailable(1, "seikatsu") && CurriculumPolicy.IsAvailable(1, "doutoku") &&
-            CurriculumPolicy.IsAvailable(1, "jouhou") && CurriculumPolicy.IsAvailable(1, "tokubetsu"),
-            "grade 1 cross-curricular scope is incomplete");
-        Assert(!CurriculumPolicy.IsAvailable(1, "shakai") && !CurriculumPolicy.IsAvailable(1, "rika"), "grade 3 subjects leaked into grade 1");
-        Assert(!CurriculumPolicy.IsAvailable(1, "hissan"), "grade 2 written arithmetic leaked into grade 1");
-        Assert(CurriculumPolicy.IsAvailable(2, "mul") && CurriculumPolicy.IsAvailable(2, "order"), "grade 2 calculation order or multiplication was unavailable");
-        Assert(CurriculumPolicy.IsAvailable(2, "seikatsu") && CurriculumPolicy.IsAvailable(2, "jouhou"), "grade 2 life or information activity was unavailable");
-        Assert(!CurriculumPolicy.IsAvailable(2, "eigo"), "supplementary English started before grade 3");
-        Assert(!CurriculumPolicy.IsAvailable(2, "shakai") && !CurriculumPolicy.IsAvailable(2, "rika") && !CurriculumPolicy.IsAvailable(2, "sougou"), "grade 3 subjects leaked into grade 2");
-        Assert(
-            CurriculumPolicy.IsAvailable(3, "div") && CurriculumPolicy.IsAvailable(3, "soroban") &&
-            CurriculumPolicy.IsAvailable(3, "shakai") && CurriculumPolicy.IsAvailable(3, "rika") &&
-            CurriculumPolicy.IsAvailable(3, "eigo") && CurriculumPolicy.IsAvailable(3, "sougou"),
-            "grade 3 scope is incomplete");
-        Assert(!CurriculumPolicy.IsAvailable(3, "seikatsu"), "life studies continued after the grade 3 subject transition");
-        Assert(
-            !CurriculumPolicy.AllTopics.Contains("ongaku", StringComparer.Ordinal) &&
-            !CurriculumPolicy.AllTopics.Contains("taiiku", StringComparer.Ordinal) &&
-            !CurriculumPolicy.AllTopics.Contains("zukou", StringComparer.Ordinal),
-            "explicitly excluded music, physical education, or arts and crafts entered the curriculum");
-        Assert(
-            CurriculumPolicy.IsAvailable(1, "keyboard") &&
-            CurriculumPolicy.IsAvailable(2, "keyboard") &&
-            CurriculumPolicy.IsAvailable(3, "keyboard"),
-            "physical keyboard practice is not independently available in every implemented grade");
-        Assert(CurriculumPolicy.PrerequisitesFor("keyboard").Count == 0, "keyboard practice unexpectedly has a prerequisite");
-        Assert(CurriculumPolicy.PrerequisitesFor("soroban").SequenceEqual(["kazu"]), "soroban is not gated by number foundations");
-        Assert(CurriculumPolicy.PrerequisitesFor("sougou").SequenceEqual(["jouhou"]), "integrated study is not gated by information literacy");
-
-        var gradeOneLanes = CurriculumPolicy.TopicLanesForGrade(1);
-        var gradeTwoLanes = CurriculumPolicy.TopicLanesForGrade(2);
-        var gradeThreeLanes = CurriculumPolicy.TopicLanesForGrade(3);
-        Assert(gradeOneLanes[0][0] == "kazu" && gradeOneLanes[1][0] == "moji", "grade 1 does not start with number and character foundations");
-        Assert(gradeTwoLanes[0].Take(6).SequenceEqual(["chart", "clock", "add", "sub", "measure", "hissan"]), "grade 2 first-term order is incorrect");
-        var gradeTwoMath = gradeTwoLanes[0].ToList();
-        Assert(gradeTwoMath.IndexOf("order") < gradeTwoMath.IndexOf("mul"), "grade 2 calculation order must precede multiplication");
-        Assert(gradeThreeLanes[0].Take(5).SequenceEqual(["mul", "div", "shape", "hissan", "kazu"]), "grade 3 first-term order is incorrect");
-        foreach (var grade in new[] { 1, 2, 3 })
-        {
-            var flattened = CurriculumPolicy.TopicLanesForGrade(grade).SelectMany(static lane => lane).ToArray();
-            Assert(flattened.Length == flattened.Distinct(StringComparer.Ordinal).Count(), $"grade {grade} repeats a topic across curriculum lanes");
-            Assert(flattened.ToHashSet(StringComparer.Ordinal).SetEquals(CurriculumPolicy.TopicsForGrade(grade)), $"grade {grade} lanes and available topics diverged");
-        }
-
-        var allTopics = Enumerable.Range(1, 3)
-            .SelectMany(static grade => CurriculumPolicy.TopicsForGrade(grade))
-            .ToHashSet(StringComparer.Ordinal);
-        Assert(
-            CurriculumPolicy.AllTopics.ToHashSet(StringComparer.Ordinal).SetEquals(allTopics),
-            "the canonical topic list diverged from the implemented curriculum");
-        var prerequisitesByTopic = CurriculumPolicy.PrerequisitesByTopic;
-        Assert(
-            prerequisitesByTopic.Keys.ToHashSet(StringComparer.Ordinal).SetEquals(allTopics),
-            "the prerequisite graph does not define every curriculum topic exactly once");
-        foreach (var (topic, prerequisites) in prerequisitesByTopic)
-        {
-            Assert(allTopics.Contains(topic), $"unknown prerequisite graph topic: {topic}");
-            Assert(prerequisites.All(allTopics.Contains), $"{topic} references an unknown prerequisite");
-            Assert(
-                prerequisites.Count == prerequisites.Distinct(StringComparer.Ordinal).Count(),
-                $"{topic} repeats a prerequisite");
-            Assert(!prerequisites.Contains(topic, StringComparer.Ordinal), $"{topic} depends on itself");
-        }
-
-        foreach (var grade in new[] { 1, 2, 3 })
-        {
-            foreach (var topic in CurriculumPolicy.TopicsForGrade(grade))
-            {
-                Assert(
-                    CurriculumPolicy.PrerequisitesFor(topic).All(prerequisite => CurriculumPolicy.IsAvailable(grade, prerequisite)),
-                    $"grade {grade} topic {topic} depends on an unavailable prerequisite");
-            }
-        }
-
-        var visiting = new HashSet<string>(StringComparer.Ordinal);
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        bool IsAcyclic(string topic)
-        {
-            if (visited.Contains(topic))
-            {
-                return true;
-            }
-
-            if (!visiting.Add(topic))
-            {
-                return false;
-            }
-
-            foreach (var prerequisite in CurriculumPolicy.PrerequisitesFor(topic))
-            {
-                if (!IsAcyclic(prerequisite))
-                {
-                    return false;
-                }
-            }
-
-            visiting.Remove(topic);
-            visited.Add(topic);
-            return true;
-        }
-
-        foreach (var topic in allTopics)
-        {
-            Assert(IsAcyclic(topic), $"the prerequisite graph contains a cycle through {topic}");
-        }
-
-        Assert(CurriculumPolicy.PrerequisitesFor("mul").SequenceEqual(["groups"]), "multiplication does not depend on equal groups");
-        Assert(CurriculumPolicy.PrerequisitesFor("div").SequenceEqual(["mul"]), "division does not depend on multiplication");
-        Assert(CurriculumPolicy.PrerequisitesFor("hissan").ToHashSet(StringComparer.Ordinal).SetEquals(["add", "sub"]), "written arithmetic prerequisites are incomplete");
-        Assert(CurriculumPolicy.PrerequisitesFor("dokkai").ToHashSet(StringComparer.Ordinal).SetEquals(["bun", "kokugo", "goi"]), "reading prerequisites are incomplete");
-#endif
         Assert(
             Math.Abs(LearningDefaults.BeginnerMastery - 0.05) < double.Epsilon,
             "beginner mastery is not represented as a structured domain value");
@@ -417,7 +296,7 @@ internal static class Program
             units.Any(static unit => unit.Grade == 6 && unit.SubjectId == "english"),
             "the grade 4-6 core curriculum is incomplete");
         Assert(
-            new[] { "math", "japanese", "science", "social", "english", "technology", "integrated", "information" }
+            new[] { "math", "japanese", "science", "social", "english", "technology", "integrated" }
                 .All(subject => Enumerable.Range(7, 3).All(grade => units.Any(unit => unit.Grade == grade && unit.SubjectId == subject))),
             "the junior-high grade 1-3 curriculum is incomplete");
         Assert(
@@ -425,7 +304,7 @@ internal static class Program
             !CurriculumPolicy.AllTopics.Contains("taiiku", StringComparer.Ordinal) &&
             !CurriculumPolicy.AllTopics.Contains("zukou", StringComparer.Ordinal),
             "an explicitly excluded subject entered the curriculum");
-        var removedTopics = new[] { "kateika", "doutoku", "tokubetsu" };
+        var removedTopics = new[] { "kateika", "doutoku", "tokubetsu", "seikatsu", "jouhou" };
         Assert(removedTopics.All(topic => !CurriculumPolicy.AllTopics.Contains(topic) &&
             Enumerable.Range(1, 9).All(grade => !CurriculumPolicy.IsAvailable(grade, topic))) &&
             units.All(unit => !removedTopics.Contains(unit.TopicId)), "retired topics remain selectable or gate progression");
