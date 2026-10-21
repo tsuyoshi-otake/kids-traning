@@ -407,6 +407,28 @@ for (const grade of [2, 3, 4, 5, 6]) {
     }
   }
 }
+
+// Calibration draws each topic three times; a repeated draw must be rerolled so the
+// first-run check never shows the same question twice. Stub two identical 'add' draws,
+// then a second canned value; the retry path must swap the duplicate out.
+{
+  const probe = new app.constructor();
+  probe.state.setupGrade = 2;
+  const realAdd = probe.buildCalib().find((item) => item.q.topic === 'add').q;
+  const dedupeApp = new app.constructor();
+  dedupeApp.state.setupGrade = 2;
+  const original = dedupeApp.genFor.bind(dedupeApp);
+  const canned = { ...realAdd, prompt: '監査用の おきかえ もんだい1' };
+  const cannedNext = { ...realAdd, prompt: '監査用の おきかえ もんだい2' };
+  let addCalls = 0;
+  dedupeApp.genFor = (kind, profile) => (kind === 'add' ? { ...(addCalls++ < 2 ? canned : cannedNext) } : original(kind, profile));
+  observe('first-run calibration retries a repeated question', 1);
+  const adds = dedupeApp.buildCalib().filter((item) => item.q.topic === 'add');
+  const distinct = new Set(adds.map((item) => app.questionIdentity(item.q))).size;
+  if (adds.length !== 3 || distinct !== 2) {
+    violated('first-run calibration retries a repeated question', `expected canned + rerolled, got ${distinct} distinct`, JSON.stringify(adds.map((item) => item.q.prompt)));
+  }
+}
 for (const [left, right, answer] of [[700,286,414],[802,467,335],[1000,1,999],[654,321,333],[52,18,34]]) {
   const plan=app.writtenArithmeticPlan({topic:'hissan',writtenArithmetic:true,prompt:`${left} - ${right}`});
   observe('subtraction regroups across zero without negative intermediate digits');
@@ -712,10 +734,19 @@ if (kanjiCounts.join(',') !== '80,160,200,202,193,191' || curriculum.length !== 
   violated('kanji allocation is complete', `counts were ${kanjiCounts.join(',')} with ${curriculum.length} total entries`, 'MEXT grade allocation');
 }
 const readingsByWord = new Map();
+// Valid readings of an asked word: a bare kanji admits its on/kun alternates (姉→あね|し),
+// while an inflected word reads only one way (広い→ひろい, never こう).
+const readingsByAskedWord = new Map();
 for (const entry of curriculum) {
   const word = entry.word || entry.k;
   if (!readingsByWord.has(word)) readingsByWord.set(word, new Set());
   readingsByWord.get(word).add(entry.r);
+  const addReadings = (key, values) => {
+    if (!readingsByAskedWord.has(key)) readingsByAskedWord.set(key, new Set());
+    for (const reading of values) if (reading) readingsByAskedWord.get(key).add(reading);
+  };
+  addReadings(entry.k, [entry.r, entry.on, entry.kun]);
+  addReadings(word, [entry.r]);
 }
 
 // Readings that inflect are only unambiguous when the okurigana is on screen. Verb and
@@ -2139,7 +2170,7 @@ for (const unit of UNITS) {
           const alsoCorrect = (question.choices || [])
             .map(String)
             .filter((choice) => choice !== answer)
-            .filter((choice) => (readingsByWord.get(choice) || new Set()).has(askedReading));
+            .filter((choice) => (readingsByAskedWord.get(choice) || new Set()).has(askedReading));
           if (alsoCorrect.length) {
             violated(
               'kanji choices have exactly one right reading',
@@ -2181,6 +2212,19 @@ for (const unit of UNITS) {
               'kanji readings are asked with their okurigana',
               `${shown} alone does not fix the reading ${answer}`,
               context,
+            );
+          }
+          observe('reading questions never offer another valid reading of the asked word');
+          const targetReadings = readingsByAskedWord.get(shown) || new Set();
+          const alternateReading = (question.choices || [])
+            .map(String)
+            .filter((choice) => choice !== answer)
+            .filter((choice) => targetReadings.has(choice));
+          if (alternateReading.length) {
+            violated(
+              'reading questions never offer another valid reading of the asked word',
+              `${alternateReading.join('、')} also reads ${shown}`,
+              `${context} choices=${JSON.stringify(question.choices)}`,
             );
           }
         }

@@ -68,7 +68,7 @@ internal static partial class LearningMarkupPatcher
 
         markup = ReplaceRequired(markup,
             "buildCalib(){const order=['add','sub','hissan','mul','kokugo'];return order.map(t=>{const q=this.genFor(t);return{q:q,choices:this.calibChoicesFor(q)};});}",
-            "buildCalib(){const core=this.state.setupGrade>=2?['add','sub','hissan','mul','kokugo','moji']:['add','sub','clock','kokugo','moji','kazu'],order=[];for(let round=0;round<3;round++)for(const topic of core)order.push(topic);const p={grade:this.state.setupGrade," + BeginnerMasteryMarkup + "};return order.map(t=>{const q=this.genFor(t,p);return{q:q,choices:this.calibChoicesFor(q)};});}",
+            "buildCalib(){const core=this.state.setupGrade>=2?['add','sub','hissan','mul','kokugo','moji']:['add','sub','clock','kokugo','moji','kazu'],order=[];for(let round=0;round<3;round++)for(const topic of core)order.push(topic);const p={grade:this.state.setupGrade," + BeginnerMasteryMarkup + "};const seen=new Set();return order.map(t=>{let q=this.genFor(t,p),key=t+'|'+this.questionIdentity(q);for(let attempt=0;seen.has(key)&&attempt<24;attempt++){q=this.genFor(t,p);key=t+'|'+this.questionIdentity(q);}seen.add(key);return{q:q,choices:this.calibChoicesFor(q)};});}",
             StringComparison.Ordinal);
 
         markup = ReplaceBlock(

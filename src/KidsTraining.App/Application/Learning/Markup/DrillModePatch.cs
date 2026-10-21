@@ -209,19 +209,17 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       dump=(sec,op,pairs,hint)=>{for(const pair of pairs)push(sec,pair[0],op,pair[1],hint);};
     const A='くりあがりなし',B='くりあがりの たしざん',C='くりさがりの ひきざん',D='3けたの ひっ算',E='0が ある ひっ算';
     const hA='くらいを そろえて、右の くらいから じゅんに けいさんしよう。',hB='一のくらいが 10を こえたら、十のくらいに 1 くりあげよう。',hC='たりない ときは となりの くらいから 1 かりよう。',hD='3けたも おなじ。右の くらいから じゅんに けいさんしよう。',hE='0の くらいは、となりから 1 かりて 10を つくろう。';
-    const twoAdd=[],twoSub=[],carryAdd=[],borrowSub=[],threeAdd=[],threeSub=[],hardAdd=[],hardSub=[[700,286],[500,173],[800,405],[600,258],[900,327],[802,467]];
+    const twoAdd=[],twoSub=[],carryAdd=[],borrowSub=[],threeAdd=[],threeSub=[],hardSub=[[700,286],[500,173],[800,405],[600,258],[900,327],[802,467],[400,236],[601,385],[703,458],[504,267],[300,147],[905,478]];
     for(let a=21;a<=87;a++)for(let b=11;b<=99-a;b++)if(carry(a,b)===0)twoAdd.push([a,b]);
     for(let a=32;a<=98;a++)for(let b=11;b<a;b++)if(borrow(a,b)===0)twoSub.push([a,b]);
     for(let a=24;a<=79;a++)for(let b=16;b<=79;b++)if(a+b<=99&&carry(a,b)>=1)carryAdd.push([a,b]);
     for(let a=31;a<=98;a++)for(let b=12;b<a;b++)if(borrow(a,b)>=1)borrowSub.push([a,b]);
     for(let a=123;a<=799;a+=3)for(let b=111;b<=799;b+=5)if(a+b<=999&&carry(a,b)>=1)threeAdd.push([a,b]);
     for(let a=301;a<=999;a+=3)for(let b=111;b<a;b+=5)if(borrow(a,b)>=1)threeSub.push([a,b]);
-    for(let a=248;a<=799;a+=4)for(let b=178;b<=699;b+=6)if(a+b<=999&&carry(a,b)>=2)hardAdd.push([a,b]);
-    for(let a=401;a<=999;a+=4)for(let b=112;b<a;b+=6)if(borrow(a,b)>=2)hardSub.push([a,b]);
     dump(A,'＋',pick(twoAdd,15),hA);dump(A,'−',pick(twoSub,15),hA);
     dump(B,'＋',pick(carryAdd,20),hB);dump(C,'−',pick(borrowSub,20),hC);
     dump(D,'＋',pick(threeAdd,10),hD);dump(D,'−',pick(threeSub,10),hD);
-    dump(E,'＋',pick(hardAdd,5),hE);dump(E,'−',pick(hardSub,5),hE);
+    dump(E,'−',pick(hardSub,10),hE);
     return list;
   }
   buildDrillBank(id){
