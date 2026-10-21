@@ -135,11 +135,10 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       if(row.opts&&typeof row.opts==='object'&&!Array.isArray(row.opts)){
         for(const key of Object.keys(row.opts)){
           const no=Math.floor(Number(key)),entry=row.opts[key];
-          // Each question carries its own option count (2-6) and a 0/1 streak of
-          // consecutive first-attempt correct answers; anything else is dropped.
+          // Each question carries its own option count (2-6); anything else is dropped.
           if(!Number.isInteger(no)||no<1||no>c.total)continue;
-          if(!entry||typeof entry!=='object'||!Number.isInteger(entry.c)||entry.c<2||entry.c>6||!Number.isInteger(entry.s)||entry.s<0||entry.s>1)continue;
-          opts[no]={c:entry.c,s:entry.s};
+          if(!entry||typeof entry!=='object'||!Number.isInteger(entry.c)||entry.c<2||entry.c>6)continue;
+          opts[no]={c:entry.c};
         }
       }
       out[c.id]={idx:this.clamp(whole(row.idx),0,c.total),perfect:this.clamp(whole(row.perfect),0,c.total),mistakes:whole(row.mistakes),runs:whole(row.runs),best:this.clamp(whole(row.best),0,c.total),opts:opts};
@@ -297,14 +296,13 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     return row&&Number.isInteger(row.c)?this.clamp(row.c,2,6):2;
   }
   drillBumpOption(d,q,correct){
-    // One step on a question's own dial: two consecutive first-attempt correct answers
-    // raise its option count by one (max 6), a first-attempt miss lowers it (min 2).
+    // One step on a question's own dial: a first-attempt correct answer raises its option
+    // count by one (max 6) and a first-attempt miss lowers it (min 2). Since a question
+    // only reappears on the next run, each correct answer makes the next run harder.
     const no=Math.floor(Number(q&&q.no)),opts=Object.assign({},(d&&d.opts&&typeof d.opts==='object')?d.opts:{});
     if(!Number.isInteger(no)||no<1)return opts;
-    const row=opts[no]||{c:2,s:0};let count=Number.isInteger(row.c)?this.clamp(row.c,2,6):2,streak=Number.isInteger(row.s)?row.s:0;
-    if(correct){streak+=1;if(streak>=2){count=Math.min(6,count+1);streak=0;}}
-    else{count=Math.max(2,count-1);streak=0;}
-    opts[no]={c:count,s:streak};
+    const row=opts[no]||{c:2},count=Number.isInteger(row.c)?this.clamp(row.c,2,6):2;
+    opts[no]={c:correct?Math.min(6,count+1):Math.max(2,count-1)};
     return opts;
   }
   drillNumericChoices(d,q){
