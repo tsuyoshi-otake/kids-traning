@@ -2420,10 +2420,10 @@ for (const courseId of ['g1', 'g2', 'd3', 'h2']) {
   }
 }
 
-// Issue #87: each arithmetic question carries its own option count (2-6) plus a streak of
-// consecutive first-attempt correct answers, persisted inside the course record. Two in a
-// row raise the count by one, a first-attempt miss lowers it by one, so a mastered fact
-// asks for sharper recognition while a shaky one stays friendly.
+// Issues #87 and #89: each arithmetic question carries its own option count (2-6),
+// persisted inside the course record. A first-attempt correct answer raises the count by
+// one and a first-attempt miss lowers it by one, so a mastered fact already asks for
+// sharper recognition on the next run while a shaky one stays friendly.
 const DRILL_STEP_CHECK = 'each drill question steps its own option count between 2 and 6 with first-attempt results';
 const DRILL_SIX_CHECK = 'every arithmetic drill question offers six valid unique options at count 6';
 const DRILL_POSITION_CHECK = 'the drill answer position spreads evenly across every option count';
@@ -2482,7 +2482,7 @@ for (const courseId of ['g1', 'g2', 'd3', 'h2']) {
 observe(DRILL_STEP_CHECK, 10);
 drillStorage.clear();
 app.state.screen = 'start';
-const stepOpt = (no) => (app.readDrillProgress().g1.opts[no] || { c: 2, s: 0 });
+const stepOpt = (no) => (app.readDrillProgress().g1.opts[no] || { c: 2 });
 const stepCorrect = () => {
   app.startDrill('g1', true, 'choice');
   const question = app.drillQuestion();
@@ -2490,20 +2490,16 @@ const stepCorrect = () => {
   app.drillFlushEcho();
 };
 stepCorrect();
-if (stepOpt(1).c !== 2 || stepOpt(1).s !== 1) {
-  violated(DRILL_STEP_CHECK, `one correct answer recorded ${JSON.stringify(stepOpt(1))}`, 'expected count 2 streak 1');
-}
-stepCorrect();
-if (stepOpt(1).c !== 3 || stepOpt(1).s !== 0) {
-  violated(DRILL_STEP_CHECK, `two consecutive correct answers recorded ${JSON.stringify(stepOpt(1))}`, 'expected count 3 streak 0');
+if (stepOpt(1).c !== 3) {
+  violated(DRILL_STEP_CHECK, `one correct answer recorded ${JSON.stringify(stepOpt(1))}`, 'expected count 3');
 }
 app.startDrill('g1', true, 'choice');
 if (app.drillChoices(app.state.drill, app.drillQuestion()).length !== 3) {
-  violated(DRILL_STEP_CHECK, 'a question at count 3 did not offer three options', '');
+  violated(DRILL_STEP_CHECK, 'a question at count 3 did not offer three options on the next run', '');
 }
-for (let round = 0; round < 6; round += 1) stepCorrect();
+for (let round = 0; round < 3; round += 1) stepCorrect();
 if (stepOpt(1).c !== 6) {
-  violated(DRILL_STEP_CHECK, `eight consecutive correct answers reached ${JSON.stringify(stepOpt(1))}`, 'expected count 6');
+  violated(DRILL_STEP_CHECK, `four consecutive correct answers reached ${JSON.stringify(stepOpt(1))}`, 'expected count 6');
 }
 app.startDrill('g1', true, 'choice');
 if (app.drillChoices(app.state.drill, app.drillQuestion()).length !== 6) {
@@ -2511,7 +2507,7 @@ if (app.drillChoices(app.state.drill, app.drillQuestion()).length !== 6) {
 }
 stepCorrect();
 stepCorrect();
-if (stepOpt(1).c !== 6 || JSON.stringify(JSON.parse(drillStorage.get('kt_drill_v1')).g1.opts['1']) !== JSON.stringify({ c: 6, s: 0 })) {
+if (stepOpt(1).c !== 6 || JSON.stringify(JSON.parse(drillStorage.get('kt_drill_v1')).g1.opts['1']) !== JSON.stringify({ c: 6 })) {
   violated(DRILL_STEP_CHECK, `the dial did not stay persisted at six: ${JSON.stringify(stepOpt(1))}`, drillStorage.get('kt_drill_v1'));
 }
 if (stepOpt(2).c !== 2 || stepOpt(3).c !== 2) {
@@ -2528,8 +2524,8 @@ const stableAfter = app.drillChoices(app.state.drill, app.drillQuestion());
 if (stableBefore.length !== 6 || stableAfter.length !== 6 || JSON.stringify(stableAfter) !== JSON.stringify(stableBefore)) {
   violated(DRILL_STABLE_CHECK, 'a wrong first try changed the on-screen options', JSON.stringify([stableBefore, stableAfter]));
 }
-if (stepOpt(1).c !== 5 || stepOpt(1).s !== 0) {
-  violated(DRILL_STEP_CHECK, `a first-attempt miss left ${JSON.stringify(stepOpt(1))}`, 'expected count 5 streak 0');
+if (stepOpt(1).c !== 5) {
+  violated(DRILL_STEP_CHECK, `a first-attempt miss left ${JSON.stringify(stepOpt(1))}`, 'expected count 5');
 }
 app.drillChoose(stableAfter.find((choice) => choice === stableQuestion.ans));
 app.drillFlushEcho();
@@ -2554,10 +2550,10 @@ while (!app.state.drill.done && requeueGuard < 200) {
   app.drillChoose(app.drillQuestion().ans);
   app.drillFlushEcho();
 }
-if (stepOpt(1).c !== 4 || stepOpt(1).s !== 0) {
-  violated(DRILL_STEP_CHECK, `the again pass moved the dial to ${JSON.stringify(stepOpt(1))}`, 'expected count 4 streak 0');
+if (stepOpt(1).c !== 4) {
+  violated(DRILL_STEP_CHECK, `the again pass moved the dial to ${JSON.stringify(stepOpt(1))}`, 'expected count 4');
 }
-if (stepOpt(2).s !== 1) {
+if (stepOpt(2).c !== 3) {
   violated(DRILL_STEP_CHECK, 'a first-pass correct answer was not recorded', JSON.stringify(stepOpt(2)));
 }
 // Missing the same question at count 2 must stay at 2; it takes three more misses to get
@@ -2572,7 +2568,8 @@ if (stepOpt(1).c !== 2) {
 }
 
 // Records saved before the dial existed, and records holding malformed dials, behave as an
-// empty dial: invalid entries are dropped but valid neighbours survive.
+// empty dial: invalid entries are dropped, valid neighbours survive, and leftover streak
+// fields from the #87 format are stripped.
 observe(DRILL_RECORD_CHECK, 4);
 drillStorage.clear();
 drillStorage.set('kt_drill_v1', JSON.stringify({ g1: { idx: 0, perfect: 0, mistakes: 0, runs: 0, best: 0 } }));
@@ -2584,8 +2581,8 @@ drillStorage.set('kt_drill_v1', JSON.stringify({ g1: {
   opts: { '1': { c: 9, s: 0 }, '2': { c: 4, s: 7 }, '3': 'junk', '4': { c: 4, s: 1 }, '5': [4, 0], '101': { c: 3, s: 0 }, '0': { c: 3, s: 0 }, '-2': { c: 3, s: 0 }, 'abc': { c: 3, s: 0 } },
 } }));
 const cleanedOpts = app.readDrillProgress().g1.opts;
-if (JSON.stringify(cleanedOpts) !== JSON.stringify({ '4': { c: 4, s: 1 } })) {
-  violated(DRILL_RECORD_CHECK, `invalid stored dials survived as ${JSON.stringify(cleanedOpts)}`, 'expected only the valid entry');
+if (JSON.stringify(cleanedOpts) !== JSON.stringify({ '2': { c: 4 }, '4': { c: 4 } })) {
+  violated(DRILL_RECORD_CHECK, `invalid stored dials survived as ${JSON.stringify(cleanedOpts)}`, 'expected the two valid entries without streak fields');
 }
 app.startDrill('g1', false, 'choice');
 if (app.drillChoices(app.state.drill, app.drillQuestion()).length !== 2) {

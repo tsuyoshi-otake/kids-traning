@@ -604,12 +604,12 @@ internal static class Program
             html.Contains("d.answerMode==='choice'?this.drillNumericChoices(d,q):[]", StringComparison.Ordinal),
             "the arithmetic drill does not build stable shuffled answer positions");
         // The dial that scales each question's option count lives in the same course record:
-        // two consecutive first-attempt correct answers step it up, a first-attempt miss
-        // steps it down, and the whole record is validated on every read (issue #87).
+        // a first-attempt correct answer steps it up, a first-attempt miss steps it down,
+        // and the whole record is validated on every read (issues #87 and #89).
         Assert(
             html.Contains("drillOptionCount(d,q)", StringComparison.Ordinal) &&
             html.Contains("drillBumpOption(d,q,correct)", StringComparison.Ordinal) &&
-            html.Contains("opts[no]={c:count,s:streak}", StringComparison.Ordinal) &&
+            html.Contains("opts[no]={c:correct?Math.min(6,count+1):Math.max(2,count-1)}", StringComparison.Ordinal) &&
             html.Contains("this.drillOptionCount(next,this.drillQuestionAt(next,next.idx))", StringComparison.Ordinal),
             "the arithmetic drill does not adapt per-question option counts from first-attempt results");
         Assert(
