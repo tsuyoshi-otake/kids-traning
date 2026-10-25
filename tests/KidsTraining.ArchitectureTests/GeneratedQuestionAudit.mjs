@@ -351,6 +351,7 @@ for (const [id, stages] of [['math.g4.number-calculation', [2, 3]], ['math.g5.nu
 }
 const writtenCases = [
   { name: 'multi-digit addition', question: { topic: 'hissan', difficulty: 5, prompt: '1234 + 111', answer: '1345' }, kind: 'addition', expects: ['5', '4', '3', '1'] },
+  { name: 'three-addend addition', question: { topic: 'hissan', difficulty: 4, writtenArithmetic: true, prompt: '38 + 47 + 29', answer: '114' }, kind: 'addition', expects: ['24', '11'] },
   { name: 'multi-digit subtraction', question: { topic: 'hissan', difficulty: 5, prompt: '9000 - 111', answer: '8889' }, kind: 'subtraction', expects: ['9', '8', '8', '8'] },
   { name: 'three-by-one multiplication', question: { topic: 'hissan', difficulty: 5, prompt: '123 × 7', answer: '861' }, kind: 'multiplication', expects: ['21', '16', '8'] },
   { name: 'two-by-two multiplication', question: { topic: 'hissan', difficulty: 5, prompt: '12 × 34', answer: '408' }, kind: 'multiplication', expects: ['8', '4', '6', '3', '8', '10', '4'] },
@@ -1011,6 +1012,10 @@ for (const unit of writtenUnits) {
           && Number(m[5]) + Number(m[6]) === Number(q.answer)
           && Number(q.answer) === Number(m[2] === '+' ? m[4] : m[1])
           && (q.op === '＋' ? stage === 2 : stage === 3);
+      } else if (q.subtype === 'three-add') {
+        // Issue #95: 3つの 数の たし算 — two-digit addends written on one board, stage 4 only.
+        valid &&= unit.grade === 2 && stage === 4 && q.op === '＋' && [q.a, q.b, q.c].every((n) => n >= 10 && n < 100)
+          && q.prompt === `${q.a} + ${q.b} + ${q.c}` && q.answer === String(q.a + q.b + q.c) && !!app.writtenArithmeticPlan(q);
       } else {
       if (unit.grade === 2 && stage === 1) valid &&= q.a >= 10 && q.a < 100 && q.b >= 10 && q.b < 100 && (q.op === '＋' ? carryCount(q.a, q.b) === 0 : borrowCount(q.a, q.b) === 0);
       if (unit.grade === 2 && stage === 2) valid &&= q.op === '＋' && carryCount(q.a, q.b) >= 1;
@@ -1087,6 +1092,115 @@ const CHECK_G2_WORKBOOK = 'grade 2 generators cover the 2年上 workbook problem
     }
     const bad = seen.find((q) => !validate(q));
     if (bad) violated(CHECK_G2_WORKBOOK, `${unitId} stage ${stage} produced an invalid ${subtype}`, JSON.stringify(bad));
+  }
+}
+// Issue #95 — 小学2年算数 topic list (study.jitenon.jp): every added problem type is
+// reachable at its stage, and each answer is recomputed here from the generated numbers.
+const CHECK_G2_TOPICS = 'grade 2 generators cover the 小学2年算数 topic list';
+{
+  const g2profile = beginnerAtGrade(2);
+  const mulProfile = beginnerAtGrade(2);
+  mulProfile.unitStats['math.g2.mul'].multiplicationFacts = Object.fromEntries(
+    app.multiplicationStageFactKeys(5).map((key) => [key, { strength: 1, attempts: 1, errors: 0, lastAttemptAt: 1 }]));
+  const toCmMm = (t) => (t % 10 === 0 ? `${t / 10}cm` : `${Math.floor(t / 10)}cm${t % 10}mm`);
+  const parseCmMm = (text) => { const m = String(text).match(/^(\d+)cm(?:(\d+)mm)?$/); return m ? Number(m[1]) * 10 + Number(m[2] || 0) : NaN; };
+  const parseLDl = (text) => { const m = String(text).match(/^(?:(\d+)L)?(?:(\d+)dL)?$/); return m && (m[1] || m[2]) ? Number(m[1] || 0) * 10 + Number(m[2] || 0) : NaN; };
+  const toMCm = (t) => (t % 100 === 0 ? `${t / 100}m` : `${t >= 100 ? `${Math.floor(t / 100)}m` : ''}${t % 100}cm`);
+  const parseMCm = (text) => { const m = String(text).match(/^(?:(\d+)m)?(?:(\d+)cm)?$/); return m && (m[1] || m[2]) ? Number(m[1] || 0) * 100 + Number(m[2] || 0) : NaN; };
+  const kanjiValue = (word) => {
+    let total = 0;
+    let digit = 0;
+    for (const ch of word) {
+      const d = '一二三四五六七八九'.indexOf(ch);
+      if (d >= 0) { digit = d + 1; continue; }
+      const unit = { 十: 10, 百: 100, 千: 1000 }[ch];
+      if (!unit) return NaN;
+      total += (digit || 1) * unit;
+      digit = 0;
+    }
+    return total + digit;
+  };
+  const product = (text) => { const m = String(text).match(/^(\d) × (\d)$/); return m ? Number(m[1]) * Number(m[2]) : NaN; };
+  const shapeTruth = {
+    '3本の 直線で かこまれた 形を 何と いう？': '三角形',
+    '4本の 直線で かこまれた 形を 何と いう？': '四角形',
+    '長方形には 直角の かどが いくつ ある？': '4つ',
+    '直角三角形には 直角の かどが いくつ ある？': '1つ',
+    '正方形の 4つの へんの 長さは どう なって いる？': '4つとも 同じ',
+    '長方形の むかいあう へんの 長さは どう なって いる？': '同じ',
+    'はこの形で、同じ 形の 面は いくつずつ ある？': '2つずつ',
+    'さいころの形の 面は、どんな 形？': '正方形',
+    'ひごと ねんどだまで はこの形を つくる。ねんどだまは 何こ いる？': '8こ',
+    'ひごと ねんどだまで はこの形を つくる。ひごは 何本 いる？': '12本',
+  };
+  const cases = [
+    ['math.g2.kazu', 4, 'place-4digit', 400, (q) => { const m = String(q.prompt).match(/^1000が ([1-9])こ、100が (\d)こ、10が (\d)こ、1が (\d)こで？$/); return !!m && q.answer === String(Number(m[1]) * 1000 + Number(m[2]) * 100 + Number(m[3]) * 10 + Number(m[4])); }, '1000が 3こ、100が 0こ…'],
+    ['math.g2.kazu', 4, 'digit-place', 400, (q) => { const m = String(q.prompt).match(/^([1-9]\d{3}) の (千|百|十|一)の くらいの 数字は？$/); return !!m && q.answer === m[1]['千百十一'.indexOf(m[2])] && q.choices.length === 4 && new Set(q.choices).size === 4 && q.choices.every((c) => /^\d$/.test(c)); }, '4618 の 百の くらい'],
+    ['math.g2.kazu', 4, 'kanji-num-4', 400, (q) => { const m = String(q.prompt).match(/^「([一二三四五六七八九十百千]+)」を すうじで かくと？$/); return !!m && q.readingTarget === m[1] && Number(q.answer) === kanjiValue(m[1]) && Number(q.answer) >= 1000 && Number(q.answer) <= 9999; }, '「三千五十二」'],
+    ['math.g2.kazu', 4, 'hundreds-count', 400, (q) => { const p = String(q.prompt); const a = p.match(/^100を (\d+)こ あつめた 数は？$/); const b = p.match(/^(\d+) は 100を 何こ あつめた 数？$/); return a ? q.answer === String(Number(a[1]) * 100) : !!b && Number(q.answer) * 100 === Number(b[1]); }, '100を 23こ / 3600は 100を 何こ'],
+    ['math.g2.kazu', 5, 'make-10000', 400, (q) => { const p = String(q.prompt); const rest = p.match(/^(\d+) と あと いくつで 10000？$/); if (rest) return Number(rest[1]) + Number(q.answer) === 10000; return ({ '1000を 10こ あつめた 数は？': '10000', '10000より 1 小さい 数は？': '9999', '10000は 100を 何こ あつめた 数？': '100' })[p] === q.answer; }, '1000を 10こ / あと いくつで 10000'],
+    ['math.g2.kazu', 5, 'number-line-big', 400, (q) => { const m = String(q.prompt).match(/^数直線の ならび (\d+)、(\d+)、□、(\d+)　□は？$/); if (!m) return false; const step = Number(m[2]) - Number(m[1]); return (step === 100 || step === 1000) && Number(m[1]) >= 1000 && Number(m[3]) - Number(m[2]) === 2 * step && Number(q.answer) === Number(m[2]) + step; }, '7400、7500、□、7700'],
+    ['math.g2.kazu', 5, 'compare-4digit', 400, (q) => /^いちばん 大きい かずは？ /.test(String(q.prompt)) && q.choices.length === 4 && new Set(q.choices).size === 4 && q.answer === String(Math.max(...q.choices.map(Number))) && q.choices.every((c) => /^[1-9]\d{3}$/.test(c) && c[0] === q.choices[0][0]), '4けたの 大小'],
+    ['math.g2.add', 5, 'thousands-add', 400, (q) => q.prompt === `${q.n1} + ${q.n2}` && q.answer === String(q.n1 + q.n2) && ((q.n1 % 1000 === 0 && q.n2 % 1000 === 0) || (q.n1 % 100 === 0 && q.n2 % 100 === 0 && q.n1 + q.n2 > 1000)), '700 + 500 / 3000 + 4000'],
+    ['math.g2.add', 5, 'hundreds-tens-add', 400, (q) => q.prompt === `${q.n1} + ${q.n2}` && q.answer === String(q.n1 + q.n2) && q.n1 > 100 && q.n1 % 10 === 0 && q.n1 % 100 !== 0 && q.n2 % 10 === 0 && q.n2 < 100 && q.n1 + q.n2 < 1000, '480 + 70'],
+    ['math.g2.sub', 5, 'thousands-sub', 400, (q) => q.prompt === `${q.a} - ${q.b}` && q.answer === String(q.a - q.b) && q.a - q.b > 0 && q.a >= 1000 && ((q.a % 1000 === 0 && q.b % 1000 === 0) || (q.a % 100 === 0 && q.b % 100 === 0 && q.b < 1000)), '1300 - 500 / 8000 - 3000'],
+    ['math.g2.sub', 5, 'hundreds-tens-sub', 400, (q) => q.prompt === `${q.a} - ${q.b}` && q.answer === String(q.a - q.b) && q.a > 100 && q.a % 10 === 0 && q.a % 100 !== 0 && q.b % 10 === 0 && q.b < 100, '530 - 40'],
+    ['math.g2.hissan', 4, 'three-add', 300, (q) => {
+      const m = String(q.prompt).match(/^(\d{2}) \+ (\d{2}) \+ (\d{2})$/);
+      if (!m || q.writtenArithmetic !== true || q.answer !== String(Number(m[1]) + Number(m[2]) + Number(m[3]))) return false;
+      const plan = app.writtenArithmeticPlan(q);
+      const ones = [m[1], m[2], m[3]].reduce((sum, n) => sum + Number(n[1]), 0);
+      const tens = [m[1], m[2], m[3]].reduce((sum, n) => sum + Number(n[0]), 0) + Math.floor(ones / 10);
+      const numberLines = plan ? app.writtenArithmeticView(plan, 0).lines.filter((line) => line.tone === 'number').length : 0;
+      return !!plan && plan.third === m[3] && JSON.stringify(plan.steps.map((step) => step.expect)) === JSON.stringify([String(ones), String(tens)]) && numberLines === 3;
+    }, '23 + 45 + 18'],
+    ['math.g2.measure', 3, 'length-story', 600, (q) => { const p = String(q.prompt); const join = p.match(/^長さ (\S+) の テープと (\S+) の テープを つなぐと、ぜんぶで 何cm何mm？$/); const cut = p.match(/^長さ (\S+) の テープから (\S+) 切りとると、のこりは 何cm何mm？$/); const t = join ? parseCmMm(join[1]) + parseCmMm(join[2]) : cut ? parseCmMm(cut[1]) - parseCmMm(cut[2]) : NaN; return t > 10 && t % 10 !== 0 && q.answer === toCmMm(t); }, '12cm + 8cm5mm'],
+    ['math.g2.measure', 5, 'dl-cups', 800, (q) => { const m = String(q.prompt).match(/^1dLますで (\d+)かい はかった 水の かさは 何L何dL？$/); return !!m && Number(m[1]) % 10 !== 0 && /^\d+L\d+dL$/.test(q.answer) && parseLDl(q.answer) === Number(m[1]); }, '13かい → 1L3dL'],
+    ['math.g2.measure', 5, 'cm-mcm', 800, (q) => { const m = String(q.prompt).match(/^(\d+)cm は 何m(何cm)?？$/); return !!m && Number(m[1]) >= 100 && !!m[2] === (Number(m[1]) % 100 !== 0) && q.answer === toMCm(Number(m[1])); }, '135cm → 1m35cm'],
+    ['math.g2.measure', 5, 'mcm-add', 800, (q) => { const m = String(q.prompt).match(/^(\S+) \+ (\S+) は？$/); return !!m && q.answer === toMCm(parseMCm(m[1]) + parseMCm(m[2])); }, '1m70cm + 40cm'],
+    ['math.g2.measure', 5, 'mcm-sub', 800, (q) => { const m = String(q.prompt).match(/^(\S+) - (\S+) は？$/); return !!m && parseMCm(m[1]) > parseMCm(m[2]) && q.answer === toMCm(parseMCm(m[1]) - parseMCm(m[2])); }, '2m50cm - 80cm'],
+    ['math.g2.clock', 5, 'elapsed-cross-hour', 1000, (q) => { const m = String(q.prompt).match(/^(\d+)時(\d+)分 から (\d+)時(\d+)分 まで 何分？$/); return !!m && Number(m[3]) === Number(m[1]) + 1 && q.answer === `${Number(m[3]) * 60 + Number(m[4]) - Number(m[1]) * 60 - Number(m[2])}分`; }, '9時40分 から 10時20分'],
+    ['math.g2.clock', 5, 'hour-minute-convert', 1000, (q) => { const p = String(q.prompt); const toMin = p.match(/^(\d+)時間(\d+)分 は 何分？$/); const toHour = p.match(/^(\d+)分 は 何時間何分？$/); if (toMin) return q.answer === `${Number(toMin[1]) * 60 + Number(toMin[2])}分`; return !!toHour && Number(toHour[1]) > 60 && q.answer === `${Math.floor(Number(toHour[1]) / 60)}時間${Number(toHour[1]) % 60}分`; }, '1時間20分 = 80分'],
+    ['math.g2.clock', 5, 'hour-shift', 1000, (q) => { const m = String(q.prompt).match(/^(\d+)時(\d+)分 の 1時間(あと|まえ)の 時こくは？$/); return !!m && q.answer === `${Number(m[1]) + (m[3] === 'あと' ? 1 : -1)}時${m[2]}分`; }, '3時20分 の 1時間あと'],
+    ['math.g2.mul', 5, 'kuku-rule-step', 1200, (q) => { const p = String(q.prompt); const blank = p.match(/^(\d) × (\d) = (\d) × (\d) \+ □　□に はいる 数は？$/); const diff = p.match(/^(\d) × (\d) の こたえは、(\d) × (\d) の こたえより いくつ 大きい？$/); const m = blank || diff; return !!m && m[1] === m[3] && Number(m[2]) === Number(m[4]) + 1 && Number(q.answer) === Number(m[1]) * Number(m[2]) - Number(m[3]) * Number(m[4]); }, '7 × 6 = 7 × 5 + □', mulProfile],
+    ['math.g2.mul', 5, 'kuku-same-product', 1200, (q) => { const m = String(q.prompt).match(/^こたえが (\d+) に なる 九九は どれ？$/); return !!m && q.choices.length === 4 && q.choices.includes(q.answer) && product(q.answer) === Number(m[1]) && q.choices.filter((c) => product(c) === Number(m[1])).length === 1; }, 'こたえが 24 に なる 九九', mulProfile],
+    ['math.g2.mul', 5, 'kuku-swap-blank', 1200, (q) => { const m = String(q.prompt).match(/^(\d) × (\d) = (\d) × □　□に はいる 数は？$/); return !!m && m[2] === m[3] && Number(m[1]) * Number(m[2]) === Number(m[3]) * Number(q.answer); }, '4 × 6 = 6 × □', mulProfile],
+    ['math.g2.groups', 5, 'times-of', 400, (q) => { const p = String(q.prompt); const len = p.match(/^(\d+)cmの テープの (\d+)ばいの 長さは？$/); const times = p.match(/^(\d+)cmの テープは、(\d+)cmの テープの 何ばい？$/); if (len) return q.answer === `${Number(len[1]) * Number(len[2])}cm`; return !!times && Number(times[1]) % Number(times[2]) === 0 && q.answer === `${Number(times[1]) / Number(times[2])}ばい`; }, '4cmの 3ばい / 12cmは 4cmの 何ばい'],
+    ['math.g2.shape', 3, 'shape-define', 800, (q) => shapeTruth[q.prompt] === q.answer && q.choices.includes(q.answer), '3本の 直線で かこまれた 形'],
+    ['math.g2.shape', 3, 'shape-cut', 800, (q) => q.answer === '直角三角形' && q.isShape === true && /を、むかいあう ちょう点を むすぶ 直線で 切ると/.test(String(q.prompt)), '正方形を 切ると 直角三角形'],
+    ['math.g2.shape', 3, 'rect-perimeter', 800, (q) => { const p = String(q.prompt); const sq = p.match(/^1つの へんが (\d+)cmの 正方形。まわりの 長さは？$/); const rect = p.match(/^たて (\d+)cm、よこ (\d+)cmの 長方形。まわりの 長さは？$/); if (sq) return q.answer === `${Number(sq[1]) * 4}cm`; return !!rect && rect[1] !== rect[2] && q.answer === `${2 * (Number(rect[1]) + Number(rect[2]))}cm`; }, 'たて 3cm、よこ 5cm'],
+    ['math.g2.shape', 4, 'box-build', 800, (q) => shapeTruth[q.prompt] === q.answer && q.choices.includes(q.answer), 'ねんどだまは 8こ'],
+    ['math.g2.shape', 4, 'box-edges', 800, (q) => { const m = String(q.prompt).match(/^たて (\d+)cm、よこ (\d+)cm、高さ (\d+)cmの はこの形を ひごで つくる。(\d+)cmの ひごは 何本 いる？$/); return !!m && new Set([m[1], m[2], m[3]]).size === 3 && [m[1], m[2], m[3]].includes(m[4]) && q.answer === '4本'; }, '4cmの ひごは 4本'],
+    ['math.g2.frac', 4, 'frac-quantity', 600, (q) => { const m = String(q.prompt).match(/^(\d+)この 1\/(\d) は 何こ？$/); return !!m && Number(m[1]) % Number(m[2]) === 0 && q.answer === `${Number(m[1]) / Number(m[2])}こ` && q.isGroups === true && q.groupCount === Number(m[2]) && q.groupSize === Number(m[1]) / Number(m[2]); }, '12この 1/3'],
+    ['math.g2.story', 3, 'story-find-change', 600, (q) => { const m = String(q.prompt).match(/^.+?が (\d+)(\D+?) ありました。いくつか もらったので (\d+)\2に なりました。もらったのは なん\2？$/); return !!m && q.isTape === true && Number(q.answer) === Number(m[3]) - Number(m[1]) && Number(q.answer) > 0; }, '25こ → 41こ'],
+    ['math.g2.story', 3, 'story-find-used', 600, (q) => { const m = String(q.prompt).match(/^.+?が (\d+)(\D+?) ありました。いくつか つかったので のこりが (\d+)\2に なりました。つかったのは なん\2？$/); return !!m && q.isTape === true && Number(q.answer) === Number(m[1]) - Number(m[3]) && Number(q.answer) > 0; }, '43こ → のこり 18こ'],
+    ['math.g2.story', 3, 'story-find-start', 600, (q) => { const m = String(q.prompt).match(/^.+?を いくつか もっていました。(\d+)(\D+?) もらったので (\d+)\2に なりました。はじめは なん\2？$/); return !!m && q.isTape === true && Number(q.answer) === Number(m[3]) - Number(m[1]) && Number(q.answer) > 0; }, 'いくつか + 12こ = 35こ'],
+    ['math.g2.story', 3, 'story-compare', 600, (q) => { const m = String(q.prompt).match(/^あおいさんは .+?を (\d+)(\D+?) もっています。けんさんは あおいさんより (\d+)\2 (多く|少なく) もっています。けんさんは なん\2？$/); return !!m && Number(q.answer) === Number(m[1]) + (m[4] === '多く' ? 1 : -1) * Number(m[3]); }, 'あおいさんより 9こ 少ない'],
+    ['math.g2.money', 3, 'price-sum', 400, (q) => { const m = String(q.prompt).match(/^(.+?)が (\d+)円、(.+?)が (\d+)円。2つ かうと いくら？$/); return !!m && m[1] !== m[3] && q.answer === `${Number(m[2]) + Number(m[4])}円`; }, '120円 + 80円'],
+    ['math.g2.money', 5, 'price-sum', 400, (q) => { const m = String(q.prompt).match(/^(.+?)が (\d+)円、(.+?)が (\d+)円。2つ かうと いくら？$/); return !!m && m[1] !== m[3] && q.answer === `${Number(m[2]) + Number(m[4])}円`; }, '650円 + 480円'],
+    ['math.g2.order', 5, 'paren-story', 400, (q) => { const m = String(q.prompt).match(/^ノート (\d+)円と、えんぴつ (\d+)円・けしゴム (\d+)円を かいます。/); return !!m && Number(m[2]) + Number(m[3]) === 100 && q.answer === `${m[1]} + (${m[2]} + ${m[3]})` && q.choices.includes(q.answer); }, '120 + (60 + 40)'],
+  ];
+  observe(CHECK_G2_TOPICS, cases.length);
+  for (const [unitId, stage, subtype, draws, validate, example, profile = g2profile] of cases) {
+    const seen = [];
+    for (let i = 0; i < draws; i += 1) {
+      const q = app.genFor(unitId, profile, stage);
+      if (q.subtype === subtype) seen.push(q);
+    }
+    if (!seen.length) {
+      violated(CHECK_G2_TOPICS, `${unitId} stage ${stage} never produced ${subtype}`, example);
+      continue;
+    }
+    const bad = seen.find((q) => !validate(q));
+    if (bad) violated(CHECK_G2_TOPICS, `${unitId} stage ${stage} produced an invalid ${subtype}`, JSON.stringify(bad));
+  }
+  // ばい starts in grade 2, so the grade-1 groups unit that shares pickGroups must never ask it.
+  const CHECK_G1_TIMES = 'grade 1 groups never ask ばい questions';
+  observe(CHECK_G1_TIMES, 400);
+  const g1profile = beginnerAtGrade(1);
+  for (let i = 0; i < 400; i += 1) {
+    const q = app.genFor('math.g1.groups', g1profile, 5);
+    if (q.subtype === 'times-of' || /ばい/.test(String(q.prompt))) { violated(CHECK_G1_TIMES, 'math.g1.groups stage 5 asked a ばい question', JSON.stringify(q)); break; }
   }
 }
 const originalSettings = app.state.settings;
@@ -1939,7 +2053,10 @@ for (const unit of UNITS) {
               violated('generated written arithmetic has a complete finite step plan', `step ${stepIndex} is incomplete`, `${context} | ${JSON.stringify(step)}`);
             }
           }
-          const arithmetic = String(question.prompt).replace(/\s+/g, '').replace(/は？$/, '').replace(/[？?]$/, '').match(/^(\d+(?:\.\d+)?)([+\-−×÷])(\d+(?:\.\d+)?)$/);
+          const compact = String(question.prompt).replace(/\s+/g, '').replace(/は？$/, '').replace(/[？?]$/, '');
+          // 3つの 数の たし算は 2つめと 3つめを まとめた a + (b + c) として 答えを たしかめる。
+          const triple = compact.match(/^(\d+)\+(\d+)\+(\d+)$/);
+          const arithmetic = triple ? [compact, triple[1], '+', String(Number(triple[2]) + Number(triple[3]))] : compact.match(/^(\d+(?:\.\d+)?)([+\-−×÷])(\d+(?:\.\d+)?)$/);
           if (!arithmetic) {
             violated('generated written arithmetic has a complete finite step plan', 'a non-arithmetic prompt entered the written-work gate', context);
           } else {
@@ -2338,6 +2455,11 @@ for (const subtype of ['kanji-choice', 'kanji-picture']) {
 // prompt would teach the child a wrong fact, which no amount of sampling may miss.
 const DRILL_OPERATORS = { '＋': (x, y) => x + y, '−': (x, y) => x - y, '×': (x, y) => x * y, '÷': (x, y) => x / y };
 const solveDrillPrompt = (text) => {
+  // Issue #95: （ ）の ある けいさん — the bracket is worked first, from either side.
+  const frontGroup = /^\((\d+) (＋|−) (\d+)\) (＋|−) (\d+)$/.exec(String(text));
+  if (frontGroup) return DRILL_OPERATORS[frontGroup[4]](DRILL_OPERATORS[frontGroup[2]](Number(frontGroup[1]), Number(frontGroup[3])), Number(frontGroup[5]));
+  const backGroup = /^(\d+) (＋|−) \((\d+) (＋|−) (\d+)\)$/.exec(String(text));
+  if (backGroup) return DRILL_OPERATORS[backGroup[2]](Number(backGroup[1]), DRILL_OPERATORS[backGroup[4]](Number(backGroup[3]), Number(backGroup[5])));
   const parts = String(text).split(' ');
   const apply = DRILL_OPERATORS[parts[1]];
   if (!apply) return undefined;
@@ -2379,10 +2501,10 @@ const DRILL_PAIR_CHECK = 'a correct drill answer shows the question and its answ
 
 const drillCourses = app.drillCourses();
 observe(DRILL_COURSE_CHECK, drillCourses.length);
-if (drillCourses.length !== 6) {
-  violated(DRILL_COURSE_CHECK, `expected six 100-question courses, found ${drillCourses.length}`, JSON.stringify(drillCourses.map((c) => c.id)));
+if (drillCourses.length !== 8) {
+  violated(DRILL_COURSE_CHECK, `expected eight 100-question courses, found ${drillCourses.length}`, JSON.stringify(drillCourses.map((c) => c.id)));
 }
-const DRILL_FIRST_PROMPT = { g1: '1 ＋ 1', g2: '2 × 1', d3: '2 ÷ 1', h2: '21 ＋ 11' };
+const DRILL_FIRST_PROMPT = { g1: '1 ＋ 1', g2: '2 × 1', d3: '2 ÷ 1', h2n: '21 ＋ 11', h2: '24 ＋ 16', p2: '(2 ＋ 1) ＋ 1' };
 for (const course of drillCourses) {
   const bank = app.drillBank(course.id);
   if (bank.length !== course.total) {
@@ -2417,8 +2539,9 @@ for (const course of drillCourses) {
 
 // The optional recognition mode must be safe across the entire fixed bank, not only a sample.
 // A session keeps its shuffled layout stable while avoiding a learnable question-number pattern.
-observe(DRILL_CHOICE_CHECK, 400);
-for (const courseId of ['g1', 'g2', 'd3', 'h2']) {
+const ARITHMETIC_DRILLS = ['g1', 'g2', 'd3', 'h2n', 'h2', 'p2'];
+observe(DRILL_CHOICE_CHECK, ARITHMETIC_DRILLS.length * 100);
+for (const courseId of ARITHMETIC_DRILLS) {
   const bank = app.drillBank(courseId);
   const choiceOrder = app.drillChoiceOrder(bank.length, courseId === 'g1' ? 123456789 : 987654321);
   const secondOrder = app.drillChoiceOrder(bank.length, courseId === 'g1' ? 987654321 : 123456789);
@@ -2474,9 +2597,9 @@ const DRILL_POSITION_CHECK = 'the drill answer position spreads evenly across ev
 const DRILL_STABLE_CHECK = 'a wrong first try does not change the options of the question on screen';
 const DRILL_RECORD_CHECK = 'drill progress persists per-question option counts and drops invalid data';
 
-observe(DRILL_SIX_CHECK, 400);
-observe(DRILL_POSITION_CHECK, 20);
-for (const courseId of ['g1', 'g2', 'd3', 'h2']) {
+observe(DRILL_SIX_CHECK, ARITHMETIC_DRILLS.length * 100);
+observe(DRILL_POSITION_CHECK, ARITHMETIC_DRILLS.length * 5);
+for (const courseId of ARITHMETIC_DRILLS) {
   const bank = app.drillBank(courseId);
   for (const count of [2, 3, 4, 5, 6]) {
     const seed = courseId.charCodeAt(0) * 7919 + count;
@@ -2659,49 +2782,69 @@ for (let addend = 1; addend <= 9; addend += 1) {
 }
 
 const DRILL_HISSAN_CHECK = 'the grade-2 written-arithmetic drill follows the two-digit then three-digit regrouping sequence';
+// Issue #95: the course is split by difficulty. h2n never carries or borrows in any column;
+// h2 (the original course id) regroups in every question.
+const hissanCarries = (left, right) => { let count = 0, carry = 0; while (left || right || carry) { const total = (left % 10) + (right % 10) + carry; carry = total >= 10 ? 1 : 0; count += carry; left = Math.floor(left / 10); right = Math.floor(right / 10); } return count; };
+const hissanBorrows = (left, right) => { let count = 0, lend = 0; while (left || right) { const digit = (left % 10) - lend; lend = digit < right % 10 ? 1 : 0; count += lend; left = Math.floor(left / 10); right = Math.floor(right / 10); } return count; };
 const hissanBank = app.drillBank('h2');
-observe(DRILL_HISSAN_CHECK, hissanBank.length);
+const plainHissanBank = app.drillBank('h2n');
+observe(DRILL_HISSAN_CHECK, hissanBank.length + plainHissanBank.length);
 const hissanDigits = (value) => String(value).length;
-let sawThreeDigit = false;
-let carryAdds = 0;
-let borrowSubs = 0;
-let zeroHeavy = 0;
-for (const question of hissanBank) {
-  const match = /^(\d+) (＋|−) (\d+)$/.exec(question.text);
-  if (!match) {
-    violated(DRILL_HISSAN_CHECK, `question ${question.no} is not a written-arithmetic prompt`, question.text);
-    continue;
+for (const [courseId, bank] of [['h2n', plainHissanBank], ['h2', hissanBank]]) {
+  let sawThreeDigit = false;
+  let carryAdds = 0;
+  let borrowSubs = 0;
+  let plainAdds = 0;
+  let plainSubs = 0;
+  let zeroHeavy = 0;
+  for (const question of bank) {
+    const match = /^(\d+) (＋|−) (\d+)$/.exec(question.text);
+    if (!match) {
+      violated(DRILL_HISSAN_CHECK, `${courseId} question ${question.no} is not a written-arithmetic prompt`, question.text);
+      continue;
+    }
+    const left = Number(match[1]);
+    const right = Number(match[3]);
+    const widest = Math.max(hissanDigits(left), hissanDigits(right));
+    if (widest > 3) {
+      violated(DRILL_HISSAN_CHECK, `${courseId} question ${question.no} leaves the grade-2 range`, question.text);
+    }
+    if (widest === 3) sawThreeDigit = true;
+    if (!sawThreeDigit && widest !== 2) {
+      violated(DRILL_HISSAN_CHECK, `${courseId} question ${question.no} leaves two-digit work before three-digit work starts`, question.text);
+    }
+    const regroups = match[2] === '＋' ? hissanCarries(left, right) : hissanBorrows(left, right);
+    if (courseId === 'h2n' && regroups !== 0) {
+      violated(DRILL_HISSAN_CHECK, `h2n question ${question.no} regroups although the course has none`, question.text);
+    }
+    if (courseId === 'h2' && regroups === 0) {
+      violated(DRILL_HISSAN_CHECK, `h2 question ${question.no} needs no regrouping`, question.text);
+    }
+    if (match[2] === '＋' && ((left % 10) + (right % 10) >= 10)) carryAdds += 1;
+    if (match[2] === '−' && ((left % 10) < (right % 10))) borrowSubs += 1;
+    if (match[2] === '＋') plainAdds += 1; else plainSubs += 1;
+    if (question.text === '700 − 286') zeroHeavy += 1;
   }
-  const left = Number(match[1]);
-  const right = Number(match[3]);
-  const widest = Math.max(hissanDigits(left), hissanDigits(right));
-  if (widest > 3) {
-    violated(DRILL_HISSAN_CHECK, `question ${question.no} leaves the grade-2 range`, question.text);
+  if (courseId === 'h2' && (carryAdds < 20 || borrowSubs < 20 || !sawThreeDigit || zeroHeavy < 1)) {
+    violated(DRILL_HISSAN_CHECK, `carry ${carryAdds}, borrow ${borrowSubs}, zero-heavy ${zeroHeavy}`, 'grade-2 written arithmetic coverage');
   }
-  if (widest === 3) sawThreeDigit = true;
-  if (!sawThreeDigit && widest !== 2) {
-    violated(DRILL_HISSAN_CHECK, `question ${question.no} leaves two-digit work before three-digit work starts`, question.text);
+  if (courseId === 'h2n' && (plainAdds < 40 || plainSubs < 40 || !sawThreeDigit)) {
+    violated(DRILL_HISSAN_CHECK, `h2n has ${plainAdds} additions and ${plainSubs} subtractions`, 'expected both operations in two and three digits');
   }
-  if (match[2] === '＋' && ((left % 10) + (right % 10) >= 10)) carryAdds += 1;
-  if (match[2] === '−' && ((left % 10) < (right % 10))) borrowSubs += 1;
-  if (question.text === '700 − 286') zeroHeavy += 1;
-}
-if (carryAdds < 20 || borrowSubs < 20 || !sawThreeDigit || zeroHeavy < 1) {
-  violated(DRILL_HISSAN_CHECK, `carry ${carryAdds}, borrow ${borrowSubs}, zero-heavy ${zeroHeavy}`, 'grade-2 written arithmetic coverage');
 }
 
 const DRILL_HISSAN_VIEW_CHECK = 'the 100-question written-arithmetic course stacks aligned operands and puts the input below the rule';
-observe(DRILL_HISSAN_VIEW_CHECK, 4);
+observe(DRILL_HISSAN_VIEW_CHECK, 6);
 const hissanMarkup = ['kt-drill-hissan-row', '{{ drillView.hissanLeft }}', '{{ drillView.hissanRight }}',
   'kt-drill-hissan-rule', 'kt-drill-hissan-result'].every(fragment => page.includes(fragment));
 if (!hissanMarkup) violated(DRILL_HISSAN_VIEW_CHECK, 'the generated page is missing the stacked operands, rule, or answer row', runtimePagePath);
 const hissanViewApp = new app.constructor();
 hissanViewApp.props = hissanViewApp.props || {};
-for (const [index, mode] of [[0, 'input'], [90, 'input'], [0, 'choice']]) {
+for (const [courseId, index, mode] of [['h2', 0, 'input'], ['h2', 90, 'input'], ['h2', 0, 'choice'], ['h2n', 0, 'input'], ['h2n', 60, 'input']]) {
   try {
-    hissanViewApp.startDrill('h2', true, mode);
+    hissanViewApp.startDrill(courseId, true, mode);
     hissanViewApp.state.drill.idx = index;
-    const question = hissanBank[index];
+    const question = app.drillBank(courseId)[index];
     const parts = /^(\d+) (＋|−) (\d+)$/.exec(question.text);
     const view = hissanViewApp.renderVals().drillView;
     if (!view.showHissan || view.showPlainPrompt || view.showAns || view.hissanLeft !== parts[1] ||
@@ -2711,6 +2854,42 @@ for (const [index, mode] of [[0, 'input'], [90, 'input'], [0, 'choice']]) {
   } catch (error) {
     violated(DRILL_HISSAN_VIEW_CHECK, `question ${index + 1} in ${mode} mode did not render`, String(error && error.stack));
   }
+}
+
+// Issue #95: （ ）の ある けいさん. Every question keeps a bracket, stays inside the
+// grade-2 range at every step, and some subtractions change value without the bracket,
+// so the course actually teaches working the bracket first.
+const DRILL_PAREN_CHECK = 'the grade-2 parentheses drill works the bracket first inside the grade-2 range';
+const parenBank = app.drillBank('p2');
+observe(DRILL_PAREN_CHECK, parenBank.length);
+let bracketMatters = 0;
+for (const question of parenBank) {
+  const front = /^\((\d+) ＋ (\d+)\) ＋ (\d+)$/.exec(question.text);
+  const back = /^(\d+) ＋ \((\d+) ＋ (\d+)\)$/.exec(question.text);
+  const minus = /^(\d+) − \((\d+) ＋ (\d+)\)$/.exec(question.text);
+  const match = front || back || minus;
+  if (!match) {
+    violated(DRILL_PAREN_CHECK, `p2 question ${question.no} has no bracketed grade-2 form`, question.text);
+    continue;
+  }
+  const [a, b, c] = match.slice(1).map(Number);
+  const inside = front ? a + b : b + c;
+  const answer = minus ? a - inside : a + b + c;
+  if (question.ans !== answer || inside <= 0 || answer < 1 || answer > 99) {
+    violated(DRILL_PAREN_CHECK, `p2 question ${question.no} leaves the grade-2 range or answers ${question.ans}`, question.text);
+  }
+  if (minus && a - b + c !== answer) bracketMatters += 1;
+}
+if (bracketMatters < 10) {
+  violated(DRILL_PAREN_CHECK, `only ${bracketMatters} subtractions change value without the bracket`, 'expected at least 10');
+}
+
+const DRILL_UNIQUE_CHECK = 'the grade-2 written-arithmetic and parentheses drills never repeat a question';
+observe(DRILL_UNIQUE_CHECK, 3);
+for (const courseId of ['h2n', 'h2', 'p2']) {
+  const texts = app.drillBank(courseId).map((question) => question.text);
+  const repeated = texts.filter((text, index) => texts.indexOf(text) !== index);
+  if (repeated.length) violated(DRILL_UNIQUE_CHECK, `${courseId} repeats ${repeated.length} questions`, repeated.join(', '));
 }
 
 const DRILL_DIV_CHECK = 'the division drill covers every ordered inverse of a multiplication fact';

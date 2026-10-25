@@ -66,14 +66,15 @@ internal static partial class LearningMarkupPatcher
     private static string BuildWrittenArithmeticMethodsScript() => """
   writtenArithmeticExpression(q){
     const raw=String(q&&q.prompt||'').replace(/\s+/g,'').replace(/は？$/,'').replace(/[？?]$/,'');
-    const match=raw.match(/^(\d+(?:\.\d+)?)([+\-−×÷])(\d+(?:\.\d+)?)$/);
+    // 3つの 数の たし算（23+45+18）は 整数どうしの たし算だけを 筆算に する。
+    const triple=raw.match(/^(\d+)\+(\d+)\+(\d+)$/),match=triple?[raw,triple[1],'+',triple[2]]:raw.match(/^(\d+(?:\.\d+)?)([+\-−×÷])(\d+(?:\.\d+)?)$/);
     if(!match)return null;
     const op=match[2]==='−'?'-':match[2],fixed=new Set(['864÷24','3.6×4','2.4×0.5','3.6÷0.9']);
     const advancedHissan=!!q&&q.topic==='hissan'&&(q.writtenArithmetic||Number(q.difficulty)>=5);
     const advancedDivision=!!q&&q.topic==='div'&&Number(q.difficulty)>=5&&op==='÷';
     const legacyCheckpoint=q.writtenArithmetic===undefined&&fixed.has(raw);
     if(!q.writtenArithmetic&&!legacyCheckpoint&&!advancedHissan&&!advancedDivision)return null;
-    return{raw:raw,left:match[1],op:op,right:match[3]};
+    return{raw:raw,left:match[1],op:op,right:match[3],third:triple?triple[3]:''};
   }
   writtenArithmeticPlan(q){
     const expression=this.writtenArithmeticExpression(q);if(!expression)return null;
@@ -88,12 +89,12 @@ internal static partial class LearningMarkupPatcher
   writtenIntegerDigits(value){const digits=String(value).replace('.','').replace(/^0+(?=\d)/,'');return digits||'0';}
   writtenAddSubPlan(expression){
     if(expression.left.includes('.')||expression.right.includes('.'))return null;
-    const left=expression.left,right=expression.right,op=expression.op,a=[...left].reverse().map(Number),b=[...right].reverse().map(Number),width=Math.max(a.length,b.length),steps=[];
+    const left=expression.left,right=expression.right,third=expression.third||'',op=expression.op,a=[...left].reverse().map(Number),b=[...right].reverse().map(Number),c=[...third].reverse().map(Number),width=Math.max(a.length,b.length,c.length),steps=[];
     if(op==='+'){
       let carry=0;
       for(let column=0;column<width;column++){
-        const av=a[column]||0,bv=b[column]||0,incoming=carry,total=av+bv+incoming,digit=total%10;carry=Math.floor(total/10);
-        const terms=(incoming?[String(incoming),String(av),String(bv)]:[String(av),String(bv)]).join(' ＋ ');
+        const av=a[column]||0,bv=b[column]||0,cv=c[column]||0,incoming=carry,total=av+bv+cv+incoming,digit=total%10;carry=Math.floor(total/10);
+        const terms=(incoming?[String(incoming)]:[]).concat([String(av),String(bv)],third?[String(cv)]:[]).join(' ＋ ');
         steps.push({phase:'column',column:column,expect:String(total),writeDigit:String(digit),carry:carry,prompt:this.writtenPlaceName(column)+'：'+terms+' は？',explain:'この位をたして、答えを入力しよう。',completeText:terms+'＝'+total+(carry?'。'+digit+'を書いて、'+carry+'をくり上げる。':'。'+digit+'を書く。')});
       }
     }else{
@@ -113,7 +114,7 @@ internal static partial class LearningMarkupPatcher
         steps.push({phase:'column',column:column,expect:String(digit),writeDigit:String(digit),regroupMoves:moves,regrouped:remaining.slice(),prompt:(regroup?regroup+'。':'')+this.writtenPlaceName(column)+'：'+top+' − '+bv+' は？',explain:moves.length?'左の0でない位から順に分け直すよ。全体の数は変わらない。':'分け直した数から、この位の数を引こう。',completeText:top+' − '+bv+'＝'+digit+'。'});
       }
     }
-    return{kind:op==='+'?'addition':'subtraction',op:op,left:left,right:right,width:width,steps:steps,note:'右の位から、一つずつ計算します。',aria:left+(op==='+'?' たす ':' ひく ')+right+'の筆算。まだ答えていない位は空欄です。'};
+    return{kind:op==='+'?'addition':'subtraction',op:op,left:left,right:right,third:third,width:width,steps:steps,note:'右の位から、一つずつ計算します。',aria:left+(op==='+'?' たす ':' ひく ')+right+(third?' たす '+third:'')+'の筆算。まだ答えていない位は空欄です。'};
   }
   writtenMultiplicationPlan(expression){
     const left=expression.left,right=expression.right,leftDigits=this.writtenIntegerDigits(left),rightDigits=this.writtenIntegerDigits(right),decimalPlaces=this.writtenDecimalPlaces(left)+this.writtenDecimalPlaces(right),steps=[],prepare=[];
@@ -179,7 +180,8 @@ internal static partial class LearningMarkupPatcher
       while(result.length>1&&result[result.length-1]===blank&&result.length>plan.width)result.pop();
       lines.push({text:'  '+marks.reverse().join(''),tone:'marks'});
       lines.push({text:'  '+pad(plan.left,width),tone:'number'});
-      lines.push({text:(plan.op==='+'?'＋':'−')+' '+pad(plan.right,width),tone:'number'});
+      if(plan.third)lines.push({text:'  '+pad(plan.right,width),tone:'number'});
+      lines.push({text:(plan.op==='+'?'＋':'−')+' '+pad(plan.third||plan.right,width),tone:'number'});
       lines.push({text:'─'.repeat(width+2),tone:'rule'});
       lines.push({text:'  '+result.reverse().join(''),tone:'result'});
       if(plan.kind==='subtraction'){
