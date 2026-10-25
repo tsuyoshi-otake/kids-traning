@@ -57,8 +57,9 @@ internal static partial class LearningMarkupPatcher
             "      isDrill:sc==='drill', drillCards:drillCards, drillView:drillView,",
             StringComparison.Ordinal);
 
-        // The drill courses belong beside "きょうの ミッション" / "いまの にがて": they are the same kind of
-        // choice, so they share the hero card row and the card design instead of owning a separate panel.
+        // The drill courses belong with "きょうの ミッション" / "いまの にがて": they are the same kind of
+        // choice, so they share the hero card row (on a line of their own) and the card design instead
+        // of owning a separate panel.
         markup = ReplaceRequired(
             markup,
             "        <div style=\"max-width:520px;\">",
@@ -121,8 +122,9 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     {id:'g2',grade:2,total:100,badge:'2年生',title:'かけざん（九九）',sub:'2のだんから じゅんばんに 100もん',color:'#4a9bf0',edge:'#2f7ccd',shade:'#eaf3ff'},
     // ひっ算は くりあがり・くりさがりの ない コースと ある コースに わける（Issue #95）。
     // h2 は もとの「くりあがり・くりさがりの たしざん・ひきざん」コースの id を ひきつぐ。
-    {id:'h2n',grade:2,total:100,badge:'2年生',title:'ひっ算（くりあがりなし）',sub:'くりあがり・くりさがりの ない たしざん・ひきざんを 100もん',color:'#f2b134',edge:'#a8750a',shade:'#fff8e6'},
-    {id:'h2',grade:2,total:100,badge:'2年生',title:'ひっ算（くりあがりあり）',sub:'くりあがり・くりさがりの たしざん・ひきざんを 100もん',color:'#e39b2e',edge:'#c47d16',shade:'#fff4e0'},
+    // かいしがめんの カードは せまいので、cardTitle と cardTag に わけて 1ぎょうに おさめる（Issue #98）。
+    {id:'h2n',grade:2,total:100,badge:'2年生',title:'ひっ算（くりあがりなし）',cardTitle:'ひっ算',cardTag:'くりあがり なし',sub:'くりあがり・くりさがりの ない たしざん・ひきざんを 100もん',color:'#f2b134',edge:'#a8750a',shade:'#fff8e6'},
+    {id:'h2',grade:2,total:100,badge:'2年生',title:'ひっ算（くりあがりあり）',cardTitle:'ひっ算',cardTag:'くりあがり あり',sub:'くりあがり・くりさがりの たしざん・ひきざんを 100もん',color:'#e39b2e',edge:'#c47d16',shade:'#fff4e0'},
     {id:'p2',grade:2,total:100,badge:'2年生',title:'（ ）の ある けいさん',sub:'（ ）の なかを さきに けいさんする しきを 100もん',color:'#e0607e',edge:'#b8395a',shade:'#ffeef2'},
     {id:'d3',grade:3,total:100,badge:'3年生',title:'わりざん',sub:'九九の ぎゃくさんを 100もん',color:'#3cb8a8',edge:'#2a8f83',shade:'#e5f7f4'},
     {id:'k1',grade:1,total:100,badge:'1年生',title:'かんじ・ことば',sub:'1年生の 漢字と くみあわせた ことばを 100もん',color:'#5fbf7a',edge:'#3f9a5b',shade:'#eaf7ee'},
@@ -456,7 +458,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       drillCards=this.drillCourses().map(c=>{
         const row=drillProgress[c.id]||this.drillDefaultRecord(),pct=Math.round(this.clamp(row.idx/c.total,0,1)*100),asking=drillAsk===c.id;
         return {
-          id:c.id, badge:c.badge, title:c.title,
+          id:c.id, badge:c.badge, cardTitle:c.cardTitle||c.title, cardTag:c.cardTag||'', tagStyle:c.cardTag?'':'display:none;',
           cardStyle:'background:'+c.shade+'; border-color:'+c.edge+'; color:'+c.edge+';',
           barStyle:'width:'+pct+'%; background:'+c.color+';',
           progressText:row.idx>0?(row.idx+' / '+c.total):(c.total+'もん'),
@@ -526,17 +528,17 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         return """
             <!-- とっくんモード -->
             <div class="kt-drill-grid">
-              <sc-for list="{{ drillCards }}" as="d" hint-placeholder-count="6">
+              <sc-for list="{{ drillCards }}" as="d" hint-placeholder-count="8">
                 <div class="kt-hero-card kt-drill-card" style="{{ d.cardStyle }}">
                   <div class="kt-drill-card-top">
                     <span class="kt-drill-card-kicker">とっくん・{{ d.badge }}</span>
                     <span class="kt-drill-reset" style="{{ d.resetStyle }}" role="button" tabindex="0" aria-label="{{ d.resetAria }}" onclick="{{ d.onReset }}">{{ d.resetText }}</span>
                   </div>
                   <div class="kt-drill-card-body" role="button" tabindex="0" aria-label="{{ d.ariaLabel }}" onclick="{{ d.onStart }}">
-                    <div class="kt-drill-card-title">{{ d.title }}</div>
-                    <div class="kt-drill-bar"><span style="{{ d.barStyle }}"></span></div>
+                    <div class="kt-drill-card-title">{{ d.cardTitle }}<span class="kt-drill-card-tag" style="{{ d.tagStyle }}">{{ d.cardTag }}</span></div>
                     <div class="kt-drill-card-foot">
                       <span class="kt-drill-card-sub">{{ d.progressText }}</span>
+                      <div class="kt-drill-bar"><span style="{{ d.barStyle }}"></span></div>
                       <span class="kt-drill-card-go">{{ d.actionText }}</span>
                     </div>
                   </div>
@@ -681,17 +683,24 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     {
         return """
 <style id="kt-drill-mode">
-  .kt-hero-row{display:flex;flex-wrap:wrap;gap:14px;margin-top:22px;align-items:stretch;}
+  .kt-hero-row{display:flex;flex-wrap:wrap;gap:14px;margin:22px 0 12px;align-items:stretch;}
   .kt-hero-card{flex:1 1 200px;min-width:0;border:4px solid #f0e2c8;border-radius:22px;padding:14px 16px;word-break:keep-all;overflow-wrap:anywhere;}
   .kt-hero-weak{word-break:normal;overflow-wrap:break-word;}
-  .kt-drill-grid{flex:2 1 420px;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+  /* The courses take their own full-width line under the mission cards, so a growing course list
+     adds columns instead of stretching those cards. A column is never narrower than the card's
+     kicker-and-reset line and its footer, so neither wraps (four columns at the usual widths). */
+  .kt-drill-grid{flex:1 1 100%;min-width:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,228px),1fr));gap:10px;}
   .kt-drill-card{border-radius:18px;padding:8px 12px;display:flex;flex-direction:column;gap:2px;}
   .kt-drill-card-top{display:flex;align-items:center;justify-content:space-between;gap:6px;}
   .kt-drill-card-body{flex:1;display:flex;flex-direction:column;justify-content:center;cursor:pointer;}
-  .kt-drill-card-kicker{font-size:13px;font-weight:700;}
-  .kt-drill-card-title{font-size:19px;font-weight:900;line-height:1.15;}
-  .kt-drill-card-foot{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:2px;}
-  .kt-drill-card-sub{font-size:13px;font-weight:700;}
+  /* The kicker yields to "ほんとうに もどす？" instead of wrapping, so the second tap of the reset
+     confirmation lands on a card that has not moved. */
+  .kt-drill-card-kicker{min-width:0;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .kt-drill-card-title{display:flex;align-items:center;flex-wrap:wrap;gap:2px 8px;font-size:19px;font-weight:900;line-height:1.15;}
+  .kt-drill-card-tag{flex:none;background:#fff;border:2px solid currentColor;border-radius:999px;padding:0 8px;font-size:13px;line-height:1.2;}
+  .kt-drill-card-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;}
+  .kt-drill-card-foot .kt-drill-bar{flex:1;min-width:24px;margin-top:0;}
+  .kt-drill-card-sub{flex:none;font-size:13px;font-weight:700;}
   .kt-drill-card-go{flex:none;font-size:14px;font-weight:900;}
   .kt-drill-bar{height:8px;margin-top:5px;background:#fff;border:3px solid #ecd9b9;border-radius:10px;overflow:hidden;}
   .kt-drill-bar > span{display:block;height:100%;border-radius:8px;}
@@ -761,7 +770,6 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-mode-option:focus-visible,.kt-drill-mode-back:focus-visible,.kt-drill-card-body:focus-visible,.kt-drill-reset:focus-visible,.kt-drill-quit:focus-visible,.kt-drill-pick-btn:focus-visible,.kt-drill-next:focus-visible,.kt-drill-back:focus-visible,.kt-drill-pad [role="button"]:focus-visible{outline:4px solid #2f7ccd;outline-offset:3px;}
 
   @media (max-width: 1100px) {
-    .kt-hero-card{flex:1 1 44%;}
     .kt-drill-screen{padding:18px 26px 24px;}
     .kt-drill-side{width:250px;}
     .kt-drill-prompt{font-size:58px;}
@@ -770,9 +778,9 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   }
 
   @media (max-height: 820px) {
-    .kt-hero-row{margin-top:14px;gap:10px;}
+    .kt-hero-row{margin:10px 0 8px;gap:8px;}
     .kt-hero-card{padding:10px 12px;}
-    .kt-drill-grid{gap:8px;}
+    .kt-drill-grid{gap:6px;grid-template-columns:repeat(auto-fill,minmax(min(100%,224px),1fr));}
     .kt-drill-card{padding:6px 10px;}
     .kt-drill-card-title{font-size:17px;}
     .kt-drill-stage{gap:10px;}
@@ -795,7 +803,6 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
 
   @media (max-width: 800px) {
     .kt-hero-card{flex:1 1 100%;}
-    .kt-drill-grid{flex:1 1 100%;grid-template-columns:minmax(0,1fr);}
     .kt-drill-body{flex-direction:column;}
     .kt-drill-side{width:100%;}
     .kt-drill-pad{grid-template-columns:repeat(6,minmax(0,1fr));}
