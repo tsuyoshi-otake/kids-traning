@@ -89,18 +89,42 @@ Curriculum scope, stable unit IDs, assessment modes, and official references are
 - The MSI installs under `%LOCALAPPDATA%\KidsTraining` and registers HKCU login startup for tray residency plus automatic fullscreen learning.
 - Start Menu includes a tray shortcut and a direct learning-mode shortcut.
 
+## Android Drill App
+
+`KidsTrainingDrill.apk` (キッズとっくん) is a WebView wrapper that shows only the とっくん drill courses on a phone.
+
+- `tools/KidsTraining.RuntimeExport` builds the runtime page with the same `LearningPageBuilder` and markup patches as the Windows app.
+- `MobileDrillOnlyPatch` then hides the non-drill start-screen elements and adds the mobile stylesheet.
+  - Every anchor is required, so a template change fails the export instead of shipping a broken page.
+  - On the start screen, the mute toggle sits in the top bar instead of the bottom-right corner, so it never covers the last drill card.
+- `android/` holds the activity, the daily auto-launch service, and the boot receiver.
+  - The parent dashboard's Android settings card turns auto-launch on or off and opens the permission settings.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-android.ps1
+adb install -r artifacts\KidsTrainingDrill.apk
+```
+
+The script needs the .NET SDK, a JDK, Python, and an Android SDK with a platform and build-tools; no Gradle is involved.
+
+- The APK takes `versionName` and `versionCode` (major*10000 + minor*100 + patch) from `KidsTraining.App.csproj` `<Version>`.
+- It is signed with the local key `android\debug.keystore`. The key is ignored by git and created on the first build.
+  - Keep that file. Every later APK must be signed with the same key to install over an existing copy.
+
 ## Release Updates
 
 Build new releases with a version that matches the release tag:
 
 ```powershell
 rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-msi.ps1 -Version 1.31.0
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-android.ps1
 ```
 
-Publish a GitHub Release such as `v1.20.0` and attach `artifacts\KidsTraining.msi`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
+Publish a GitHub Release such as `v1.20.0` and attach `artifacts\KidsTraining.msi` and `artifacts\KidsTrainingDrill.apk`. Anonymous update checks require the repository/releases to be public, or GitHub will return a private-repository access error.
 
 Tracking issues:
 - Initial app and installer: https://github.com/tsuyoshi-otake/kids-traning/issues/1
+- Android drill app in releases: https://github.com/tsuyoshi-otake/kids-traning/issues/101
 - Tray updater: https://github.com/tsuyoshi-otake/kids-traning/issues/2
 - Login fullscreen startup: https://github.com/tsuyoshi-otake/kids-traning/issues/3
 - Level 1 beginner startup: https://github.com/tsuyoshi-otake/kids-traning/issues/4

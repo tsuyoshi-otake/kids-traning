@@ -9,6 +9,11 @@ artifacts/
 **/bin/
 **/obj/
 
+# Android manual build outputs and local signing key
+android/build/
+android/app/src/main/assets/
+android/debug.keystore
+
 *.user
 *.suo
 *.wixpdb
