@@ -449,8 +449,12 @@ internal static class Program
             html.Contains("title:'かけざん（九九）'", StringComparison.Ordinal) &&
             html.Contains("title:'わりざん'", StringComparison.Ordinal) &&
             html.Contains("{id:'d3',grade:3", StringComparison.Ordinal) &&
-            html.Contains("title:'ひっ算'", StringComparison.Ordinal) &&
+            html.Contains("title:'ひっ算（くりあがりなし）'", StringComparison.Ordinal) &&
+            html.Contains("{id:'h2n',grade:2", StringComparison.Ordinal) &&
+            html.Contains("title:'ひっ算（くりあがりあり）'", StringComparison.Ordinal) &&
             html.Contains("{id:'h2',grade:2", StringComparison.Ordinal) &&
+            html.Contains("title:'（ ）の ある けいさん'", StringComparison.Ordinal) &&
+            html.Contains("{id:'p2',grade:2", StringComparison.Ordinal) &&
             html.Contains("{id:'k1',grade:1", StringComparison.Ordinal) &&
             html.Contains("{id:'k2',grade:2", StringComparison.Ordinal),
             "the arithmetic and kanji courses are not all defined for grade 1 and grade 2");

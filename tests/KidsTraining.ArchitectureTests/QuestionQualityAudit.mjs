@@ -134,8 +134,14 @@ export function auditQuestionQuality(app, units, profileFor, observe, violated) 
       for (let sample = 0; sample < 200; sample++) {
         const q = app.genFor(unit.id, gradeTwo, stage);
         if (topic === 'frac') {
-          check('grade-2 fractions are concrete equal unit parts', q.isFracViz && q.fn === 1 && [2, 3, 4, 8].includes(q.fd), JSON.stringify(q));
           check('grade-2 fractions avoid abstract computation', !/いくつ分|どちらが 大きい|\d+\.\d+|\s[+＋−-]\s/.test(q.prompt), q.prompt);
+          if (q.subtype === 'frac-quantity') {
+            // Issue #95: 12この 1/3 — a set split into equal groups, drawn as those groups.
+            const m = String(q.prompt).match(/^(\d+)この 1\/([234]) は 何こ？$/);
+            check('grade-2 set fractions are drawn as equal groups', stage >= 4 && !!m && q.isGroups === true && q.groupCount === Number(m[2]) && q.groupCount * q.groupSize === Number(m[1]) && q.answer === `${q.groupSize}こ`, JSON.stringify(q));
+            continue;
+          }
+          check('grade-2 fractions are concrete equal unit parts', q.isFracViz && q.fn === 1 && [2, 3, 4, 8].includes(q.fd), JSON.stringify(q));
           if (stage <= 3) check('grade-2 fraction label matches the picture', q.answer === `1/${q.fd}` && q.choices.every(c => /^1\/(2|3|4|8)$/.test(c)), JSON.stringify(q));
           if (stage === 4) check('grade-2 fraction explanation identifies equal parts', q.answer === `同じ 大きさの ${q.fd}つに 分けた 1つ分だから`, JSON.stringify(q));
           if (stage === 5) check('grade-2 fractional reconstruction matches the diagram', Number(q.answer) === q.fd, JSON.stringify(q));

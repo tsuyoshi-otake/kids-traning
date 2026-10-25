@@ -20,7 +20,11 @@ genAdd(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'add'),make=(a,
     // No.28-29: 何百＋何百（500 + 200、200 + 800 = 1000 まで）。
     ()=>{const a=this.rand(1,9)*100,b=this.rand(1,10-a/100)*100,q=make(a,b);q.subtype='hundreds-add';q.explanation='100の まとまりで かんがえる。'+a+' + '+b+' = '+(a+b)+'。';return q;},
     // No.44: （ ）を さきに けいさんする。16 + (8 + 2) のように 何十に まとまる 組に する。
-    ()=>{const a=this.rand(11,88),b=Math.random()<.5?this.rand(1,9):this.rand(1,8)*10+this.rand(1,9),c=10-b%10,ans=a+b+c;return{topic:'add',mode:'num',subtype:'paren-add',n1:a,n2:b+c,prompt:a+' + ('+b+' + '+c+')',answer:''+ans,explanation:'（ ）の なかを さきに。'+b+' + '+c+' = '+(b+c)+'、'+a+' + '+(b+c)+' = '+ans+'。'};}
+    ()=>{const a=this.rand(11,88),b=Math.random()<.5?this.rand(1,9):this.rand(1,8)*10+this.rand(1,9),c=10-b%10,ans=a+b+c;return{topic:'add',mode:'num',subtype:'paren-add',n1:a,n2:b+c,prompt:a+' + ('+b+' + '+c+')',answer:''+ans,explanation:'（ ）の なかを さきに。'+b+' + '+c+' = '+(b+c)+'、'+a+' + '+(b+c)+' = '+ans+'。'};},
+    // 1000より 大きい 数の 計算: 1000を こえる 何百＋何百（700 + 500）と 何千＋何千（3000 + 4000）。
+    ()=>{const big=Math.random()<.5,a=big?this.rand(1,8)*1000:this.rand(2,9)*100,b=big?this.rand(1,9-a/1000)*1000:this.rand(11-a/100,9)*100,q=make(a,b);q.subtype='thousands-add';q.explanation=(big?'1000':'100')+'の まとまりで かんがえる。'+a+' + '+b+' = '+(a+b)+'。';return q;},
+    // 何百何十＋何十（340 + 50、480 + 70 = 550）。
+    ()=>{const a=this.rand(1,8)*100+this.rand(1,9)*10,b=this.rand(1,9)*10,q=make(a,b);q.subtype='hundreds-tens-add';q.explanation='10の まとまりで かんがえる。'+(a/10)+' + '+(b/10)+' = '+((a+b)/10)+' だから '+a+' + '+b+' = '+(a+b)+'。';return q;}
   );}return this.pickStage(stage,buckets,0);}
 """;
     }
@@ -47,7 +51,11 @@ genSub(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'sub'),make=(a,
     [()=>{const a=this.rand(11,18),b=this.rand(1,Math.max(1,a%10));return make(a,b);},()=>{const a=this.rand(5,18),b=this.rand(1,a-1),answer=a-b;return{topic:'sub',mode:'num',subtype:'missing-sub',prompt:a+' - □ = '+answer,answer:''+b,explanation:a+' から '+answer+' になるには '+b+' を ひく。'};}],
     [()=>{let a=this.rand(21,89);if(a%10===0)a++;const b=this.rand(1,a%10);return make(a,b);},()=>{const a=this.rand(2,9)*10,b=this.rand(1,a/10-1)*10;return make(a,b);},()=>{const a=this.rand(2,9)*10,b=this.rand(1,9),q=make(a,b);q.subtype='tens-sub-one';q.explanation='10の まとまりから '+b+' を ひく。'+a+' - '+b+' = '+(a-b)+'。';return q;},()=>{const b=this.rand(2,9),answer=this.rand(10,40),a=answer+b;return{topic:'sub',mode:'num',subtype:'missing-sub',prompt:'□ - '+b+' = '+answer,answer:''+a,explanation:answer+' に '+b+' を たすと '+a+'。'};}],
     [()=>{const a=this.rand(30,99),b=this.rand(a%10+1,Math.min(19,a-1));return make(a,b);},()=>{const a=this.rand(11,19)*10,b=this.rand(1,9)*10,q=make(a,b);q.subtype='tens-sub-100';q.explanation='10の まとまりで かんがえる。'+a+' - '+b+' = '+(a-b)+'。';return q;},()=>{const x=this.rand(12,28),y=this.rand(1,8),z=this.rand(1,Math.max(1,x-y-1)),s=x-y-z;return make(x,y+z,{prompt:x+' - '+y+' - '+z,answer:s,explanation:'まえから じゅんに。'+x+'−'+y+'='+(x-y)+'、'+(x-y)+'−'+z+'='+s+'。'});},()=>({topic:'sub',mode:'num',prompt:'9 - 3 - 2',answer:'4',explanation:'まえから じゅんに。9−3=6、6−2=4。'})],
-    [makeHissan,()=>{const a=this.rand(2,10)*100,b=this.rand(1,a/100-1)*100,q=make(a,b);q.subtype='hundreds-sub';q.explanation='100の まとまりで かんがえる。'+a+' - '+b+' = '+(a-b)+'。';return q;}]
+    [makeHissan,()=>{const a=this.rand(2,10)*100,b=this.rand(1,a/100-1)*100,q=make(a,b);q.subtype='hundreds-sub';q.explanation='100の まとまりで かんがえる。'+a+' - '+b+' = '+(a-b)+'。';return q;},
+    // 1000より 大きい 数の 計算: 何千何百−何百（1300 - 500）と 何千−何千（8000 - 3000）。
+    ()=>{const big=Math.random()<.5,a=big?this.rand(2,9)*1000:this.rand(11,18)*100,b=big?this.rand(1,a/1000-1)*1000:this.rand(Math.max(1,a/100-10),9)*100,q=make(a,b);q.subtype='thousands-sub';q.explanation=(big?'1000':'100')+'の まとまりで かんがえる。'+a+' - '+b+' = '+(a-b)+'。';return q;},
+    // 何百何十−何十（530 - 40 = 490）。
+    ()=>{const a=this.rand(1,9)*100+this.rand(1,9)*10,b=this.rand(1,9)*10,q=make(a,b);q.subtype='hundreds-tens-sub';q.explanation='10の まとまりで かんがえる。'+(a/10)+' - '+(b/10)+' = '+((a-b)/10)+' だから '+a+' - '+b+' = '+(a-b)+'。';return q;}]
   ];
   return this.pickStage(stage,g<=1?gradeOneBuckets:upperGradeBuckets,0);}
 """;
@@ -69,7 +77,9 @@ genHissan(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'hissan'),ta
     // No.34-35: こたえが 三桁に なる 二桁＋二桁（46 + 92 = 138）。
     ()=>{const pair=find(()=>[this.rand(41,99),this.rand(41,99)],(a,b)=>a+b>=100,[96,92]);return add(pair[0],pair[1],4);},
     // No.40: 三桁＋一・二桁（528 + 28、503 + 7）。
-    ()=>{const a=this.rand(101,979),b=this.rand(1,Math.min(89,999-a));return add(a,b,4);}],
+    ()=>{const a=this.rand(101,979),b=this.rand(1,Math.min(89,999-a));return add(a,b,4);},
+    // 3つの 数の たし算の 筆算（23 + 45 + 18）。一の位の くり上がりが 2に なる ことも ある。
+    ()=>{const a=this.rand(11,59),b=this.rand(11,49),c=this.rand(11,39),s=a+b+c;return tag({topic:'hissan',mode:'num',subtype:'three-add',op:'＋',a:a,b:b,c:c,prompt:a+' + '+b+' + '+c,answer:''+s,explanation:'くらいを そろえて、右の くらいから 3つの 数を じゅんに たす。'+a+' + '+b+' + '+c+' = '+s+'。'},4);}],
     [()=>{const pair=find(()=>[this.rand(248,799),this.rand(178,699)],(a,b)=>a+b<=999&&carry(a,b)>=2,[468,357]);return add(pair[0],pair[1],5);},()=>{const pair=find(()=>{const a=this.rand(401,999);return[a,this.rand(112,a-1)];},(a,b)=>borrow(a,b)>=2,[802,467]);return sub(pair[0],pair[1],5);},()=>sub(700,286,5),
     // No.37-39: 三桁−一・二桁（105 - 16、148 - 83）。百のくらいからの くりさがりを ふくむ。
     ()=>{const pair=find(()=>{const a=this.rand(101,989);return[a,this.rand(1,Math.min(99,a-1))];},(a,b)=>borrow(a,b)>=1,[103,96]);return sub(pair[0],pair[1],5);},
@@ -89,7 +99,16 @@ genHissan(p){const g=this.effectiveGrade(p),stage=this.topicStage(p,'hissan'),ta
     private static string BuildPickMulScript()
     {
         return """
-pickMul(p){const stage=this.topicStage(p,'mul'),stat=this.topicStat(p,'mul'),facts=stat.multiplicationFacts||{},keys=this.multiplicationStageFactKeys(stage),score=key=>{const f=facts[key];if(!f)return 0;const strength=Math.max(0,Math.min(2,Number(f.strength)||0)),attempts=Math.max(0,Number(f.attempts)||0),errors=Math.max(0,Number(f.errors)||0),age=(Number(f.lastAttemptAt)||0)/1e13;return strength*1000000+(attempts===0?0:errors>0?-100000:1000)+age;},ranked=keys.slice().sort((a,b)=>score(a)-score(b)),limit=Math.min(6,ranked.length),total=limit*(limit+1)/2,pick=()=>{let ticket=this.rand(1,total);for(let i=0;i<limit;i++){ticket-=limit-i;if(ticket<=0)return ranked[i];}return ranked[0];},recall=key=>{const parts=key.split('x'),a=Number(parts[0]),b=Number(parts[1]),ans=a*b;return{topic:'mul',mode:'num',op:'mul',a:a,b:b,prompt:a+' × '+b,answer:''+ans,multiplicationFactKey:key,memoryAssessment:true,explanation:a+' × '+b+' = '+ans+'。声に出して たしかめよう。'};},progress=this.multiplicationFactProgress(stat,stage);if(stage<5||progress.secure<progress.total||Math.random()<.75)return recall(pick());if(Math.random()<.5){const a=this.rand(2,9),b=this.rand(2,9),ans=a*b,swap=b+' × '+a;return{topic:'mul',mode:'choices',prompt:a+' × '+b+' と こたえが おなじ しきは？',answer:swap,choices:this.pick4(swap,[a+' × '+(b+1),a+' × '+(b-1),(a+1)+' × '+b]),explanation:'かける 数と かけられる 数を いれかえても、こたえは '+ans+'。'};}const each=this.rand(2,9),groups=this.rand(2,9),ans=each*groups;return{topic:'mul',mode:'num',op:'mul',a:each,b:groups,prompt:'1さらに りんごが '+each+'こずつ、'+groups+'さら。ぜんぶで？',answer:''+ans,explanation:'同じ数ずつが いくつ分かは かけ算。'+each+' × '+groups+' = '+ans+'。'};}
+pickMul(p){const stage=this.topicStage(p,'mul'),stat=this.topicStat(p,'mul'),facts=stat.multiplicationFacts||{},keys=this.multiplicationStageFactKeys(stage),score=key=>{const f=facts[key];if(!f)return 0;const strength=Math.max(0,Math.min(2,Number(f.strength)||0)),attempts=Math.max(0,Number(f.attempts)||0),errors=Math.max(0,Number(f.errors)||0),age=(Number(f.lastAttemptAt)||0)/1e13;return strength*1000000+(attempts===0?0:errors>0?-100000:1000)+age;},ranked=keys.slice().sort((a,b)=>score(a)-score(b)),limit=Math.min(6,ranked.length),total=limit*(limit+1)/2,pick=()=>{let ticket=this.rand(1,total);for(let i=0;i<limit;i++){ticket-=limit-i;if(ticket<=0)return ranked[i];}return ranked[0];},recall=key=>{const parts=key.split('x'),a=Number(parts[0]),b=Number(parts[1]),ans=a*b;return{topic:'mul',mode:'num',op:'mul',a:a,b:b,prompt:a+' × '+b,answer:''+ans,multiplicationFactKey:key,memoryAssessment:true,explanation:a+' × '+b+' = '+ans+'。声に出して たしかめよう。'};},progress=this.multiplicationFactProgress(stat,stage);if(stage<5||progress.secure<progress.total||Math.random()<.75)return recall(pick());const extras=[
+()=>{const a=this.rand(2,9),b=this.rand(2,9),ans=a*b,swap=b+' × '+a;return{topic:'mul',mode:'choices',prompt:a+' × '+b+' と こたえが おなじ しきは？',answer:swap,choices:this.pick4(swap,[a+' × '+(b+1),a+' × '+(b-1),(a+1)+' × '+b]),explanation:'かける 数と かけられる 数を いれかえても、こたえは '+ans+'。'};},
+()=>{const each=this.rand(2,9),groups=this.rand(2,9),ans=each*groups;return{topic:'mul',mode:'num',op:'mul',a:each,b:groups,prompt:'1さらに りんごが '+each+'こずつ、'+groups+'さら。ぜんぶで？',answer:''+ans,explanation:'同じ数ずつが いくつ分かは かけ算。'+each+' × '+groups+' = '+ans+'。'};},
+// 九九の きまり: かける 数が 1 ふえると、こたえは かけられる 数だけ ふえる（7 × 6 = 7 × 5 + 7）。
+()=>{const a=this.rand(2,9),b=this.rand(2,8),blank=Math.random()<.5;return{topic:'mul',mode:'num',subtype:'kuku-rule-step',prompt:blank?a+' × '+(b+1)+' = '+a+' × '+b+' + □　□に はいる 数は？':a+' × '+(b+1)+' の こたえは、'+a+' × '+b+' の こたえより いくつ 大きい？',answer:''+a,explanation:'かける 数が 1 ふえると、こたえは かけられる 数の '+a+' だけ ふえる。'+(a*b)+' + '+a+' = '+(a*(b+1))+'。'};},
+// こたえが 同じに なる 九九を 見つける（こたえが 24 → 3 × 8、4 × 6、6 × 4、8 × 3）。
+()=>{const targets=[12,16,18,24,36],target=targets[this.rand(0,targets.length-1)],pairs=[],pool=[];for(let a=1;a<=9;a++)if(target%a===0&&target/a<=9)pairs.push(a+' × '+(target/a));for(let a=2;a<=9;a++)for(let b=2;b<=9;b++)if(a*b!==target&&Math.abs(a*b-target)<=4)pool.push(a+' × '+b);const answer=pairs[this.rand(0,pairs.length-1)];return{topic:'mul',mode:'choices',subtype:'kuku-same-product',prompt:'こたえが '+target+' に なる 九九は どれ？',answer:answer,choices:this.pick4(answer,this.shuffle(pool)),explanation:'こたえが '+target+' に なる 九九は '+pairs.join('、')+'。'};},
+// かける 数と かけられる 数を いれかえる（4 × 6 = 6 × □）。
+()=>{const a=this.rand(2,9);let b=this.rand(2,9);while(b===a)b=this.rand(2,9);return{topic:'mul',mode:'num',subtype:'kuku-swap-blank',prompt:a+' × '+b+' = '+b+' × □　□に はいる 数は？',answer:''+a,explanation:'かける 数と かけられる 数を いれかえても、こたえは おなじ。'+a+' × '+b+' = '+b+' × '+a+' = '+(a*b)+'。'};}
+];return extras[Math.min(extras.length-1,Math.floor(Math.random()*extras.length))]();}
 """;
     }
 

@@ -119,8 +119,12 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   drillCourses(){return [
     {id:'g1',grade:1,total:100,badge:'1年生',title:'たしざん・ひきざん',sub:'1＋1から じゅんばんに 100もん',color:'#ff8a3d',edge:'#e07d2a',shade:'#fff3e6'},
     {id:'g2',grade:2,total:100,badge:'2年生',title:'かけざん（九九）',sub:'2のだんから じゅんばんに 100もん',color:'#4a9bf0',edge:'#2f7ccd',shade:'#eaf3ff'},
+    // ひっ算は くりあがり・くりさがりの ない コースと ある コースに わける（Issue #95）。
+    // h2 は もとの「くりあがり・くりさがりの たしざん・ひきざん」コースの id を ひきつぐ。
+    {id:'h2n',grade:2,total:100,badge:'2年生',title:'ひっ算（くりあがりなし）',sub:'くりあがり・くりさがりの ない たしざん・ひきざんを 100もん',color:'#f2b134',edge:'#a8750a',shade:'#fff8e6'},
+    {id:'h2',grade:2,total:100,badge:'2年生',title:'ひっ算（くりあがりあり）',sub:'くりあがり・くりさがりの たしざん・ひきざんを 100もん',color:'#e39b2e',edge:'#c47d16',shade:'#fff4e0'},
+    {id:'p2',grade:2,total:100,badge:'2年生',title:'（ ）の ある けいさん',sub:'（ ）の なかを さきに けいさんする しきを 100もん',color:'#e0607e',edge:'#b8395a',shade:'#ffeef2'},
     {id:'d3',grade:3,total:100,badge:'3年生',title:'わりざん',sub:'九九の ぎゃくさんを 100もん',color:'#3cb8a8',edge:'#2a8f83',shade:'#e5f7f4'},
-    {id:'h2',grade:2,total:100,badge:'2年生',title:'ひっ算',sub:'くりあがり・くりさがりの たしざん・ひきざんを 100もん',color:'#e39b2e',edge:'#c47d16',shade:'#fff4e0'},
     {id:'k1',grade:1,total:100,badge:'1年生',title:'かんじ・ことば',sub:'1年生の 漢字と くみあわせた ことばを 100もん',color:'#5fbf7a',edge:'#3f9a5b',shade:'#eaf7ee'},
     {id:'k2',grade:2,total:100,badge:'2年生',title:'かんじ・ことば',sub:'1・2年生で ならった 漢字の ことばを 100もん',color:'#b07ae0',edge:'#8d55c4',shade:'#f4ecff'}
   ];}
@@ -201,30 +205,66 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     for(let i=0;i<extra;i++)ask(i<wordTargets.length?B:C,wordTargets[i%wordTargets.length],kanjiSlots+i);
     return list;
   }
-  buildHissanDrillBank(){
+  buildHissanDrillBank(id){
     const list=[],carry=(a,b)=>{let c=0,i=0;while(a||b||i){const t=a%10+b%10+i;if(t>=10)c++;i=t>=10?1:0;a=Math.floor(a/10);b=Math.floor(b/10);}return c;},
       borrow=(a,b)=>{let c=0,l=0;while(a||b){let d=a%10-l;const t=b%10;l=0;if(d<t){c++;l=1;}a=Math.floor(a/10);b=Math.floor(b/10);}return c;},
       push=(sec,a,op,b,hint)=>list.push({no:list.length+1,sec:sec,text:a+' '+op+' '+b,ans:op==='＋'?a+b:a-b,hint:hint,kind:'num',choices:null}),
       pick=(pool,n)=>{const out=[],seen=new Set();for(let i=0;i<n;i++){const item=pool[Math.min(pool.length-1,Math.floor(i*pool.length/n))];const key=item.join(',');if(seen.has(key))continue;seen.add(key);out.push(item);}for(let i=0;i<pool.length&&out.length<n;i++){const key=pool[i].join(',');if(seen.has(key))continue;seen.add(key);out.push(pool[i]);}return out;},
       dump=(sec,op,pairs,hint)=>{for(const pair of pairs)push(sec,pair[0],op,pair[1],hint);};
-    const A='くりあがりなし',B='くりあがりの たしざん',C='くりさがりの ひきざん',D='3けたの ひっ算',E='0が ある ひっ算';
-    const hA='くらいを そろえて、右の くらいから じゅんに けいさんしよう。',hB='一のくらいが 10を こえたら、十のくらいに 1 くりあげよう。',hC='たりない ときは となりの くらいから 1 かりよう。',hD='3けたも おなじ。右の くらいから じゅんに けいさんしよう。',hE='0の くらいは、となりから 1 かりて 10を つくろう。';
-    const twoAdd=[],twoSub=[],carryAdd=[],borrowSub=[],threeAdd=[],threeSub=[],hardSub=[[700,286],[500,173],[800,405],[600,258],[900,327],[802,467],[400,236],[601,385],[703,458],[504,267],[300,147],[905,478]];
-    for(let a=21;a<=87;a++)for(let b=11;b<=99-a;b++)if(carry(a,b)===0)twoAdd.push([a,b]);
-    for(let a=32;a<=98;a++)for(let b=11;b<a;b++)if(borrow(a,b)===0)twoSub.push([a,b]);
+    const hA='くらいを そろえて、右の くらいから じゅんに けいさんしよう。',hD='3けたも おなじ。右の くらいから じゅんに けいさんしよう。';
+    if(id==='h2n'){
+      // くりあがり・くりさがりが どの くらいにも ない 二けた・三けたの ひっ算。
+      const A='2けたの たしざん',B='2けたの ひきざん',C='3けたの たしざん',D='3けたの ひきざん';
+      const twoAdd=[],twoSub=[],threeAdd=[],threeAddTwo=[],threeSub=[],threeSubTwo=[];
+      for(let a=21;a<=87;a++)for(let b=11;b<=99-a;b++)if(carry(a,b)===0)twoAdd.push([a,b]);
+      for(let a=32;a<=98;a++)for(let b=11;b<a;b++)if(borrow(a,b)===0)twoSub.push([a,b]);
+      for(let a=123;a<=876;a+=3)for(let b=111;b<=876;b+=5)if(a+b<=999&&carry(a,b)===0)threeAdd.push([a,b]);
+      for(let a=211;a<=887;a+=7)for(let b=11;b<=88;b+=3)if(carry(a,b)===0)threeAddTwo.push([a,b]);
+      for(let a=345;a<=999;a+=3)for(let b=111;b<a;b+=5)if(borrow(a,b)===0)threeSub.push([a,b]);
+      for(let a=211;a<=999;a+=7)for(let b=11;b<=99;b+=3)if(borrow(a,b)===0)threeSubTwo.push([a,b]);
+      dump(A,'＋',pick(twoAdd,25),hA);dump(B,'−',pick(twoSub,25),hA);
+      dump(C,'＋',pick(threeAdd,15),hD);dump(C,'＋',pick(threeAddTwo,10),hD);
+      dump(D,'−',pick(threeSub,15),hD);dump(D,'−',pick(threeSubTwo,10),hD);
+      return list;
+    }
+    const B='くりあがりの たしざん',C='くりさがりの ひきざん',F='こたえが 3けたの たしざん',D='3けたの ひっ算',E='0が ある ひっ算';
+    const hB='一のくらいが 10を こえたら、十のくらいに 1 くりあげよう。',hC='たりない ときは となりの くらいから 1 かりよう。',hF='十のくらいが 10を こえたら、百のくらいに 1 くりあげよう。',hE='0の くらいは、となりから 1 かりて 10を つくろう。';
+    const carryAdd=[],borrowSub=[],hundredAdd=[],threeAdd=[],threeSub=[],hardSub=[[700,286],[500,173],[800,405],[600,258],[900,327],[802,467],[400,236],[601,385],[703,458],[504,267],[300,147],[905,478],[100,8],[100,46],[103,96]];
     for(let a=24;a<=79;a++)for(let b=16;b<=79;b++)if(a+b<=99&&carry(a,b)>=1)carryAdd.push([a,b]);
     for(let a=31;a<=98;a++)for(let b=12;b<a;b++)if(borrow(a,b)>=1)borrowSub.push([a,b]);
+    for(let a=38;a<=98;a++)for(let b=24;b<=98;b++)if(a+b>=100&&a+b<=180)hundredAdd.push([a,b]);
     for(let a=123;a<=799;a+=3)for(let b=111;b<=799;b+=5)if(a+b<=999&&carry(a,b)>=1)threeAdd.push([a,b]);
     for(let a=301;a<=999;a+=3)for(let b=111;b<a;b+=5)if(borrow(a,b)>=1)threeSub.push([a,b]);
-    dump(A,'＋',pick(twoAdd,15),hA);dump(A,'−',pick(twoSub,15),hA);
     dump(B,'＋',pick(carryAdd,20),hB);dump(C,'−',pick(borrowSub,20),hC);
-    dump(D,'＋',pick(threeAdd,10),hD);dump(D,'−',pick(threeSub,10),hD);
-    dump(E,'−',pick(hardSub,10),hE);
+    dump(F,'＋',pick(hundredAdd,15),hF);
+    dump(D,'＋',pick(threeAdd,15),hD);dump(D,'−',pick(threeSub,15),hD);
+    dump(E,'−',pick(hardSub,15),hE);
+    return list;
+  }
+  buildParenDrillBank(){
+    // （ ）の ある しき（2年「計算の きまり」）: （ ）の なかを さきに けいさんする。
+    // どの こたえも 100いか、とちゅうの こたえも 0より 大きい。
+    const list=[],add=(sec,text,ans,hint)=>list.push({no:list.length+1,sec:sec,text:text,ans:ans,hint:hint,kind:'num',choices:null}),
+      front=(sec,a,b,c,hint)=>add(sec,'('+a+' ＋ '+b+') ＋ '+c,a+b+c,hint),back=(sec,a,b,c,hint)=>add(sec,a+' ＋ ('+b+' ＋ '+c+')',a+b+c,hint),
+      minus=(sec,a,b,c,hint)=>add(sec,a+' − ('+b+' ＋ '+c+')',a-(b+c),hint);
+    const A='（ ）の なかを さきに',B='10を つくって たす',C='ひきざんと （ ）',D='しあげの ミックス';
+    const hA='（ ）の なかを さきに けいさんしよう。',hB='（ ）の なかで 10を つくると、けいさんが かんたんに なるよ。',hC='さきに （ ）の なかを たして、その こたえを ひこう。',hD='（ ）の なかを さきに。10の まとまりを さがそう。';
+    for(let i=0;i<25;i++){const a=2+(i*3)%8,b=1+(i*5)%9,c=1+(i*7)%9;if(i%2===0)front(A,a,b,c,hA);else back(A,a,b,c,hA);}
+    for(let i=0;i<25;i++){const u=1+(i%9);if(i%2===0)back(B,11+(i*7)%59,u,10-u,hB);else front(B,10*(1+(i%6))+u,10-u,3+(i*7)%27,hB);}
+    for(let i=0;i<25;i++){const b=i<15?1+(i%9):2+(i*3)%8,c=i<15?10-b:2+(i*5)%8;minus(C,b+c+5+(i*11)%60,b,c,hC);}
+    for(let i=0;i<25;i++){
+      const k=i%4,u=1+(i*7)%9;
+      if(k===0)back(D,21+(i*5)%40,10+u,10-u,hD);
+      else if(k===1)front(D,10*(2+(i%5))+u,10-u,11+(i*7)%20,hD);
+      else if(k===2)minus(D,60+(i*3)%40,20+u,10-u,hD);
+      else front(D,11+(i*5)%30,12+(i*3)%20,13+(i*7)%15,hD);
+    }
     return list;
   }
   buildDrillBank(id){
     if(id==='k1'||id==='k2')return this.buildKanjiDrillBank(id);
-    if(id==='h2')return this.buildHissanDrillBank();
+    if(id==='h2'||id==='h2n')return this.buildHissanDrillBank(id);
+    if(id==='p2')return this.buildParenDrillBank();
     const list=[],add=(sec,text,ans,hint,choices)=>{list.push({no:list.length+1,sec:sec,text:text,ans:ans,hint:hint,kind:choices?'pick':'num',choices:choices||null});};
     if(id==='d3'){
       const A='九九で わる',B='□に はいる かず',C='しあげの ミックス';
@@ -448,7 +488,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       drillPad.push({label:'0',ariaLabel:'0',style:keyTile,onClick:()=>this.press('0')});
       drillPad.push({label:'OK',ariaLabel:'こたえる',style:keyOk,onClick:()=>this.drillSubmit()});
       const dChoices=this.drillChoices(d,dq),dPick=dChoices.length>0,dKanji=!!(dq&&dq.kind==='pick'),dWriting=d.answerMode==='writing';
-      const hissan=d.id==='h2'&&dq?/^(\d+) (＋|−) (\d+)$/.exec(String(dq.text)):null;
+      const hissan=(d.id==='h2'||d.id==='h2n')&&dq?/^(\d+) (＋|−) (\d+)$/.exec(String(dq.text)):null;
       // The pair is what has to be memorised, so it is shown in one fixed place: green while the
       // correct answer is echoed, red when the second mistake reveals it, and never anywhere else.
       const dEcho=d.echo&&typeof d.echo==='object'?d.echo:null,dPair=this.drillPair(d,dq)||{main:'',sub:''};
