@@ -426,12 +426,21 @@ internal static class Program
             heroRowAt >= 0 && weakCardAt > heroRowAt && entryAt > weakCardAt && heroRowEndAt > entryAt,
             "the drill courses are not offered beside the weakness card inside the start screen card row");
         Assert(
-            html.Contains("<sc-for list=\"{{ drillCards }}\" as=\"d\" hint-placeholder-count=\"6\">", StringComparison.Ordinal) &&
+            html.Contains("<sc-for list=\"{{ drillCards }}\" as=\"d\" hint-placeholder-count=\"8\">", StringComparison.Ordinal) &&
             html.Contains("onStart:()=>this.selectDrillCourse(c.id)", StringComparison.Ordinal),
             "the start screen does not list every drill course as its own selectable card");
         Assert(
             html.Contains("<div class=\"kt-drill-card-body\" role=\"button\" tabindex=\"0\"", StringComparison.Ordinal),
             "the drill course card is not keyboard reachable");
+        // Eight courses beside the mission cards made a four-row grid that stretched those cards and
+        // pushed the start button below the fold (Issue #98); the grid takes its own line instead.
+        Assert(
+            html.Contains(".kt-drill-grid{flex:1 1 100%;min-width:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,228px),1fr));", StringComparison.Ordinal) &&
+            html.Contains("cardTitle:'ひっ算',cardTag:'くりあがり なし'", StringComparison.Ordinal) &&
+            html.Contains("cardTitle:'ひっ算',cardTag:'くりあがり あり'", StringComparison.Ordinal) &&
+            html.Contains("<div class=\"kt-drill-card-title\">{{ d.cardTitle }}<span class=\"kt-drill-card-tag\" style=\"{{ d.tagStyle }}\">{{ d.cardTag }}</span></div>", StringComparison.Ordinal) &&
+            html.Contains("tagStyle:c.cardTag?'':'display:none;'", StringComparison.Ordinal),
+            "the start-screen drill cards do not keep their own line with one-line titles");
         Assert(
             html.Contains("<sc-if value=\"{{ isDrill }}\" hint-placeholder-val=\"{{ false }}\">", StringComparison.Ordinal) &&
             html.Contains("isDrill:sc==='drill'", StringComparison.Ordinal),
