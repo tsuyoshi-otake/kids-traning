@@ -501,9 +501,16 @@ internal static class Program
         Assert(
             html.Contains("drillOptionCount(d,q)", StringComparison.Ordinal) &&
             html.Contains("drillBumpOption(d,q,correct)", StringComparison.Ordinal) &&
-            html.Contains("opts[no]={c:correct?Math.min(6,count+1):Math.max(2,count-1)}", StringComparison.Ordinal) &&
+            html.Contains("opts[no]=!correct?{c:Math.max(2,count-1)}:count<6?{c:count+1}:run+1>=3?{c:6,t:3,r:Math.floor(Number(d&&d.run))||0}:{c:6,t:run+1}", StringComparison.Ordinal) &&
             html.Contains("this.drillOptionCount(next,this.drillQuestionAt(next,next.idx))", StringComparison.Ordinal),
             "the arithmetic drill does not adapt per-question option counts from first-attempt results");
+        // At six options the dial counts first-attempt answers instead, and three in a row retire
+        // the question from later runs; the run itself skips retired positions (issue #104).
+        Assert(
+            html.Contains("drillRetiredIndexes(opts,runs)", StringComparison.Ordinal) &&
+            html.Contains("skip=this.drillRetiredIndexes(saved.opts,saved.runs)", StringComparison.Ordinal) &&
+            html.Contains("next.idx=this.drillActiveFrom(d.skip,d.idx+1,total)", StringComparison.Ordinal),
+            "the arithmetic drill does not retire questions answered three times in a row at six options");
         Assert(
             html.Contains("drillKanjiWritingChoices(d,q)", StringComparison.Ordinal) &&
             html.Contains("d.answerMode!=='writing'", StringComparison.Ordinal) &&

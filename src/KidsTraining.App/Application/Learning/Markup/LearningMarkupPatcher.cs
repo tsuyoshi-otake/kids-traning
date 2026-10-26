@@ -230,6 +230,7 @@ internal static partial class LearningMarkupPatcher
         markup = PatchFractionalScoring(markup);
         markup = PatchSessionPassGate(markup);
         markup = PatchLearningCheckpoint(markup);
+        markup = PatchAnswerCopyGate(markup);
         markup = PatchSoroban(markup);
         markup = PatchKanjiPictureQuestions(markup);
         markup = PatchDrillMode(markup);

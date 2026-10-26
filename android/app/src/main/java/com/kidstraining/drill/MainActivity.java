@@ -8,12 +8,16 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+
+import java.util.Locale;
 
 public class MainActivity extends Activity {
     static final String PREFS_NAME = "kt_settings";
@@ -32,6 +36,11 @@ public class MainActivity extends Activity {
 
     private WebView webView;
     private SharedPreferences prefs;
+    // Japanese text-to-speech for the drill's correct answers (issue #105). The bridge reads it
+    // from the JavaScript thread, so both fields are volatile; ttsReady stays false until the
+    // engine has a Japanese voice, and the page then simply shows the answer without reading it.
+    private volatile TextToSpeech tts;
+    private volatile boolean ttsReady;
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
@@ -48,6 +57,7 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient());
         webView.addJavascriptInterface(new AndroidBridge(), "KtAndroid");
         setContentView(webView);
+        startSpeech();
 
         if (prefs.getBoolean(PREF_AUTO_LAUNCH, false)) {
             startAutoLaunchService();
@@ -57,6 +67,51 @@ public class MainActivity extends Activity {
         } else {
             webView.loadUrl(LEARNING_PAGE_URL);
         }
+    }
+
+    private void startSpeech() {
+        tts = new TextToSpeech(this, status -> {
+            TextToSpeech engine = tts;
+            if (status != TextToSpeech.SUCCESS || engine == null) {
+                return;
+            }
+            engine.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                @Override
+                public void onStart(String utteranceId) {
+                }
+
+                @Override
+                public void onDone(String utteranceId) {
+                    notifySpeechEnd(utteranceId);
+                }
+
+                @Override
+                public void onError(String utteranceId) {
+                    notifySpeechEnd(utteranceId);
+                }
+            });
+            int result = engine.setLanguage(Locale.JAPAN);
+            ttsReady = result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED;
+        });
+    }
+
+    /** Tells the page that the reading it started with KtAndroid.speak has finished. */
+    private void notifySpeechEnd(String utteranceId) {
+        String id = digitsOnly(utteranceId);
+        if (id.isEmpty()) {
+            return;
+        }
+        runOnUiThread(() -> {
+            if (webView != null) {
+                webView.evaluateJavascript(
+                    "window.__ktDrillSpeechEnd&&window.__ktDrillSpeechEnd('" + id + "')", null);
+            }
+        });
+    }
+
+    // Utterance ids come from the page and go back into a script, so only digits survive.
+    private static String digitsOnly(String value) {
+        return value == null ? "" : value.replaceAll("[^0-9]", "");
     }
 
     private void startAutoLaunchService() {
@@ -71,7 +126,8 @@ public class MainActivity extends Activity {
     /**
      * Bridge exposed to the generated runtime as window.KtAndroid. The parent
      * dashboard's "Android せってい" card uses it for the daily auto-launch toggle
-     * and the Android settings shortcuts. Calls arrive on a background thread,
+     * and the Android settings shortcuts, and the drill uses speak/stopSpeaking to
+     * read correct answers aloud. Calls arrive on a background thread,
      * so anything touching the activity hops back to the UI thread.
      */
     private class AndroidBridge {
@@ -135,6 +191,28 @@ public class MainActivity extends Activity {
                 }
             });
         }
+
+        /**
+         * Reads text aloud in Japanese and returns whether it started. When it ends, the
+         * page's window.__ktDrillSpeechEnd(id) runs with the same digits-only id.
+         */
+        @JavascriptInterface
+        public boolean speak(String text, String id) {
+            TextToSpeech engine = tts;
+            String utteranceId = digitsOnly(id);
+            if (!ttsReady || engine == null || text == null || text.isEmpty() || utteranceId.isEmpty()) {
+                return false;
+            }
+            return engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId) == TextToSpeech.SUCCESS;
+        }
+
+        @JavascriptInterface
+        public void stopSpeaking() {
+            TextToSpeech engine = tts;
+            if (engine != null) {
+                engine.stop();
+            }
+        }
     }
 
     // ---- lifecycle / navigation ----
@@ -167,6 +245,13 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        TextToSpeech engine = tts;
+        tts = null;
+        ttsReady = false;
+        if (engine != null) {
+            engine.stop();
+            engine.shutdown();
+        }
         webView.destroy();
         super.onDestroy();
     }

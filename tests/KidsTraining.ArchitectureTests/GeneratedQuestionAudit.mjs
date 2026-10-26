@@ -2480,6 +2480,74 @@ const solveDrillPrompt = (text) => {
   return undefined;
 };
 
+// Issue #103: a missed learning question waits on the feedback screen until the child enters the
+// shown answer by the same means the question used. The copy is practice: it never scores.
+const ANSWER_COPY_CHECK = 'a missed learning question moves on only after the shown answer is entered again';
+{
+  const priorState = app.state, priorSfx = app.sfx, priorSetTimeout = globalThis.setTimeout, timers = [];
+  const missed = (q, attempt) => {
+    app.state = { screen: 'feedback', input: '', answerCopy: null, lastResult: { correct: false, q }, session: { attempt, idx: 0, questions: [q], rolePlan: ['kazu'] } };
+  };
+  app.sfx = () => {};
+  globalThis.setTimeout = (fn, ms) => { timers.push({ fn, ms }); return timers.length; };
+  try {
+    observe(ANSWER_COPY_CHECK, 7);
+    if (!page.includes('class="kt-answer-copy"') || !page.includes('{{ answerCopy.show }}') || !page.includes('{{ answerCopy.showNext }}')) {
+      violated(ANSWER_COPY_CHECK, 'the feedback screen has no answer-copy panel', runtimePagePath);
+    }
+    missed({ mode: 'num', prompt: '9 × 8', answer: '72' }, 1);
+    const sessionBefore = JSON.stringify(app.state.session);
+    app.next();
+    if (app.state.screen !== 'feedback' || !app.answerCopyPending()) {
+      violated(ANSWER_COPY_CHECK, 'つぎへ left a missed question before its answer was entered', JSON.stringify(app.state));
+    }
+    app.answerCopyInput('8');
+    if (!app.state.answerCopy || app.state.answerCopy.input !== '' || app.state.answerCopy.miss !== 1 || !app.answerCopyPending()) {
+      violated(ANSWER_COPY_CHECK, 'a digit that does not match the shown answer was kept', JSON.stringify(app.state.answerCopy));
+    }
+    app.answerCopyInput('7');
+    app.answerCopyInput('2');
+    if (!app.state.lastResult.copied || app.answerCopyPending() || timers.length !== 1 || timers[0].ms !== app.answerCopyAdvanceMs() ||
+        JSON.stringify(app.state.session) !== sessionBefore) {
+      violated(ANSWER_COPY_CHECK, 'entering the shown answer did not move on by itself, or it changed the session', JSON.stringify(app.state));
+    }
+    let advanced = 0;
+    app.next = () => { advanced += 1; };
+    app.state.session.idx = 1;
+    timers[0].fn();
+    app.state.session.idx = 0;
+    timers[0].fn();
+    delete app.next;
+    if (advanced !== 1) violated(ANSWER_COPY_CHECK, `the copy timer advanced ${advanced} time(s)`, 'expected once, and never for another question');
+    missed({ mode: 'choices', prompt: 'どれ？', answer: 'いぬ', choices: ['ねこ', 'いぬ', 'とり', 'うま'] }, 2);
+    app.answerCopyInput('1');
+    app.answerCopyChoose('ねこ');
+    if (!app.state.answerCopy || app.state.answerCopy.miss !== 1 || !app.answerCopyPending()) {
+      violated(ANSWER_COPY_CHECK, 'a different choice was accepted as the copy', JSON.stringify(app.state));
+    }
+    app.answerCopyChoose('いぬ');
+    if (!app.state.lastResult.copied) violated(ANSWER_COPY_CHECK, 'choosing the shown answer did not count', JSON.stringify(app.state));
+    missed({ mode: 'type', prompt: 'ねこ', answer: 'Cat' }, 3);
+    for (const key of ['c', 'A', 't']) app.answerCopyInput(key);
+    if (!app.state.lastResult.copied) violated(ANSWER_COPY_CHECK, 'typing the shown word did not count regardless of case', JSON.stringify(app.state));
+    missed({ mode: 'num', prompt: '7 ＋ 8', answer: '15' }, 4);
+    app.answerCopyInput('1');
+    app.state.session.idx = 1;
+    if (app.answerCopyState().input !== '') violated(ANSWER_COPY_CHECK, 'keys typed for one question carried over to the next', JSON.stringify(app.state.answerCopy));
+    missed({ mode: 'num', prompt: '3 ÷ 4', answer: '3/4' }, 5);
+    if (app.answerCopyPending()) violated(ANSWER_COPY_CHECK, 'an answer with no entry method blocked つぎへ', JSON.stringify(app.state.lastResult));
+    app.state.lastResult = { correct: true, q: { mode: 'num', answer: '12' } };
+    if (app.answerCopyPending()) violated(ANSWER_COPY_CHECK, 'a correct answer asked to be entered again', '');
+  } catch (error) {
+    violated(ANSWER_COPY_CHECK, 'the answer copy threw', String(error && error.stack));
+  } finally {
+    globalThis.setTimeout = priorSetTimeout;
+    if (Object.prototype.hasOwnProperty.call(app, 'next')) delete app.next;
+    app.sfx = priorSfx;
+    app.state = priorState;
+  }
+}
+
 // The drill persists progress through localStorage, which Node does not have. The stub is a
 // storage sink only; every rule about what is stored still comes from the generated app.
 const drillStorage = new Map();
@@ -2498,6 +2566,10 @@ const DRILL_KANJI_WORD_CHECK = 'kanji word questions use only characters learned
 const DRILL_KANJI_WRITING_CHECK = 'every kanji writing question offers one right spelling and three same-grade distractors with different readings';
 const DRILL_FLOW_CHECK = 'a drill run advances, requeues a revealed question, and resumes where it stopped';
 const DRILL_PAIR_CHECK = 'a correct drill answer shows the question and its answer as one pair before advancing';
+const DRILL_COPY_CHECK = 'a revealed drill answer has to be entered or chosen again before the run moves on';
+const DRILL_RETIRE_CHECK = 'a drill question leaves later runs after three first-try answers in a row at six options';
+const DRILL_SPEECH_CHECK = 'a correct drill answer is read aloud as one sentence and the drill waits for the reading';
+const DRILL_COLUMN_CHECK = 'the written-arithmetic drill takes its answer one digit at a time from the ones place';
 
 const drillCourses = app.drillCourses();
 observe(DRILL_COURSE_CHECK, drillCourses.length);
@@ -2674,8 +2746,9 @@ if (app.drillChoices(app.state.drill, app.drillQuestion()).length !== 6) {
 }
 stepCorrect();
 stepCorrect();
-if (stepOpt(1).c !== 6 || JSON.stringify(JSON.parse(drillStorage.get('kt_drill_v1')).g1.opts['1']) !== JSON.stringify({ c: 6 })) {
-  violated(DRILL_STEP_CHECK, `the dial did not stay persisted at six: ${JSON.stringify(stepOpt(1))}`, drillStorage.get('kt_drill_v1'));
+// Issue #104: at six the dial cannot rise, so the first-try answers count toward retirement.
+if (stepOpt(1).c !== 6 || JSON.stringify(JSON.parse(drillStorage.get('kt_drill_v1')).g1.opts['1']) !== JSON.stringify({ c: 6, t: 2 })) {
+  violated(DRILL_STEP_CHECK, `the dial did not stay persisted at six with two answers toward retirement: ${JSON.stringify(stepOpt(1))}`, drillStorage.get('kt_drill_v1'));
 }
 if (stepOpt(2).c !== 2 || stepOpt(3).c !== 2) {
   violated(DRILL_STEP_CHECK, 'questions that were never answered left their dial', JSON.stringify(app.readDrillProgress().g1.opts));
@@ -2710,7 +2783,9 @@ if (requeueChoices.length !== 5) {
 }
 app.drillChoose(requeueChoices.find((choice) => choice !== app.drillQuestion().ans));
 app.drillChoose(requeueChoices.find((choice) => choice !== app.drillQuestion().ans));
-app.drillNext();
+// Copying the revealed answer (issue #103) is the only way on, and it leaves the dial alone.
+app.drillChoose(app.drillQuestion().ans);
+app.drillFlushEcho();
 let requeueGuard = 0;
 while (!app.state.drill.done && requeueGuard < 200) {
   requeueGuard += 1;
@@ -2836,7 +2911,7 @@ for (const [courseId, bank] of [['h2n', plainHissanBank], ['h2', hissanBank]]) {
 const DRILL_HISSAN_VIEW_CHECK = 'the 100-question written-arithmetic course stacks aligned operands and puts the input below the rule';
 observe(DRILL_HISSAN_VIEW_CHECK, 6);
 const hissanMarkup = ['kt-drill-hissan-row', '{{ drillView.hissanLeft }}', '{{ drillView.hissanRight }}',
-  'kt-drill-hissan-rule', 'kt-drill-hissan-result'].every(fragment => page.includes(fragment));
+  'kt-drill-hissan-rule', 'kt-drill-hissan-cell'].every(fragment => page.includes(fragment));
 if (!hissanMarkup) violated(DRILL_HISSAN_VIEW_CHECK, 'the generated page is missing the stacked operands, rule, or answer row', runtimePagePath);
 const hissanViewApp = new app.constructor();
 hissanViewApp.props = hissanViewApp.props || {};
@@ -3132,7 +3207,26 @@ app.drillSubmit();
 if (!app.state.drill.revealed) {
   violated(DRILL_FLOW_CHECK, 'the second mistake did not reveal the answer', JSON.stringify(app.state.drill));
 }
-app.drillNext();
+// Issue #103: the revealed answer has to be entered again before the run moves on. A wrong copy
+// only clears the entry; the right copy shows the pair, scores nothing, and requeues the question.
+observe(DRILL_COPY_CHECK, 3);
+const copyMistakes = app.state.drill.mistakes;
+app.setState({ input: String(revealedQuestion.ans + 3) });
+app.drillSubmit();
+if (!app.state.drill.revealed || app.state.drill.copyMiss !== 1 || app.state.drill.echo || app.state.drill.idx !== 0 ||
+    app.state.input !== '' || app.state.drill.mistakes !== copyMistakes) {
+  violated(DRILL_COPY_CHECK, 'a wrong copy of the revealed answer moved on, kept the entry, or counted as a mistake', JSON.stringify(app.state.drill));
+}
+app.setState({ input: String(revealedQuestion.ans) });
+app.drillSubmit();
+if (!app.state.drill.echo || app.state.drill.idx !== 0 || app.state.drill.echo.main !== app.drillAnswerLine(revealedQuestion)) {
+  violated(DRILL_COPY_CHECK, 'copying the revealed answer did not show the completed pair', JSON.stringify(app.state.drill));
+}
+app.drillFlushEcho();
+if (app.state.drill.idx !== 1 || !app.state.drill.again.includes(0) || app.state.drill.revealed || app.state.drill.copyMiss !== 0 ||
+    app.state.drill.perfect !== 0 || app.state.drill.mistakes !== copyMistakes) {
+  violated(DRILL_COPY_CHECK, 'the copied question did not move on to the again queue without credit', JSON.stringify(app.state.drill));
+}
 let requeueAsked = 0;
 let lastPrompt = '';
 while (!app.state.drill.done && requeueAsked <= gradeOneBank.length) {
@@ -3212,6 +3306,281 @@ if ([...drillStorage.keys()].join(',') !== 'kt_drill_v1') {
   violated(DRILL_FLOW_CHECK, `the drill wrote outside its own storage key: ${[...drillStorage.keys()].join(',')}`, 'storage isolation');
 }
 app.exitDrill();
+if (page.includes('drillNext(') || page.includes('drillView.onNext')) {
+  violated(DRILL_COPY_CHECK, 'the drill still offers a つぎへ button that skips copying the revealed answer', runtimePagePath);
+}
+// A chosen answer is copied by choosing it again, with the same miss handling.
+app.startDrill('k1', true, 'reading');
+const copyKanji = app.drillQuestion();
+const copyWrongReading = copyKanji.choices.find((choice) => choice !== copyKanji.ans);
+chooseDrillAnswer(copyWrongReading);
+chooseDrillAnswer(copyWrongReading);
+chooseDrillAnswer(copyWrongReading);
+if (!app.state.drill.revealed || app.state.drill.copyMiss !== 1 || app.state.drill.idx !== 0) {
+  violated(DRILL_COPY_CHECK, 'a wrong reading chosen after the reveal moved on or was not counted as a copy miss', JSON.stringify(app.state.drill));
+}
+chooseDrillAnswer(copyKanji.ans);
+if (app.state.drill.idx !== 1 || !app.state.drill.again.includes(0) || app.state.drill.perfect !== 0) {
+  violated(DRILL_COPY_CHECK, 'choosing the revealed reading did not requeue the question without credit', JSON.stringify(app.state.drill));
+}
+app.exitDrill();
+
+// Issue #104: at six options, three first-try answers in a row retire a question. The run that
+// retired it still finishes with it; every later run leaves it out, and the counts follow.
+observe(DRILL_RETIRE_CHECK, 9);
+const writeDrillRecord = (id, record) => drillStorage.set('kt_drill_v1', JSON.stringify({ [id]: Object.assign({ idx: 0, perfect: 0, mistakes: 0, runs: 0, best: 0, opts: {} }, record) }));
+const storedDrillRecord = (id) => JSON.parse(drillStorage.get('kt_drill_v1'))[id];
+const drillViewOf = (id, restart, mode) => { hissanViewApp.startDrill(id, restart, mode); return hissanViewApp.renderVals().drillView; };
+drillStorage.clear();
+writeDrillRecord('g1', { runs: 4, opts: { '1': { c: 6, t: 2 } } });
+app.startDrill('g1', true, 'choice');
+chooseDrillAnswer(app.drillQuestion().ans);
+if (JSON.stringify(storedDrillRecord('g1').opts['1']) !== JSON.stringify({ c: 6, t: 3, r: 4 })) {
+  violated(DRILL_RETIRE_CHECK, `the third first-try answer at six recorded ${JSON.stringify(storedDrillRecord('g1').opts['1'])}`, 'expected {c:6,t:3,r:4}');
+}
+app.exitDrill();
+app.startDrill('g1', true, 'choice');
+if (app.state.drill.idx !== 0 || app.drillQuestion().no !== 1 || app.state.drill.skip.length !== 0) {
+  violated(DRILL_RETIRE_CHECK, 'a question retired in this run left the run before it finished', JSON.stringify(app.state.drill));
+}
+app.exitDrill();
+writeDrillRecord('g1', { runs: 5, opts: { '1': { c: 6, t: 3, r: 4 } } });
+const retiredView = drillViewOf('g1', true, 'choice');
+if (hissanViewApp.drillQuestion().no !== 2 || retiredView.countText !== '0 / 99') {
+  violated(DRILL_RETIRE_CHECK, `the next run started at question ${hissanViewApp.drillQuestion().no} counting ${retiredView.countText}`, 'expected question 2 and 0 / 99');
+}
+hissanViewApp.exitDrill();
+writeDrillRecord('g1', { runs: 5, opts: { '3': { c: 6, t: 3, r: 0 }, '4': { c: 6, t: 3, r: 1 } } });
+app.startDrill('g1', true, 'choice');
+chooseDrillAnswer(app.drillQuestion().ans);
+chooseDrillAnswer(app.drillQuestion().ans);
+if (app.drillQuestion().no !== 5) {
+  violated(DRILL_RETIRE_CHECK, `advancing past two retired questions landed on question ${app.drillQuestion().no}`, 'expected question 5');
+}
+let retireAsked = 2;
+while (!app.state.drill.done && retireAsked <= 100) {
+  retireAsked += 1;
+  chooseDrillAnswer(app.drillQuestion().ans);
+}
+if (retireAsked !== 98 || app.state.drill.perfect !== 98 || storedDrillRecord('g1').runs !== 6) {
+  violated(DRILL_RETIRE_CHECK, `a run without two retired questions asked ${retireAsked}, scored ${app.state.drill.perfect}, runs ${storedDrillRecord('g1').runs}`, 'expected 98 questions and one more run');
+}
+app.exitDrill();
+writeDrillRecord('g1', { runs: 2, opts: { '1': { c: 6, t: 2 } } });
+app.startDrill('g1', true, 'choice');
+const retireMiss = app.drillQuestion();
+chooseDrillAnswer(app.drillChoices(app.state.drill, retireMiss).find((choice) => choice !== retireMiss.ans));
+if (JSON.stringify(storedDrillRecord('g1').opts['1']) !== JSON.stringify({ c: 5 })) {
+  violated(DRILL_RETIRE_CHECK, `a miss at six recorded ${JSON.stringify(storedDrillRecord('g1').opts['1'])}`, 'expected the run toward retirement to drop with the count');
+}
+app.exitDrill();
+writeDrillRecord('g1', { runs: 3, opts: { '1': { c: 6, t: 3 }, '2': { c: 6, t: 7, r: 1 }, '3': { c: 5, t: 2 }, '4': { c: 6, t: 3, r: -1 }, '5': { c: 6, t: 0 }, '6': { c: 6, t: 3, r: 1.5 } } });
+const sanitizedRetire = app.readDrillProgress().g1.opts;
+const expectedRetire = { '1': { c: 6, t: 2 }, '2': { c: 6, t: 3, r: 1 }, '3': { c: 5 }, '4': { c: 6, t: 2 }, '5': { c: 6 }, '6': { c: 6, t: 2 } };
+if (JSON.stringify(sanitizedRetire) !== JSON.stringify(expectedRetire)) {
+  violated(DRILL_RETIRE_CHECK, `stored retirement fields were read as ${JSON.stringify(sanitizedRetire)}`, JSON.stringify(expectedRetire));
+}
+const everyRetired = {};
+for (let no = 1; no <= 100; no += 1) everyRetired[no] = { c: 6, t: 3, r: 0 };
+writeDrillRecord('g1', { runs: 1, opts: everyRetired });
+const allRetiredView = drillViewOf('g1', true, 'choice');
+if (!hissanViewApp.state.drill.done || !hissanViewApp.state.drill.allRetired || allRetiredView.finishTitle !== 'ぜんぶ おぼえたよ！' || allRetiredView.countText !== '') {
+  violated(DRILL_RETIRE_CHECK, 'a course with every question retired did not open on its finish screen', JSON.stringify(allRetiredView));
+}
+hissanViewApp.relearnDrill();
+if (hissanViewApp.state.drill.done || hissanViewApp.state.drill.idx !== 0 || Object.keys(storedDrillRecord('g1').opts).length !== 0 || storedDrillRecord('g1').runs !== 1) {
+  violated(DRILL_RETIRE_CHECK, 'starting a fully retired course over did not bring every question back', drillStorage.get('kt_drill_v1'));
+}
+hissanViewApp.exitDrill();
+for (const [opts, expected] of [[{ '1': { c: 6, t: 3, r: 4 } }, '99もん'], [everyRetired, 'ぜんぶ おぼえた']]) {
+  writeDrillRecord('g1', { runs: 5, opts });
+  hissanViewApp.state.screen = 'start';
+  try {
+    const card = hissanViewApp.renderVals().drillCards.find((row) => row.id === 'g1');
+    if (!card || card.progressText !== expected) {
+      violated(DRILL_RETIRE_CHECK, `the start card read ${card && card.progressText}`, expected);
+    }
+  } catch (error) {
+    violated(DRILL_RETIRE_CHECK, 'the start screen did not render the drill cards', String(error && error.stack));
+  }
+}
+drillStorage.clear();
+
+// Issue #105: a correct answer, first try or copied, is read aloud as one sentence, and the
+// pair stays up until the reading ends (capped so a stuck engine never holds the drill).
+observe(DRILL_SPEECH_CHECK, 10);
+for (const [courseId, prompt, expected] of [['g2', '6 × 5', '6かける5は30'], ['g1', '3 ＋ 7', '3たす7は10'], ['g1', '10 − □ ＝ 3', '10ひく7は3'],
+  ['h2n', '21 ＋ 11', '21たす11は32'], ['p2', '(2 ＋ 1) ＋ 1', 'かっこ2たす1かっことじ、たす1は4']]) {
+  const question = app.drillBank(courseId).find((row) => row.text === prompt);
+  const spoken = question ? app.drillSpeechText({ id: courseId }, question) : '(missing)';
+  if (spoken !== expected) violated(DRILL_SPEECH_CHECK, `${courseId} ${prompt} is read as ${spoken}`, expected);
+}
+for (const course of drillCourses) {
+  for (const question of app.drillBank(course.id)) {
+    const spoken = app.drillSpeechText({ id: course.id }, question);
+    const readsAnswer = question.text.includes('□') ? spoken.includes(String(question.ans)) : spoken.endsWith('は' + question.ans);
+    if (!spoken || (question.kind !== 'pick' && (/[()＋−×÷＝□\s-]/.test(spoken) || !readsAnswer))) {
+      violated(DRILL_SPEECH_CHECK, `${course.id} question ${question.no} is read as ${spoken}`, question.text);
+    }
+  }
+}
+{
+  const priorGlobals = { setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout, window: globalThis.window, SpeechSynthesisUtterance: globalThis.SpeechSynthesisUtterance, KtAndroid: globalThis.KtAndroid };
+  const timers = [], utterances = [], androidCalls = [];
+  let voices = [{ lang: 'ja-JP' }], cancelled = 0, androidStops = 0, androidAccepts = true;
+  globalThis.setTimeout = (fn, ms) => { timers.push({ fn, ms, cleared: false }); return timers.length; };
+  globalThis.clearTimeout = (id) => { if (timers[id - 1]) timers[id - 1].cleared = true; };
+  globalThis.window = { speechSynthesis: { getVoices: () => voices, speak: (utterance) => utterances.push(utterance), cancel: () => { cancelled += 1; } } };
+  globalThis.SpeechSynthesisUtterance = class { constructor(text) { this.text = text; } };
+  const pending = () => timers.filter((timer) => !timer.cleared).at(-1);
+  const answerG2 = (value) => { app.setState({ input: String(value) }); app.drillSubmit(); };
+  try {
+    app.state.muted = false;
+    app.startDrill('g2', true, 'input');
+    const spokenQuestion = app.drillQuestion();
+    answerG2(spokenQuestion.ans);
+    const reading = utterances.at(-1);
+    if (utterances.length !== 1 || reading.text !== app.drillSpeechText(app.state.drill, spokenQuestion) || reading.lang !== 'ja-JP' ||
+        !pending() || pending().ms !== app.drillSpeechMaxMs()) {
+      violated(DRILL_SPEECH_CHECK, 'a correct answer was not read aloud in Japanese while the pair waited', JSON.stringify({ utterances, timers: timers.map((t) => t.ms) }));
+    }
+    reading.onend();
+    const afterReading = pending();
+    if (!afterReading || afterReading.ms > app.drillEchoMs() || app.state.drill.idx !== 0) {
+      violated(DRILL_SPEECH_CHECK, 'the end of the reading did not release the pair', JSON.stringify(timers.map((t) => t.ms)));
+    }
+    const timersBefore = timers.length;
+    reading.onend();
+    if (timers.length !== timersBefore) violated(DRILL_SPEECH_CHECK, 'a second end of the same reading moved the drill again', '');
+    afterReading.fn();
+    if (app.state.drill.idx !== 1) violated(DRILL_SPEECH_CHECK, 'the drill did not move on after the reading', JSON.stringify(app.state.drill));
+    // The copy of a revealed answer is read aloud too.
+    const copiedQuestion = app.drillQuestion();
+    answerG2(copiedQuestion.ans + 1);
+    answerG2(copiedQuestion.ans + 2);
+    answerG2(copiedQuestion.ans);
+    if (utterances.length !== 2 || utterances[1].text !== app.drillSpeechText(app.state.drill, copiedQuestion)) {
+      violated(DRILL_SPEECH_CHECK, 'copying the revealed answer was not read aloud', JSON.stringify(utterances.map((u) => u.text)));
+    }
+    app.toggleMute();
+    const mutedTimers = timers.length;
+    utterances[1].onend();
+    if (cancelled < 1 || !app.state.muted || timers.length !== mutedTimers || pending().ms > app.drillEchoMs()) {
+      violated(DRILL_SPEECH_CHECK, 'muting did not stop the reading or left the pair waiting for it', JSON.stringify({ cancelled, timers: timers.map((t) => t.ms) }));
+    }
+    drillStorage.delete('kt_muted_v1');
+    pending().fn();
+    answerG2(app.drillQuestion().ans);
+    if (utterances.length !== 2 || pending().ms !== app.drillEchoMs()) {
+      violated(DRILL_SPEECH_CHECK, 'a muted drill read aloud or waited for a reading', JSON.stringify(timers.map((t) => t.ms)));
+    }
+    pending().fn();
+    app.state.muted = false;
+    voices = [{ lang: 'en-US' }];
+    answerG2(app.drillQuestion().ans);
+    if (utterances.length !== 2 || pending().ms !== app.drillEchoMs()) {
+      violated(DRILL_SPEECH_CHECK, 'the drill read numbers with a non-Japanese voice', JSON.stringify(utterances.map((u) => u.text)));
+    }
+    pending().fn();
+    voices = [{ lang: 'ja-JP' }];
+    answerG2(app.drillQuestion().ans);
+    const cancelledBefore = cancelled;
+    app.exitDrill();
+    if (cancelled !== cancelledBefore + 1) violated(DRILL_SPEECH_CHECK, 'leaving the drill did not stop the reading', String(cancelled));
+    const webReadings = utterances.length;
+    globalThis.KtAndroid = { speak: (text, id) => { androidCalls.push({ text, id }); return androidAccepts; }, stopSpeaking: () => { androidStops += 1; } };
+    app.startDrill('g2', true, 'input');
+    const androidQuestion = app.drillQuestion();
+    answerG2(androidQuestion.ans);
+    const androidCall = androidCalls.at(-1);
+    if (androidCalls.length !== 1 || utterances.length !== webReadings || !/^\d+$/.test(androidCall.id) ||
+        androidCall.text !== app.drillSpeechText(app.state.drill, androidQuestion) || pending().ms !== app.drillSpeechMaxMs()) {
+      violated(DRILL_SPEECH_CHECK, 'the Android app did not read the answer through its own speech bridge', JSON.stringify(androidCalls));
+    }
+    const androidTimers = timers.length;
+    globalThis.window.__ktDrillSpeechEnd(String(Number(androidCall.id) + 1));
+    if (timers.length !== androidTimers) violated(DRILL_SPEECH_CHECK, 'an end notice for another reading released the pair', '');
+    globalThis.window.__ktDrillSpeechEnd(androidCall.id);
+    if (pending().ms > app.drillEchoMs()) violated(DRILL_SPEECH_CHECK, 'the Android end notice did not release the pair', JSON.stringify(timers.map((t) => t.ms)));
+    pending().fn();
+    androidAccepts = false;
+    answerG2(app.drillQuestion().ans);
+    if (pending().ms !== app.drillEchoMs()) violated(DRILL_SPEECH_CHECK, 'a refused Android reading still held the pair', JSON.stringify(timers.map((t) => t.ms)));
+    androidAccepts = true;
+    pending().fn();
+    answerG2(app.drillQuestion().ans);
+    app.exitDrill();
+    if (androidStops < 1) violated(DRILL_SPEECH_CHECK, 'leaving the drill did not stop the Android reading', String(androidStops));
+  } catch (error) {
+    violated(DRILL_SPEECH_CHECK, 'reading aloud threw', String(error && error.stack));
+  } finally {
+    for (const [name, value] of Object.entries(priorGlobals)) {
+      if (value === undefined) delete globalThis[name]; else globalThis[name] = value;
+    }
+    app.state.muted = false;
+    if (app.state.drill) app.exitDrill();
+  }
+}
+
+// Issue #106: the written-arithmetic drill takes the answer like the written method, one digit
+// at a time from the ones place, so 21 ＋ 11 is entered 2 then 3.
+observe(DRILL_COLUMN_CHECK, 6);
+drillStorage.clear();
+app.startDrill('h2n', true, 'input');
+const columnQuestion = app.drillQuestion();
+app.drillPress('2');
+app.drillPress('3');
+app.drillPress('9');
+if (columnQuestion.text !== '21 ＋ 11' || app.drillHissanColumns(app.state.drill, columnQuestion) !== 2 || app.state.input !== '23' || app.drillTypedValue() !== '32') {
+  violated(DRILL_COLUMN_CHECK, `21 ＋ 11 took ${app.state.input} as ${app.drillTypedValue()}`, 'expected two cells read as 32');
+}
+app.drillSubmit();
+if (!app.state.drill.echo || app.state.drill.mark) violated(DRILL_COLUMN_CHECK, 'entering 2 then 3 for 21 ＋ 11 was not accepted', JSON.stringify(app.state.drill));
+app.drillFlushEcho();
+app.startDrill('h2n', true, 'input');
+app.drillPress('3');
+app.drillPress('2');
+app.drillSubmit();
+if (app.state.drill.mark !== 'wrong') violated(DRILL_COLUMN_CHECK, 'entering 32 left to right was accepted although the ones place comes first', JSON.stringify(app.state.drill));
+app.exitDrill();
+const widerAnswer = hissanBank.find((row) => String(row.ans).length > Math.max(...row.text.split(/ [＋−] /).map((part) => part.length)));
+const shorterAnswer = hissanBank.find((row) => String(row.ans).length < Math.max(...row.text.split(/ [＋−] /).map((part) => part.length)));
+for (const row of [widerAnswer, shorterAnswer]) {
+  if (!row) { violated(DRILL_COLUMN_CHECK, 'h2 has no question whose answer width differs from its numbers', ''); continue; }
+  app.startDrill('h2', true, 'input');
+  app.state.drill.idx = row.no - 1;
+  const width = Math.max(String(row.ans).length, ...row.text.split(/ [＋−] /).map((part) => part.length));
+  for (const digit of String(row.ans).split('').reverse()) app.drillPress(digit);
+  if (app.drillHissanColumns(app.state.drill, row) !== width || app.drillTypedValue() !== String(row.ans)) {
+    violated(DRILL_COLUMN_CHECK, `${row.text} offers ${app.drillHissanColumns(app.state.drill, row)} cells and reads ${app.drillTypedValue()}`, `expected ${width} cells`);
+  }
+  app.drillSubmit();
+  if (!app.state.drill.echo) violated(DRILL_COLUMN_CHECK, `${row.text} rejected its answer entered from the ones place`, JSON.stringify(app.state.drill));
+  app.exitDrill();
+}
+for (const [courseId, mode] of [['h2n', 'choice'], ['g1', 'input']]) {
+  app.startDrill(courseId, true, mode);
+  app.setState({ input: '12' });
+  if (app.drillHissanColumns(app.state.drill, app.drillQuestion()) !== 0 || app.drillTypedValue() !== '12') {
+    violated(DRILL_COLUMN_CHECK, `${courseId} in ${mode} mode reads its entry backwards`, app.drillTypedValue());
+  }
+  app.exitDrill();
+}
+try {
+  hissanViewApp.startDrill('h2n', true, 'input');
+  hissanViewApp.drillPress('2');
+  const columnView = hissanViewApp.renderVals().drillView;
+  const cells = columnView.hissanCells || [];
+  if (cells.length !== 2 || cells[1].text !== '2' || cells[0].text !== '' || !cells[0].style || cells[1].style ||
+      columnView.hissanCellsAria !== 'こたえ 2' || !columnView.showColumnAsk) {
+    violated(DRILL_COLUMN_CHECK, 'the column cells do not show the ones digit and point at the tens place next', JSON.stringify(columnView));
+  }
+  hissanViewApp.exitDrill();
+} catch (error) {
+  violated(DRILL_COLUMN_CHECK, 'the column cells did not render', String(error && error.stack));
+}
+if (!page.includes('this.drillPress(e.key)')) violated(DRILL_COLUMN_CHECK, 'the keyboard bypasses the column limit', runtimePagePath);
+drillStorage.clear();
 
 // --- aggregate checks -------------------------------------------------------------------
 

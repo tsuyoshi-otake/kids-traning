@@ -182,7 +182,7 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("quotitive-division", "いくつ分かを もとめる わりざん。"),
         ("division-scaffold", "q.topic==='div'&&this.topicStage(p,'div')<=2"),
         ("english-speech", "speakEnglish(text)"),
-        ("speech-stop", "if(m)this.stopEnglishSpeech()"),
+        ("speech-stop", "if(m){this.stopEnglishSpeech();this.stopDrillSpeech();}"),
         ("speech-api", "SpeechSynthesisUtterance"),
         ("speech-language", "utterance.lang='en-US'"),
         ("speech-rate", "utterance.rate=.85"),
@@ -219,7 +219,13 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("arithmetic-drill-answer-mode", "isDrillMode:sc==='drill-mode'"),
         ("arithmetic-drill-two-choice", "drillNumericChoices(d,q)"),
         ("kanji-drill-courses", "drillKanjiEntries(grade)"),
-        ("kanji-drill-choices", "class=\"kt-drill-pick-btn\"")
+        ("kanji-drill-choices", "class=\"kt-drill-pick-btn\""),
+        ("answer-copy-gate", "next(){if(this.answerCopyPending())return;"),
+        ("drill-answer-copy", "copyMiss:(d.copyMiss||0)+1"),
+        ("drill-retirement", "drillRetiredIndexes(opts,runs)"),
+        ("drill-answer-speech", "drillSpeechText(d,q)"),
+        ("drill-android-speech", "KtAndroid.speak(value,String(token))"),
+        ("drill-written-columns", "drillHissanColumns(d,q)")
     ];
 
     private static readonly (string Code, string Marker)[] ForbiddenMarkers =
