@@ -96,7 +96,7 @@ Curriculum scope, stable unit IDs, assessment modes, and official references are
 - `tools/KidsTraining.RuntimeExport` builds the runtime page with the same `LearningPageBuilder` and markup patches as the Windows app.
 - `MobileDrillOnlyPatch` then hides the non-drill start-screen elements and adds the mobile stylesheet.
   - Every anchor is required, so a template change fails the export instead of shipping a broken page.
-  - On the start screen, the mute toggle sits in the top bar instead of the bottom-right corner, so it never covers the last drill card.
+  - On the start screen, the answer-mode screen, and the drill screen, the mute toggle sits at the top right instead of the bottom-right corner, so it never covers the last drill card or the question card ([#109](https://github.com/tsuyoshi-otake/kids-traning/issues/109)). On a narrow phone screen the drill title moves to its own row below the toggle.
 - `android/` holds the activity, the daily auto-launch service, and the boot receiver.
   - The parent dashboard's Android settings card turns auto-launch on or off and opens the permission settings.
   - The activity lends the page the phone's text-to-speech engine, so the drill reads correct answers aloud with the phone's Japanese voice. The manifest declares the TTS service query that Android 11 and later need to find that engine.
