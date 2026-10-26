@@ -33,8 +33,14 @@ internal static partial class LearningMarkupPatcher
             "if(this._mathKeyHandler)document.removeEventListener('keydown',this._mathKeyHandler);",
             "if(this._mathKeyHandler)document.removeEventListener('keydown',this._mathKeyHandler);" +
             "if(this._drillKeyHandler)document.removeEventListener('keydown',this._drillKeyHandler);" +
-            "this.clearDrillEcho();" +
+            "this.clearDrillEcho();this.stopDrillSpeech();" +
             "if(this.state.drill)this.saveDrillProgress(this.state.drill,false);",
+            StringComparison.Ordinal);
+
+        markup = ReplaceRequired(
+            markup,
+            "toggleMute(){const m=!this.state.muted;if(m)this.stopEnglishSpeech();",
+            "toggleMute(){const m=!this.state.muted;if(m){this.stopEnglishSpeech();this.stopDrillSpeech();}",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -109,7 +115,7 @@ internal static partial class LearningMarkupPatcher
     private static string BuildDrillKeyHandlerScript()
     {
         return """
-this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlKey||e.altKey||e.metaKey)return;const sc=this.state.screen;if(sc==='drill-mode'){const id=String(this.state.drillCourseChoice||'');if(e.key==='Escape'){e.preventDefault();this.cancelDrillMode();return;}if((e.key==='1'||e.key==='2')&&id){e.preventDefault();const kanji=id==='k1'||id==='k2',mode=e.key==='1'?(kanji?'reading':'input'):(kanji?'writing':'choice');this.startDrill(id,false,mode);}return;}if(sc!=='drill')return;const d=this.state.drill;if(!d||d.done)return;const roleButton=!!(e.target&&e.target.getAttribute&&(e.target.getAttribute('role')==='button'||e.target.tagName==='BUTTON'));if(roleButton&&(e.key==='Enter'||e.key===' '))return;if(d.echo){if(e.key==='Enter'||e.key===' '){e.preventDefault();this.drillFlushEcho();}return;}if(d.revealed){if(e.key==='Enter'||e.key===' '){e.preventDefault();this.drillNext();}return;}const base=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,base),choices=this.drillChoices(d,dq);if(choices.length){const choiceIndex=Number(e.key)-1;if(choiceIndex>=0&&choiceIndex<choices.length){e.preventDefault();this.drillChoose(choices[choiceIndex]);}return;}if(/^[0-9]$/.test(e.key)){e.preventDefault();this.press(e.key);return;}if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();this.del();return;}if(e.key!=='Enter'||!this.state.input)return;e.preventDefault();this.drillSubmit();};document.addEventListener('keydown',this._drillKeyHandler);
+this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlKey||e.altKey||e.metaKey)return;const sc=this.state.screen;if(sc==='drill-mode'){const id=String(this.state.drillCourseChoice||'');if(e.key==='Escape'){e.preventDefault();this.cancelDrillMode();return;}if((e.key==='1'||e.key==='2')&&id){e.preventDefault();const kanji=id==='k1'||id==='k2',mode=e.key==='1'?(kanji?'reading':'input'):(kanji?'writing':'choice');this.startDrill(id,false,mode);}return;}if(sc!=='drill')return;const d=this.state.drill;if(!d||d.done)return;const roleButton=!!(e.target&&e.target.getAttribute&&(e.target.getAttribute('role')==='button'||e.target.tagName==='BUTTON'));if(roleButton&&(e.key==='Enter'||e.key===' '))return;if(d.echo){if(e.key==='Enter'||e.key===' '){e.preventDefault();this.drillFlushEcho();}return;}const base=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,base),choices=this.drillChoices(d,dq);if(choices.length){const choiceIndex=Number(e.key)-1;if(choiceIndex>=0&&choiceIndex<choices.length){e.preventDefault();this.drillChoose(choices[choiceIndex]);}return;}if(/^[0-9]$/.test(e.key)){e.preventDefault();this.drillPress(e.key);return;}if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();this.del();return;}if(e.key!=='Enter'||!this.state.input)return;e.preventDefault();this.drillSubmit();};document.addEventListener('keydown',this._drillKeyHandler);
 """.TrimEnd('\r', '\n');
     }
 
@@ -141,10 +147,14 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       if(row.opts&&typeof row.opts==='object'&&!Array.isArray(row.opts)){
         for(const key of Object.keys(row.opts)){
           const no=Math.floor(Number(key)),entry=row.opts[key];
-          // Each question carries its own option count (2-6); anything else is dropped.
+          // Each question carries its own option count (2-6) and, at six, its run of first-try
+          // answers toward retirement (t, 1-3; see drillBumpOption); anything else is dropped.
           if(!Number.isInteger(no)||no<1||no>c.total)continue;
           if(!entry||typeof entry!=='object'||!Number.isInteger(entry.c)||entry.c<2||entry.c>6)continue;
-          opts[no]={c:entry.c};
+          // A retired question (t=3) also keeps the run that retired it (r); without one it
+          // falls back to two answers so the next first-try answer retires it properly.
+          const run=entry.c===6&&Number.isInteger(entry.t)?this.clamp(entry.t,0,3):0,retired=run===3&&Number.isInteger(entry.r)&&entry.r>=0;
+          opts[no]=retired?{c:6,t:3,r:entry.r}:run>0?{c:6,t:Math.min(2,run)}:{c:entry.c};
         }
       }
       out[c.id]={idx:this.clamp(whole(row.idx),0,c.total),perfect:this.clamp(whole(row.perfect),0,c.total),mistakes:whole(row.mistakes),runs:whole(row.runs),best:this.clamp(whole(row.best),0,c.total),opts:opts};
@@ -339,12 +349,24 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     // One step on a question's own dial: a first-attempt correct answer raises its option
     // count by one (max 6) and a first-attempt miss lowers it (min 2). Since a question
     // only reappears on the next run, each correct answer makes the next run harder.
+    // At six the dial cannot rise, so first-attempt correct answers count up in t instead; the
+    // third in a row retires the question (issue #104, see drillRetiredIndexes) and records the
+    // run that retired it in r. A miss lowers the count and drops the run.
     const no=Math.floor(Number(q&&q.no)),opts=Object.assign({},(d&&d.opts&&typeof d.opts==='object')?d.opts:{});
     if(!Number.isInteger(no)||no<1)return opts;
-    const row=opts[no]||{c:2},count=Number.isInteger(row.c)?this.clamp(row.c,2,6):2;
-    opts[no]={c:correct?Math.min(6,count+1):Math.max(2,count-1)};
+    const row=opts[no]||{c:2},count=Number.isInteger(row.c)?this.clamp(row.c,2,6):2,run=count===6&&Number.isInteger(row.t)?this.clamp(row.t,0,3):0;
+    opts[no]=!correct?{c:Math.max(2,count-1)}:count<6?{c:count+1}:run+1>=3?{c:6,t:3,r:Math.floor(Number(d&&d.run))||0}:{c:6,t:run+1};
     return opts;
   }
+  drillRetiredIndexes(opts,runs){
+    // A retired question finishes the run that retired it (r === runs), so a resumed run keeps
+    // its length; every later run leaves it out. Bank positions are no-1 because every bank
+    // builder numbers its rows list.length+1.
+    const map=opts&&typeof opts==='object'?opts:{},current=Number(runs)||0,out=[];
+    for(const key of Object.keys(map)){const no=Math.floor(Number(key)),row=map[key];if(Number.isInteger(no)&&no>=1&&row&&row.c===6&&row.t>=3&&Number.isInteger(row.r)&&row.r<current)out.push(no-1);}
+    return out.sort((a,b)=>a-b);
+  }
+  drillActiveFrom(skip,from,total){const list=Array.isArray(skip)?skip:[];let i=from;while(i<total&&list.indexOf(i)>=0)i++;return i;}
   drillNumericChoices(d,q){
     if(!d||!q||q.kind!=='num')return [];
     const answer=Number(q.ans);if(!Number.isFinite(answer))return [];
@@ -374,21 +396,24 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   drillChoices(d,q){if(!d||!q)return [];if(q.kind==='pick')return Array.isArray(q.choices)?q.choices:[];return d.answerMode==='choice'?this.drillNumericChoices(d,q):[];}
   startDrill(id,restart,answerMode){
     const course=this.drillCourse(id);if(!course)return;
-    const progress=this.readDrillProgress(),saved=progress[id]||this.drillDefaultRecord(),bank=this.drillBank(id);
+    const progress=this.readDrillProgress(),saved=progress[id]||this.drillDefaultRecord(),bank=this.drillBank(id),skip=this.drillRetiredIndexes(saved.opts,saved.runs);
     let idx=restart?0:this.clamp(saved.idx,0,bank.length);
-    if(idx>=bank.length)idx=0;
+    if(this.drillActiveFrom(skip,idx,bank.length)>=bank.length)idx=0;
     const fresh=restart||idx===0;
+    idx=this.drillActiveFrom(skip,idx,bank.length);
+    // Every question retired: nothing is left to ask, so the run ends before it starts.
+    const allRetired=idx>=bank.length;
     const mode=id==='k1'||id==='k2'?(answerMode==='writing'?'writing':'reading'):(answerMode==='choice'?'choice':'input'),choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder(bank.length,choiceSeed);
     if(fresh){progress[id]={idx:0,perfect:0,mistakes:0,runs:saved.runs,best:saved.best,opts:saved.opts};this.writeDrillProgress(progress);}
-    this.clearDrillEcho();
+    this.clearDrillEcho();this.stopDrillSpeech();
     this.sfx('select');
     const opts=Object.assign({},saved.opts);
-    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,answerMode:mode,choiceSeed:choiceSeed,choiceOrder:choiceOrder,idx:idx,miss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:false,echo:null,opts:opts,count:this.drillOptionCount({opts:opts},bank[idx])}});
+    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,answerMode:mode,choiceSeed:choiceSeed,choiceOrder:choiceOrder,idx:idx,miss:0,copyMiss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:allRetired,allRetired:allRetired,echo:null,opts:opts,run:saved.runs,skip:skip,count:allRetired?2:this.drillOptionCount({opts:opts},bank[idx])}});
   }
   drillAdvance(patch){
     const d=this.state.drill;if(!d)return;
-    const total=this.drillBank(d.id).length,next=Object.assign({},d,{miss:0,mark:'',hint:'',revealed:false,echo:null},patch||{});
-    next.idx=d.idx+1;
+    const total=this.drillBank(d.id).length,next=Object.assign({},d,{miss:0,copyMiss:0,mark:'',hint:'',revealed:false,echo:null},patch||{});
+    next.idx=this.drillActiveFrom(d.skip,d.idx+1,total);
     const again=Array.isArray(next.again)?next.again:[],countRun=!d.counted&&next.idx>=total;
     if(countRun)next.counted=true;
     next.done=next.idx>=total+again.length;
@@ -398,24 +423,105 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     this.setState({drill:next,input:''});
   }
   drillEchoMs(){return 700;}
-  clearDrillEcho(){if(this._drillEchoTimer){clearTimeout(this._drillEchoTimer);this._drillEchoTimer=null;}this._drillEchoPatch=null;}
-  scheduleDrillAdvance(patch){
+  drillSpeechMaxMs(){return 4000;}
+  clearDrillEcho(){if(this._drillEchoTimer){clearTimeout(this._drillEchoTimer);this._drillEchoTimer=null;}this._drillEchoPatch=null;this._drillEchoToken=(this._drillEchoToken||0)+1;}
+  scheduleDrillAdvance(patch,speech){
+    // The echo stays up for drillEchoMs and, while the answer is read aloud (issue #105), until
+    // the reading ends; drillSpeechMaxMs caps the wait so a stuck engine never holds the drill.
     this.clearDrillEcho();
     this._drillEchoPatch=patch;
-    this._drillEchoTimer=setTimeout(()=>this.drillFlushEcho(),this.drillEchoMs());
+    const token=this._drillEchoToken,started=Date.now(),flushIn=ms=>{if(this._drillEchoToken!==token)return;if(this._drillEchoTimer)clearTimeout(this._drillEchoTimer);this._drillEchoTimer=setTimeout(()=>this.drillFlushEcho(),Math.max(0,ms));};
+    let ended=false;
+    const speaking=this.drillSpeak(speech,()=>{ended=true;flushIn(this.drillEchoMs()-(Date.now()-started));});
+    if(!ended)flushIn(speaking?this.drillSpeechMaxMs():this.drillEchoMs());
   }
   drillFlushEcho(){
     const patch=this._drillEchoPatch,cur=this.state.drill;
-    this.clearDrillEcho();
+    this.clearDrillEcho();this.stopDrillSpeech();
     if(!patch||this.state.screen!=='drill'||!cur||!cur.echo)return;
     this.drillAdvance(patch);
   }
-  drillSubmit(){this.drillAnswerWith(this.state.input);}
+  drillSpeechText(d,q){
+    // What is read aloud on a correct answer: a kanji question's reading, or a calculation and
+    // its answer in words ("6 × 5" -> 6かける5は30). q is the bank row, never the writing-mode view.
+    if(!q)return '';
+    if(q.kind==='pick')return String(q.ans==null?'':q.ans);
+    const answer=String(q.ans),text=String(q.text),line=text.indexOf('□')>=0?text.replace('□',answer):text+' ＝ '+answer;
+    const words={'(':'かっこ',')':'かっことじ','＋':'たす','−':'ひく','-':'ひく','×':'かける','÷':'わる','＝':'は'};
+    return line.replace(/\)\s*(?=[＋−×÷\-])/g,'かっことじ、').replace(/[()＋−×÷＝\-]/g,ch=>words[ch]).replace(/\s+/g,'');
+  }
+  drillSpeechEngine(){
+    // The Android drill app reads aloud through its TextToSpeech bridge (MainActivity.AndroidBridge);
+    // everywhere else the Web Speech API does, when it exists.
+    try{if(typeof KtAndroid!=='undefined'&&KtAndroid&&typeof KtAndroid.speak==='function')return 'android';}catch(e){}
+    return typeof window!=='undefined'&&window.speechSynthesis&&typeof SpeechSynthesisUtterance!=='undefined'?'web':'';
+  }
+  drillSpeak(text,done){
+    // Returns true when the reading started; done then runs once, when it ends or fails. A newer
+    // reading or stopDrillSpeech retires the token, so a stale end never advances the drill.
+    this.stopDrillSpeech();
+    const value=String(text||''),engine=value&&!this.state.muted?this.drillSpeechEngine():'';
+    if(!engine)return false;
+    const token=this._drillSpeechToken=(this._drillSpeechToken||0)+1,end=()=>{if(this._drillSpeechToken!==token||!this._drillSpeechActive)return;this._drillSpeechActive=false;if(typeof done==='function')done();};
+    this._drillSpeechActive=true;this._drillSpeechFinish=done;
+    try{
+      if(engine==='android'){
+        window.__ktDrillSpeechEnd=id=>{if(String(id)===String(token))end();};
+        if(KtAndroid.speak(value,String(token))!==true){this._drillSpeechActive=false;return false;}
+        return true;
+      }
+      const synth=window.speechSynthesis,voices=typeof synth.getVoices==='function'?(synth.getVoices()||[]):[],voice=voices.find(v=>/^ja([-_]|$)/i.test(String(v&&v.lang||'')))||null;
+      // Voices that are loaded but none of them Japanese would read the numbers in English.
+      if(voices.length&&!voice){this._drillSpeechActive=false;return false;}
+      const utterance=new SpeechSynthesisUtterance(value);utterance.lang='ja-JP';if(voice)utterance.voice=voice;utterance.rate=0.95;utterance.onend=end;utterance.onerror=end;
+      synth.speak(utterance);
+      return true;
+    }catch(e){this._drillSpeechActive=false;return false;}
+  }
+  stopDrillSpeech(){
+    // A stopped reading counts as ended, so a pair waiting on it (muting mid-sentence) moves on
+    // without the cap; callers that drop the pair clear the echo first, which makes that a no-op.
+    if(!this._drillSpeechActive)return;
+    const finish=this._drillSpeechFinish;
+    this._drillSpeechActive=false;this._drillSpeechToken=(this._drillSpeechToken||0)+1;
+    try{if(this.drillSpeechEngine()==='android'){if(typeof KtAndroid.stopSpeaking==='function')KtAndroid.stopSpeaking();}else if(typeof window!=='undefined'&&window.speechSynthesis)window.speechSynthesis.cancel();}catch(e){}
+    if(typeof finish==='function')finish();
+  }
+  drillHissanParts(d,q){return (d&&(d.id==='h2'||d.id==='h2n')&&q)?/^(\d+) (＋|−) (\d+)$/.exec(String(q.text)):null;}
+  drillHissanColumns(d,q){
+    // The written-arithmetic courses take an answer one digit at a time from the ones place
+    // (issue #106), into as many cells as the widest of the two numbers and the answer.
+    const parts=d&&d.answerMode==='input'?this.drillHissanParts(d,q):null;
+    return parts?Math.max(parts[1].length,parts[3].length,String(q.ans).length):0;
+  }
+  drillPress(n){
+    const d=this.state.drill,columns=d?this.drillHissanColumns(d,this.drillQuestion()):0;
+    if(columns&&String(this.state.input||'').length>=columns)return;
+    this.press(n);
+  }
+  drillTypedValue(){
+    // Column input arrives ones place first, so the number reads the presses backwards.
+    const d=this.state.drill,raw=String(this.state.input||'');
+    return d&&this.drillHissanColumns(d,this.drillQuestion())?raw.split('').reverse().join(''):raw;
+  }
+  drillSubmit(){this.drillAnswerWith(this.drillTypedValue());}
   drillChoose(value){this.drillAnswerWith(value);}
   drillAnswerWith(value){
-    const d=this.state.drill;if(!d||d.done||d.revealed||d.echo)return;
-    const q=this.drillPresentedQuestion(d,this.drillQuestion());if(!q)return;
+    const d=this.state.drill;if(!d||d.done||d.echo)return;
+    const base=this.drillQuestion(),q=this.drillPresentedQuestion(d,base);if(!q)return;
     const raw=String(value==null?'':value);if(!raw.length)return;
+    if(d.revealed){
+      // After the second miss the answer stays up until the child enters or picks it (issue
+      // #103). Copying it scores nothing and leaves the dial alone; the question still goes to
+      // the again queue, exactly as the つぎへ button that this replaces did.
+      if(!this.drillMatches(q,raw)){this.sfx('wrong');this.setState({input:'',drill:Object.assign({},d,{copyMiss:(d.copyMiss||0)+1})});return;}
+      const again=Array.isArray(d.again)?d.again.slice():[];
+      if(d.idx<this.drillBank(d.id).length&&again.indexOf(d.idx)<0)again.push(d.idx);
+      this.sfx('correct');
+      this.setState({drill:Object.assign({},d,{mark:'',hint:'',echo:this.drillPair(d,q)})});
+      this.scheduleDrillAdvance({again:again,streak:0},this.drillSpeechText(d,base));
+      return;
+    }
     if(this.drillMatches(q,raw)){
       const clean=d.miss===0,firstPass=d.idx<this.drillBank(d.id).length;
       // Only the first pass of the first attempt moves a question's dial; retries and the
@@ -424,7 +530,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       const opts=firstPass&&clean&&q.kind==='num'?this.drillBumpOption(d,q,true):d.opts;
       this.sfx(clean&&d.streak>=4?'combo':'correct');
       this.setState({drill:Object.assign({},d,{mark:'',hint:'',opts:opts,echo:this.drillPair(d,q)})});
-      this.scheduleDrillAdvance({perfect:d.perfect+(clean&&firstPass?1:0),streak:clean?d.streak+1:0,opts:opts});
+      this.scheduleDrillAdvance({perfect:d.perfect+(clean&&firstPass?1:0),streak:clean?d.streak+1:0,opts:opts},this.drillSpeechText(d,base));
       return;
     }
     this.sfx('wrong');
@@ -433,19 +539,16 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     this.setState({input:'',drill:nextDrill});
     if(firstMiss)this.saveDrillProgress(nextDrill,false);
   }
-  drillNext(){
-    const d=this.state.drill;if(!d||!d.revealed)return;
-    const bank=this.drillBank(d.id),again=Array.isArray(d.again)?d.again.slice():[];
-    if(d.idx<bank.length&&again.indexOf(d.idx)<0)again.push(d.idx);
-    this.drillAdvance({again:again,streak:0});
-  }
-  exitDrill(){const d=this.state.drill;this.clearDrillEcho();this.saveDrillProgress(d,false);this.sfx('tap');this.setState({screen:'start',drill:null,drillAsk:'',drillCourseChoice:'',input:''});}
+  exitDrill(){const d=this.state.drill;this.clearDrillEcho();this.stopDrillSpeech();this.saveDrillProgress(d,false);this.sfx('tap');this.setState({screen:'start',drill:null,drillAsk:'',drillCourseChoice:'',input:''});}
   askDrillReset(id){this.sfx('tap');this.setState({drillAsk:this.state.drillAsk===id?'':id});}
-  confirmDrillReset(id){
+  drillClearRecord(id){
+    // Back to question 1 with every dial at two options, which also brings retired questions back.
     const progress=this.readDrillProgress(),prev=progress[id]||this.drillDefaultRecord();
     progress[id]={idx:0,perfect:0,mistakes:0,runs:prev.runs,best:prev.best,opts:{}};
-    this.writeDrillProgress(progress);this.sfx('select');this.setState({drillAsk:''});
+    this.writeDrillProgress(progress);
   }
+  confirmDrillReset(id){this.drillClearRecord(id);this.sfx('select');this.setState({drillAsk:''});}
+  relearnDrill(){const d=this.state.drill;if(!d)return;this.drillClearRecord(d.id);this.startDrill(d.id,true,d.answerMode);}
 """.TrimEnd('\r', '\n');
     }
 
@@ -456,16 +559,18 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     if(sc==='start'){
       const drillProgress=this.readDrillProgress(),drillAsk=String(S.drillAsk||'');
       drillCards=this.drillCourses().map(c=>{
-        const row=drillProgress[c.id]||this.drillDefaultRecord(),pct=Math.round(this.clamp(row.idx/c.total,0,1)*100),asking=drillAsk===c.id;
+        // Retired questions (issue #104) leave the count, so the card shows what the next run asks.
+        const row=drillProgress[c.id]||this.drillDefaultRecord(),skip=this.drillRetiredIndexes(row.opts,row.runs),active=Math.max(0,c.total-skip.length),done=row.idx-skip.filter(i=>i<row.idx).length;
+        const pct=Math.round((active?this.clamp(done/active,0,1):1)*100),asking=drillAsk===c.id;
         return {
           id:c.id, badge:c.badge, cardTitle:c.cardTitle||c.title, cardTag:c.cardTag||'', tagStyle:c.cardTag?'':'display:none;',
           cardStyle:'background:'+c.shade+'; border-color:'+c.edge+'; color:'+c.edge+';',
           barStyle:'width:'+pct+'%; background:'+c.color+';',
-          progressText:row.idx>0?(row.idx+' / '+c.total):(c.total+'もん'),
+          progressText:!active?'ぜんぶ おぼえた':row.idx>0?(done+' / '+active):(active+'もん'),
           actionText:row.idx>0?'つづきから ▶':'はじめる ▶',
           resetText:asking?'ほんとうに もどす？':'さいしょから',
           resetStyle:asking?'background:#ffe0da; border-color:#e08a7a; color:#b23b23;':'',
-          ariaLabel:c.badge+'の とっくんモード、'+c.title+'。'+c.sub+'。'+c.total+'もん中 '+row.idx+'もん',
+          ariaLabel:c.badge+'の とっくんモード、'+c.title+'。'+c.sub+'。'+active+'もん中 '+done+'もん'+(skip.length?'。おぼえた '+skip.length+'もんは でない':''),
           resetAria:asking?c.title+'の しんちょくを 0にもどす':c.title+'を さいしょから',
           onStart:()=>this.selectDrillCourse(c.id),
           onReset:()=>{if(this.state.drillAsk===c.id)this.confirmDrillReset(c.id);else this.askDrillReset(c.id);}
@@ -484,13 +589,14 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     }
     if(sc==='drill'&&S.drill){
       const d=S.drill,course=this.drillCourse(d.id)||{},total=this.drillBank(d.id).length,baseQuestion=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,baseQuestion);
-      const dAgain=Array.isArray(d.again)?d.again:[],seen=Math.min(d.idx,total),inMain=d.idx<total;
-      const drillPad=['1','2','3','4','5','6','7','8','9'].map(n=>({label:n,ariaLabel:n,style:keyTile,onClick:()=>this.press(n)}));
+      const dAgain=Array.isArray(d.again)?d.again:[],dSkip=Array.isArray(d.skip)?d.skip:[],passed=Math.min(d.idx,total),inMain=d.idx<total;
+      const activeTotal=Math.max(0,total-dSkip.length),seen=passed-dSkip.filter(i=>i<passed).length,retiredNow=this.drillRetiredIndexes(d.opts,Infinity).length;
+      const drillPad=['1','2','3','4','5','6','7','8','9'].map(n=>({label:n,ariaLabel:n,style:keyTile,onClick:()=>this.drillPress(n)}));
       drillPad.push({label:'けす',ariaLabel:'ひとつ けす',style:keyClear,onClick:()=>this.del()});
-      drillPad.push({label:'0',ariaLabel:'0',style:keyTile,onClick:()=>this.press('0')});
+      drillPad.push({label:'0',ariaLabel:'0',style:keyTile,onClick:()=>this.drillPress('0')});
       drillPad.push({label:'OK',ariaLabel:'こたえる',style:keyOk,onClick:()=>this.drillSubmit()});
       const dChoices=this.drillChoices(d,dq),dPick=dChoices.length>0,dKanji=!!(dq&&dq.kind==='pick'),dWriting=d.answerMode==='writing';
-      const hissan=(d.id==='h2'||d.id==='h2n')&&dq?/^(\d+) (＋|−) (\d+)$/.exec(String(dq.text)):null;
+      const hissan=this.drillHissanParts(d,dq);
       // The pair is what has to be memorised, so it is shown in one fixed place: green while the
       // correct answer is echoed, red when the second mistake reveals it, and never anywhere else.
       const dEcho=d.echo&&typeof d.echo==='object'?d.echo:null,dPair=this.drillPair(d,dq)||{main:'',sub:''};
@@ -499,25 +605,37 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         no:String(i+1), label:String(choice), ariaLabel:(i+1)+'ばん、'+choice,
         style:dSolved&&String(choice)===dAnswer?'background:#e8f7ec; border-color:#3aa655; color:#22683c; box-shadow:0 4px 0 #9dd3ae;':'',
         onClick:()=>this.drillChoose(choice)}));
+      // Column cells, left to right: cell i holds the digit of place columns-1-i, and presses
+      // fill them from the ones place, so the next empty place is the one to highlight. The
+      // right/wrong colours go on the cells themselves, never on the wider column they sit in.
+      const hissanColumns=this.drillHissanColumns(d,dq),typed=String(S.input||''),hissanCells=[];
+      for(let i=0;i<hissanColumns;i++){const place=hissanColumns-1-i;hissanCells.push({text:place<typed.length?typed[place]:'',style:dEcho?'background:#e8f7ec; box-shadow:inset 0 0 0 3px #3aa655; color:#22683c;':place===typed.length?'box-shadow:inset 0 0 0 5px #ff8a3d; background:#fff0de;':(d.mark?'box-shadow:inset 0 0 0 3px #e08a7a; color:#b23b23;':'')});}
+      const copyAsk=dPick?'おなじ こたえを えらんで すすもう':hissanColumns?'おなじ こたえを みぎの くらいから いれよう':'おなじ こたえを いれて すすもう';
       drillView={
         badge:course.badge||'', title:course.title||'', section:dq?dq.sec:'',
-        countText:inMain?(seen+' / '+total):('なおし '+(d.idx-total+1)+' / '+dAgain.length),
+        countText:d.done?(d.allRetired?'':activeTotal+' / '+activeTotal):inMain?(seen+' / '+activeTotal):('なおし '+(d.idx-total+1)+' / '+dAgain.length),
         headStyle:'background:'+(course.color||'#ff8a3d')+';',
-        barStyle:'width:'+Math.round(this.clamp(seen/(total||1),0,1)*100)+'%; background:'+(course.color||'#ff8a3d')+';',
+        barStyle:'width:'+Math.round((activeTotal?this.clamp(seen/activeTotal,0,1):1)*100)+'%; background:'+(course.color||'#ff8a3d')+';',
         prompt:dq?this.drillPrompt(dq):'', ansBox:S.input||'?',
         showHissan:!!hissan, showPlainPrompt:!hissan, hissanLeft:hissan?hissan[1]:'',hissanOp:hissan?hissan[2]:'',hissanRight:hissan?hissan[3]:'',
-        hissanAria:hissan?hissan[1]+' '+hissan[2]+' '+hissan[3]+' の筆算':'',showHissanInput:!!hissan&&!dPick,
+        hissanAria:hissan?hissan[1]+' '+hissan[2]+' '+hissan[3]+' の筆算':'',showHissanInput:hissanColumns>0,
+        hissanCells:hissanCells, hissanCellsAria:'こたえ '+(typed?typed.split('').reverse().join(''):'まだ ない'),
+        showColumnAsk:hissanColumns>0&&!dSolved, columnAsk:'みぎの くらいから 1けたずつ いれてね',
         ansStyle:dEcho?'background:#e8f7ec; border-color:#3aa655; color:#22683c;':(d.mark?'border-color:#e08a7a; color:#b23b23;':''),
         showAns:!dPick&&!hissan, showAsk:dPick, askText:dWriting?'ただしい かんじを えらんでね':(dKanji?'よみかたを えらんでね':'こたえを '+dChoices.length+'つから えらんでね'),
         showPad:!dPick, showPick:dPick, pickStyle:dChoices.length>4?'grid-template-columns:repeat(3,minmax(0,1fr));':'', pickAria:dWriting?'かんじの えらびもんだい':(dKanji?'よみかたの えらびもんだい':'こたえの '+dChoices.length+'たくもんだい'), picks:drillPicks,
         showHint:d.mark==='wrong', hint:d.hint||'',
         showEcho:!!dEcho, echoMain:dEcho?dEcho.main:'', echoSub:dEcho?dEcho.sub:'', echoHasSub:!!(dEcho&&dEcho.sub),
-        showAnswer:!!d.revealed, answerMain:dPair.main, answerSub:dPair.sub, answerHasSub:!!dPair.sub,
+        showAnswer:!!d.revealed&&!dEcho, answerMain:dPair.main, answerSub:dPair.sub, answerHasSub:!!dPair.sub,
+        showCopy:!!d.revealed&&!dEcho, copyText:d.copyMiss>0?'もういちど。うえの こたえを よく みてね':copyAsk,
         showStreak:d.streak>=3, streakText:'れんぞく '+d.streak+'もん！',
         playing:!d.done, finished:!!d.done,
-        clearBody:d.perfect+' / '+total+'もんを 1かいめで せいかい',
+        finishMark:d.allRetired?'🎓':'🏅', finishTitle:d.allRetired?'ぜんぶ おぼえたよ！':'ぜんぶ おわったよ！',
+        clearBody:d.allRetired?'どの もんだいも 6つから 3かい つづけて せいかい できたよ':(d.perfect+' / '+activeTotal+'もんを 1かいめで せいかい'),
+        showRetiredNote:!d.allRetired&&retiredNow>0, retiredNote:'おぼえた もんだい '+retiredNow+'もんは つぎから でないよ',
+        restartText:d.allRetired?'さいしょから':'もういちど',
         pad:drillPad,
-        onNext:()=>this.drillNext(), onExit:()=>this.exitDrill(), onRestart:()=>this.startDrill(d.id,true,d.answerMode)
+        onExit:()=>this.exitDrill(), onRestart:()=>{if(d.allRetired)this.relearnDrill();else this.startDrill(d.id,true,d.answerMode);}
       };
     }
 """.TrimEnd('\r', '\n');
@@ -608,9 +726,14 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
                 <div class="kt-drill-hissan-row"><span>{{ drillView.hissanOp }}</span><span>{{ drillView.hissanRight }}</span></div>
                 <div class="kt-drill-hissan-rule" aria-hidden="true"></div>
                 <sc-if value="{{ drillView.showHissanInput }}" hint-placeholder-val="{{ false }}">
-                  <div class="kt-drill-hissan-result" style="{{ drillView.ansStyle }}" aria-live="polite">{{ drillView.ansBox }}</div>
+                  <div class="kt-drill-hissan-row"><span aria-hidden="true"></span><span class="kt-drill-hissan-cells" role="group" aria-live="polite" aria-label="{{ drillView.hissanCellsAria }}">
+                    <sc-for list="{{ drillView.hissanCells }}" as="h" hint-placeholder-count="3"><span class="kt-drill-hissan-cell" style="{{ h.style }}" aria-hidden="true">{{ h.text }}</span></sc-for>
+                  </span></div>
                 </sc-if>
               </div>
+            </sc-if>
+            <sc-if value="{{ drillView.showColumnAsk }}" hint-placeholder-val="{{ false }}">
+              <div class="kt-drill-ask">{{ drillView.columnAsk }}</div>
             </sc-if>
             <sc-if value="{{ drillView.showPlainPrompt }}" hint-placeholder-val="{{ true }}">
               <div class="kt-drill-prompt">{{ drillView.prompt }}</div>
@@ -648,7 +771,9 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
                     <span class="kt-drill-pair-sub">{{ drillView.answerSub }}</span>
                   </sc-if>
                 </div>
-                <div class="kt-drill-next" role="button" tabindex="0" onclick="{{ drillView.onNext }}">つぎへ ▶</div>
+              </sc-if>
+              <sc-if value="{{ drillView.showCopy }}" hint-placeholder-val="{{ false }}">
+                <div class="kt-drill-note is-copy" role="status">✏️ {{ drillView.copyText }}</div>
               </sc-if>
             </div>
           </div>
@@ -665,11 +790,14 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       </sc-if>
       <sc-if value="{{ drillView.finished }}" hint-placeholder-val="{{ false }}">
         <div class="kt-drill-finish">
-          <div class="kt-drill-finish-mark">🏅</div>
-          <div class="kt-drill-finish-title">ぜんぶ おわったよ！</div>
+          <div class="kt-drill-finish-mark">{{ drillView.finishMark }}</div>
+          <div class="kt-drill-finish-title">{{ drillView.finishTitle }}</div>
           <div class="kt-drill-finish-body">{{ drillView.clearBody }}</div>
+          <sc-if value="{{ drillView.showRetiredNote }}" hint-placeholder-val="{{ false }}">
+            <div class="kt-drill-finish-note">🎓 {{ drillView.retiredNote }}</div>
+          </sc-if>
           <div class="kt-drill-finish-row">
-            <div class="kt-drill-next" role="button" tabindex="0" onclick="{{ drillView.onRestart }}">もういちど</div>
+            <div class="kt-drill-next" role="button" tabindex="0" onclick="{{ drillView.onRestart }}">{{ drillView.restartText }}</div>
             <div class="kt-drill-back" role="button" tabindex="0" onclick="{{ drillView.onExit }}">トップへ</div>
           </div>
         </div>
@@ -733,7 +861,10 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-hissan-row{display:grid;grid-template-columns:1em 4ch;align-items:baseline;}
   .kt-drill-hissan-row span:last-child{text-align:right;}
   .kt-drill-hissan-rule{border-top:5px solid currentColor;margin:3px 0 8px;}
-  .kt-drill-hissan-result{box-sizing:border-box;width:100%;min-height:1.25em;background:#fff7ec;border:4px dashed #d8c4a0;border-radius:14px;padding:0 6px;text-align:right;}
+  /* Answer cells line up under the digits above: each is one ch of the same font, and the
+     outline is an inset shadow so it never widens a cell (issue #106). */
+  .kt-drill-hissan-cells{display:flex;justify-content:flex-end;}
+  .kt-drill-hissan-cell{display:inline-block;width:1ch;height:1.18em;text-align:center;background:#fff7ec;border-radius:10px;box-shadow:inset 0 0 0 3px #d8c4a0;}
   .kt-drill-answering{width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;}
   .kt-drill-ans{min-width:220px;background:#fff7ec;border:4px dashed #d8c4a0;border-radius:20px;padding:4px 24px;font-size:52px;font-weight:900;color:#3a3326;text-align:center;}
   /* The feedback slot keeps its height while it is empty, hinting, or showing the pair, so the
@@ -741,6 +872,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-feedback{width:100%;min-height:248px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:12px;}
   .kt-drill-note{border-radius:16px;padding:9px 16px;font-size:19px;font-weight:700;text-align:center;}
   .kt-drill-note.is-hint{background:#fff6db;border:3px solid #ffd24a;color:#7a5d00;}
+  .kt-drill-note.is-copy{background:#fff0f0;border:3px solid #e08a7a;color:#9c2f1c;}
   .kt-drill-pair{min-width:300px;display:flex;flex-direction:column;align-items:center;gap:2px;border-radius:20px;padding:10px 32px;text-align:center;}
   .kt-drill-pair.is-ok{background:#e8f7ec;border:4px solid #3aa655;color:#22683c;}
   .kt-drill-pair.is-answer{background:#ffe0da;border:4px solid #e08a7a;color:#b23b23;}
@@ -762,6 +894,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-finish-mark{font-size:96px;line-height:1;}
   .kt-drill-finish-title{font-size:44px;font-weight:900;}
   .kt-drill-finish-body{font-size:24px;font-weight:700;color:#6b5e45;}
+  .kt-drill-finish-note{font-size:20px;font-weight:700;color:#3f7a4f;background:#e8f7ec;border:3px solid #9dd3ae;border-radius:16px;padding:6px 16px;}
   .kt-drill-finish-row{display:flex;gap:16px;margin-top:8px;}
   .kt-drill-mode-option:hover,.kt-drill-pick-btn:hover{border-color:#ffb170;background:#fffaf4;transform:translateY(-2px);box-shadow:0 8px 0 #ecd9b9;}
   .kt-drill-mode-option:active,.kt-drill-pick-btn:active{transform:translateY(3px);box-shadow:0 2px 0 #dcc49c;}

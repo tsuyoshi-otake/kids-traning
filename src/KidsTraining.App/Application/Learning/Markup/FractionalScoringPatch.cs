@@ -28,7 +28,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "fbStarText:lr.stars||0,",
-            "fbScore:this.formatScore(lr.points||0), fbAutoAdvance:!!lr.exhausted, fbStarText:lr.stars||0,",
+            "fbScore:this.formatScore(lr.points||0), fbStarText:lr.stars||0,",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -63,9 +63,6 @@ internal static partial class LearningMarkupPatcher
 """,
             """
       <div class="kt-feedback-score">この もんだい：<b>{{ fbScore }}てん</b></div>
-      <sc-if value="{{ fbAutoAdvance }}" hint-placeholder-val="{{ false }}">
-        <div class="kt-feedback-auto-advance" role="status">こたえを かくにんして、つぎへ すすみます</div>
-      </sc-if>
 
       <sc-if value="{{ fbCorrect }}" hint-placeholder-val="{{ false }}">
         <div class="kt-feedback-rewards">
@@ -82,10 +79,8 @@ scoreForMistakes(misses){const n=Math.max(0,Math.min(3,Number(misses)||0));retur
   formatScore(value){const n=Math.max(0,Number(value)||0);return Number.isInteger(n)?String(n):n.toFixed(2).replace(/0+$/,'').replace(/\.$/,'');}
   currentQuestionToken(){const s=this.state.session;return s?String(s.attempt||1)+':'+String(s.idx||0):'';}
   claimQuestionTerminal(){const token=this.currentQuestionToken();if(!token||this._terminalQuestionToken===token)return false;this._terminalQuestionToken=token;return true;}
-  clearAutoAdvance(){if(this._autoAdvanceTimer){clearTimeout(this._autoAdvanceTimer);this._autoAdvanceTimer=null;}}
-  scheduleAutoAdvance(){this.clearAutoAdvance();const token=this.currentQuestionToken();this._autoAdvanceTimer=setTimeout(()=>{this._autoAdvanceTimer=null;if(this.state.screen==='feedback'&&this.currentQuestionToken()===token&&this.state.lastResult&&this.state.lastResult.exhausted)this.next();},1800);}
   finishScoredQuestion(q,misses,options){if(!this.claimQuestionTerminal())return;const p=this.curP(),points=this.scoreForMistakes(misses),independent=points===1,combo=independent?this.state.combo+1:0,stars=independent?(combo>=3?2:1):1,opts=options||{},perfectXp=Number(opts.perfectXp)||12,comboXp=Number(opts.comboXp)||18,assistedXp=Number(opts.assistedXp)||6,xpInfo=this.gainXp(p,independent?(combo>=3?comboXp:perfectXp):assistedXp);this.recordEvidence(p,q,independent?'independent':'assisted',points,{userAnswer:opts.userAnswer==null?q.answer:opts.userAnswer,mistakes:misses,viaSteps:!!opts.viaSteps});p.stars+=stars;this.sfx(independent&&combo>=3?'combo':'correct');this.setState({screen:'feedback',combo:combo,lastResult:{correct:true,q:q,userAns:q.answer,stars:stars,combo:combo,helped:!independent,viaSteps:!!opts.viaSteps,perfect:independent,points:points,xp:xpInfo.amount,levelUp:xpInfo.levelUp},input:'',numChoices:null,hsStepChoices:null,waStepChoices:null,waHint:'',waError:'',typed:'',attemptNotice:''});}
-  exhaustQuestion(userAns){const q=this.cur();if(!q||!this.claimQuestionTerminal())return;const p=this.curP();this.recordEvidence(p,q,'incorrect',0,{userAnswer:userAns,mistakes:3});this.sfx('wrong');this.setState({screen:'feedback',combo:0,lastResult:{correct:false,exhausted:true,q:q,userAns:userAns==null?'':String(userAns),stars:0,combo:0,points:0,xp:0,levelUp:false},input:'',numChoices:null,hsStepChoices:null,waStepChoices:null,waHint:'',waError:'',typed:'',attemptNotice:''},()=>this.scheduleAutoAdvance());}
+  exhaustQuestion(userAns){const q=this.cur();if(!q||!this.claimQuestionTerminal())return;const p=this.curP();this.recordEvidence(p,q,'incorrect',0,{userAnswer:userAns,mistakes:3});this.sfx('wrong');this.setState({screen:'feedback',combo:0,lastResult:{correct:false,exhausted:true,q:q,userAns:userAns==null?'':String(userAns),stars:0,combo:0,points:0,xp:0,levelUp:false},input:'',numChoices:null,hsStepChoices:null,waStepChoices:null,waHint:'',waError:'',typed:'',attemptNotice:''});}
   typeKey(ch){const q=this.cur(),answer=String(q&&q.answer||'').toLowerCase(),typed=String(this.state.typed||'');if(typed.length>=answer.length||this._terminalQuestionToken===this.currentQuestionToken())return;const key=String(ch||'').toLowerCase();if(key!==answer.charAt(typed.length)){const miss=(this.state.typeMiss||0)+1;if(miss>=3){this.exhaustQuestion(typed+key);return;}this.sfx('wrong');this.setState({typeMiss:miss,combo:0});return;}const next=typed+key;if(next.length>=answer.length){this.setState({typed:next},()=>this.finishTyping());return;}this.sfx('step');this.setState({typed:next});}
   finishTyping(){const q=this.cur();this.finishScoredQuestion(q,this.state.typeMiss||0,{userAnswer:q.answer});}
 """;

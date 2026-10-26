@@ -471,13 +471,6 @@ internal static partial class LearningMarkupPatcher
     font-weight: 900;
   }
 
-  .kt-feedback-auto-advance {
-    margin-top: var(--kt-space-2);
-    color: #835a21;
-    font-size: 17px;
-    font-weight: 800;
-  }
-
   .kt-feedback-rewards {
     display: flex;
     flex-wrap: wrap;
@@ -741,11 +734,6 @@ internal static partial class LearningMarkupPatcher
       margin-top: var(--kt-space-2);
       padding: var(--kt-space-1) var(--kt-space-3);
       font-size: 17px;
-    }
-
-    .kt-feedback-auto-advance {
-      margin-top: var(--kt-space-1);
-      font-size: 15px;
     }
 
     .kt-feedback-rewards {
