@@ -10,6 +10,11 @@ namespace KidsTraining.RuntimeExport;
 /// </summary>
 internal static class MobileDrillOnlyPatch
 {
+    // One look for every in-page sound toggle, so the button stays the same pill in the same
+    // corner from the start screen into a drill.
+    private const string MuteToggle =
+        "<span role=\"button\" tabindex=\"0\" onclick=\"{{ toggleMute }}\" class=\"kt-mobile-mute\" title=\"おと の オン/オフ\" aria-label=\"音声のオン・オフ\">{{ muteIcon }}</span>";
+
     public static string Apply(string markup)
     {
         // Start-screen mascot, greeting, mission/weakness cards, the session start button,
@@ -38,16 +43,27 @@ internal static class MobileDrillOnlyPatch
             "<span role=\"button\" tabindex=\"0\" onclick=\"{{ goEmergency }}\"");
 
         // The global mute button is fixed to the bottom-right corner. Once the eight drill
-        // cards fill a phone screen it covers the last card's "はじめる ▶", so on the start
-        // screen the toggle moves into the top bar next to 保護者 and the corner copy is
-        // hidden there (see BuildMobileStyle). Other screens keep the corner button.
+        // cards fill a phone screen it covers the last card's "はじめる ▶", and on the drill
+        // screen it sits on the question card's corner. So the start screen, the answer-mode
+        // screen and the drill screen carry their own toggle at the top right, and the corner
+        // copy is hidden wherever one is on screen (see BuildMobileStyle, #101 and #109).
+        // The parent screens keep the corner button.
         markup = ReplaceRequired(markup,
             "<div role=\"button\" tabindex=\"0\" onclick=\"{{ toggleMute }}\"",
             "<div role=\"button\" tabindex=\"0\" onclick=\"{{ toggleMute }}\" class=\"kt-mute-fab\"");
         markup = ReplaceRequired(markup,
             "<span role=\"button\" tabindex=\"0\" onclick=\"{{ goParent }}\"",
-            "<span role=\"button\" tabindex=\"0\" onclick=\"{{ toggleMute }}\" class=\"kt-mobile-mute\" title=\"おと の オン/オフ\" aria-label=\"音声のオン・オフ\" style=\"background:#fff; border:3px solid #f0e2c8; border-radius:24px; padding:7px 14px; font-size:18px; cursor:pointer;\">{{ muteIcon }}</span>\n"
-            + "          <span role=\"button\" tabindex=\"0\" onclick=\"{{ goParent }}\"");
+            MuteToggle + "\n          <span role=\"button\" tabindex=\"0\" onclick=\"{{ goParent }}\"");
+        markup = ReplaceRequired(markup,
+            "<button type=\"button\" class=\"kt-drill-mode-back\" aria-label=\"とっくんの いちらんに もどる\" onclick=\"{{ drillModeView.onBack }}\">← もどる</button>",
+            "<div class=\"kt-mobile-mode-head\">\n"
+            + "        <button type=\"button\" class=\"kt-drill-mode-back\" aria-label=\"とっくんの いちらんに もどる\" onclick=\"{{ drillModeView.onBack }}\">← もどる</button>\n"
+            + "        " + MuteToggle + "\n"
+            + "      </div>");
+        markup = ReplaceRequired(markup,
+            "<div class=\"kt-drill-count\">{{ drillView.countText }}</div>",
+            "<div class=\"kt-drill-count\">{{ drillView.countText }}</div>\n"
+            + "        " + MuteToggle);
 
         // The parent dashboard's "pause to desktop" action only talks to the WebView2
         // host (kidsTraining.pause), which does not exist on Android.
@@ -166,11 +182,16 @@ internal static class MobileDrillOnlyPatch
   .kt-mobile-hide{display:none!important;}
   .kt-mobile-panel{width:100%;margin:0 auto;}
   .kt-mobile-panel .kt-hero-row{margin-top:0;}
-  body:has([data-screen-label="開始"]) .kt-mute-fab{display:none!important;}
+  .kt-mobile-mute{flex:none;background:#fff;border:3px solid #f0e2c8;border-radius:24px;padding:7px 14px;font-size:18px;cursor:pointer;user-select:none;}
+  .kt-mobile-mode-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .kt-mobile-mode-head .kt-drill-mode-back{align-self:center;}
+  body:has(.kt-mobile-mute) .kt-mute-fab{display:none!important;}
   @media (max-width:700px){
     [data-screen-label="開始"]{padding:16px 16px 22px!important;}
     .kt-drill-screen{padding:14px 14px 20px;}
     .kt-drill-head{flex-wrap:wrap;gap:8px;}
+    .kt-drill-head .kt-drill-quit{margin-right:auto;}
+    .kt-drill-head .kt-drill-titles{order:1;flex-basis:100%;}
     .kt-drill-mode-screen{padding:16px 16px 22px;}
     .kt-drill-prompt{font-size:48px;}
     .kt-drill-hissan{font-size:48px;}
