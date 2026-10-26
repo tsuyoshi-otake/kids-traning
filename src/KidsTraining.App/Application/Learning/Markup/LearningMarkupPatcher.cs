@@ -237,6 +237,7 @@ internal static partial class LearningMarkupPatcher
         markup = PatchParentPinGate(markup);
         markup = PatchCelebrationEffects(markup);
         markup = PatchLearningLabelWording(markup);
+        markup = PatchSoundTogglePlacement(markup);
 
         return markup;
     }

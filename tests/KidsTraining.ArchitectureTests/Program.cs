@@ -34,6 +34,7 @@ internal static class Program
         Run("Review schedule uses bounded spaced intervals", TestReviewSchedule);
         Run("Learning markup contains evidence-based progression", () => TestEducationalProgressionMarkup(repositoryRoot));
         Run("Arithmetic drill mode is selectable from the start screen", () => TestDrillModeMarkup(repositoryRoot));
+        Run("Sound toggle sits at the top right of every child screen", () => TestSoundToggleMarkup(repositoryRoot));
         Run("Learning hot paths retain bounded-work performance contracts", () => TestPerformanceContracts(repositoryRoot));
         Run("Generated learning algorithms keep bounded operation counts", () => TestAlgorithmPerformanceAudit(repositoryRoot));
         Run("Generated questions satisfy curriculum invariants", () => TestGeneratedQuestionAudit(repositoryRoot));
@@ -59,7 +60,7 @@ internal static class Program
 
         if (Failures.Count == 0)
         {
-            Console.WriteLine("Architecture tests passed: 29");
+            Console.WriteLine("Architecture tests passed: 30");
             return 0;
         }
 
@@ -534,6 +535,61 @@ internal static class Program
                 !drillScript.Contains(forbidden, StringComparison.Ordinal),
                 $"the drill touches curriculum evidence through {forbidden}");
         }
+    }
+
+    private static void TestSoundToggleMarkup(string repositoryRoot)
+    {
+        var (template, appDefinition) = ReadLearningSource(repositoryRoot);
+        var html = new LearningPageBuilder().Build(template, appDefinition, "Sound Test", ParentPin.Default);
+        const string headerToggle = "onclick=\"{{ toggleMute }}\" class=\"kt-sound-toggle\" title=";
+        const string cornerToggle = "onclick=\"{{ toggleMute }}\" class=\"kt-sound-toggle kt-sound-toggle-corner\" title=";
+
+        // The bottom-right button sat on the start button and on question and drill cards, so each
+        // child screen carries one toggle at the top right and the corner copy hides while it shows
+        // (Issue #111). The profile and parent screens keep the corner button.
+        string Screen(string label)
+        {
+            var at = html.IndexOf($"data-screen-label=\"{label}\"", StringComparison.Ordinal);
+            Assert(at >= 0, $"the {label} screen is missing");
+            var next = html.IndexOf("data-screen-label=\"", at + 1, StringComparison.Ordinal);
+            return html[at..(next < 0 ? html.Length : next)];
+        }
+
+        int Count(string text, string value) => text.Split(value).Length - 1;
+
+        foreach (var label in new[] { "開始", "初回チェック", "出題", "こたえかた", "とっくん" })
+        {
+            Assert(Count(Screen(label), headerToggle) == 1, $"the {label} screen does not carry exactly one sound toggle in its header");
+        }
+
+        Assert(Count(html, cornerToggle) == 3, "the headerless child screens do not carry exactly three corner sound toggles");
+        foreach (var opening in new[]
+        {
+            "<div class=\"kt-feedback-screen\" data-screen-label=\"フィードバック\"",
+            "<div data-screen-label=\"合格・解除\"",
+            "<div data-screen-label=\"もういちど\"",
+        })
+        {
+            Assert(
+                html.Contains(cornerToggle + "\"おと の オン/オフ\" aria-label=\"音声のオン・オフ\">{{ muteIcon }}</span>\n    " + opening, StringComparison.Ordinal),
+                $"a headerless child screen does not open with the corner sound toggle: {opening}");
+        }
+
+        foreach (var label in new[] { "プロフィール選択", "プロフィール作成", "保護者ダッシュボード", "緊急解除" })
+        {
+            Assert(!Screen(label).Contains("kt-sound-toggle", StringComparison.Ordinal), $"the {label} screen carries an in-page sound toggle");
+        }
+
+        Assert(
+            Screen("開始").Contains("🔑 解除</span>\n          <span role=\"button\" tabindex=\"0\" " + headerToggle, StringComparison.Ordinal) &&
+            Screen("こたえかた").Contains("<div class=\"kt-drill-mode-head\">", StringComparison.Ordinal) &&
+            Screen("とっくん").Contains("<div class=\"kt-drill-count\">{{ drillView.countText }}</div>\n        <span role=\"button\" tabindex=\"0\" " + headerToggle, StringComparison.Ordinal),
+            "the start, answer-mode or drill toggle left its top-right spot");
+        Assert(
+            Count(html, "onclick=\"{{ toggleMute }}\" class=\"kt-mute-fab\"") == 1 &&
+            html.Contains("body:has(.kt-sound-toggle) .kt-mute-fab{display:none!important;}", StringComparison.Ordinal) &&
+            html.Contains(".kt-sound-toggle-corner{position:fixed;top:24px;right:44px;z-index:50;}", StringComparison.Ordinal),
+            "the corner sound button is not hidden while an in-page toggle is on screen");
     }
 
     private static void TestEducationalProgressionMarkup(string repositoryRoot)
