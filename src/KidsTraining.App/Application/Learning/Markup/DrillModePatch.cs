@@ -701,7 +701,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       for(let i=0;i<hissanColumns;i++){const place=hissanColumns-1-i;hissanCells.push({text:place<typed.length?typed[place]:'',style:dEcho?'background:#e8f7ec; box-shadow:inset 0 0 0 3px #3aa655; color:#22683c;':place===typed.length?'box-shadow:inset 0 0 0 5px #ff8a3d; background:#fff0de;':(d.mark?'box-shadow:inset 0 0 0 3px #e08a7a; color:#b23b23;':'')});}
       const copyAsk=dPick?'おなじ こたえを えらんで すすもう':hissanColumns?'おなじ こたえを みぎの くらいから いれよう':'おなじ こたえを いれて すすもう';
       drillView={
-        badge:course.badge||'', title:course.title||'', stageText:'ステージ '+stageNo, section:dq?dq.sec:'',
+        badge:course.badge||'', title:course.title||'', stageText:'ステージ '+stageNo, section:dq?dq.sec:'', sectionStyle:dq&&dq.sec?'':'display:none;',
         countText:d.done?(d.allRetired?'':activeTotal+' / '+activeTotal):inMain?(seen+' / '+activeTotal):('なおし '+(d.idx-end+1)+' / '+dAgain.length),
         headStyle:'background:'+(course.color||'#ff8a3d')+';',
         barStyle:'width:'+Math.round((activeTotal?this.clamp(seen/activeTotal,0,1):1)*100)+'%; background:'+(course.color||'#ff8a3d')+';',
@@ -717,7 +717,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         showEcho:!!dEcho, echoMain:dEcho?dEcho.main:'', echoSub:dEcho?dEcho.sub:'', echoHasSub:!!(dEcho&&dEcho.sub),
         showAnswer:!!d.revealed&&!dEcho, answerMain:dPair.main, answerSub:dPair.sub, answerHasSub:!!dPair.sub,
         showCopy:!!d.revealed&&!dEcho, copyText:d.copyMiss>0?'もういちど。うえの こたえを よく みてね':copyAsk,
-        showStreak:d.streak>=3, streakText:'れんぞく '+d.streak+'もん！',
+        streakHidden:d.streak>=3?'false':'true', streakText:'れんぞく '+d.streak+'もん！',
         playing:!d.done, finished:!!d.done,
         finishMark:d.allRetired?'🎓':'🏅', finishTitle:d.allRetired?'ぜんぶ おぼえたよ！':'ステージ '+stageNo+' クリア！',
         clearBody:d.allRetired?'どの もんだいも 6つから 3かい つづけて せいかい できたよ':(d.perfect+' / '+activeTotal+'もんを 1かいめで せいかい'),
@@ -835,11 +835,9 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
           <span class="kt-drill-badge" style="{{ drillView.headStyle }}">{{ drillView.badge }}</span>
           <span class="kt-drill-title">{{ drillView.title }}</span>
           <span class="kt-drill-stage-chip">{{ drillView.stageText }}</span>
-          <span class="kt-drill-section">{{ drillView.section }}</span>
+          <span class="kt-drill-section" style="{{ drillView.sectionStyle }}">{{ drillView.section }}</span>
         </div>
-        <sc-if value="{{ drillView.showStreak }}" hint-placeholder-val="{{ false }}">
-          <div class="kt-drill-streak">🔥 {{ drillView.streakText }}</div>
-        </sc-if>
+        <div class="kt-drill-streak" aria-hidden="{{ drillView.streakHidden }}">🔥 {{ drillView.streakText }}</div>
         <div class="kt-drill-count">{{ drillView.countText }}</div>
       </div>
       <div class="kt-drill-bar kt-drill-bar-wide"><span style="{{ drillView.barStyle }}"></span></div>
@@ -1023,6 +1021,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-pair-sub{font-size:32px;font-weight:900;line-height:1.2;}
   .kt-drill-side{width:300px;flex:none;display:flex;flex-direction:column;gap:10px;}
   .kt-drill-streak{flex:none;background:#fff6db;border:3px solid #ffd24a;border-radius:18px;padding:4px 12px;text-align:center;font-size:16px;font-weight:900;color:#7a5d00;white-space:nowrap;}
+  .kt-drill-streak[aria-hidden="true"]{display:none;}
   .kt-drill-ask{font-size:20px;font-weight:700;color:#6b5e45;}
   .kt-drill-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-content:start;}
   /* The choices sit directly under the question in a grid: up to four fill two columns, and five

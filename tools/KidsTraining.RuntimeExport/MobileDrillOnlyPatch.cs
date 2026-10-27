@@ -38,8 +38,12 @@ internal static class MobileDrillOnlyPatch
             "<span role=\"button\" tabindex=\"0\" onclick=\"{{ goEmergency }}\"");
 
         // The sound toggle already sits at the top right of the start, answer-mode and drill
-        // screens (the shared SoundTogglePlacementPatch, #109 and #111); BuildMobileStyle only
-        // moves the drill title below it on a narrow phone.
+        // screens (the shared SoundTogglePlacementPatch, #109 and #111). On a narrow phone
+        // BuildMobileStyle keeps only ✕ やめる, the count and the toggle in the drill header's
+        // first row and moves the title chips and the streak chip below it, so a long streak
+        // never pushes the toggle off the top right (#119). There the streak chip takes the
+        // section pill's height, keeps its place while hidden, and is wide enough for a
+        // two-digit streak, so the question does not move when a streak starts or grows.
 
         // The parent dashboard's "pause to desktop" action only talks to the WebView2
         // host (kidsTraining.pause), which does not exist on Android.
@@ -161,9 +165,14 @@ internal static class MobileDrillOnlyPatch
   @media (max-width:700px){
     [data-screen-label="開始"]{padding:16px 16px 22px!important;}
     .kt-drill-screen{padding:14px 14px 20px;}
-    .kt-drill-head{flex-wrap:wrap;gap:8px;}
+    .kt-drill-head{flex-wrap:wrap;column-gap:8px;row-gap:0;}
     .kt-drill-head .kt-drill-quit{margin-right:auto;}
-    .kt-drill-head .kt-drill-titles{order:1;flex-basis:100%;}
+    .kt-drill-head::before{content:'';order:1;flex-basis:100%;height:0;}
+    .kt-drill-head .kt-drill-titles{display:contents;}
+    .kt-drill-head .kt-drill-titles>*,
+    .kt-drill-head .kt-drill-streak{order:2;margin-top:8px;}
+    .kt-drill-head .kt-drill-streak{padding:3px 12px;font-size:15px;min-width:12.2em;}
+    .kt-drill-head .kt-drill-streak[aria-hidden="true"]{display:block;visibility:hidden;}
     .kt-drill-mode-screen{padding:16px 16px 22px;}
     .kt-drill-prompt{font-size:48px;}
     .kt-drill-hissan{font-size:48px;}
