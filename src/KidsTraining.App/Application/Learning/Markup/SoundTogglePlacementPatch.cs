@@ -40,13 +40,20 @@ internal static partial class LearningMarkupPatcher
             "🔥 {{ comboCount }}れんぞく</span>\n        </sc-if>\n        " + SoundToggle + "\n      </div>\n      <!-- question metadata -->",
             StringComparison.Ordinal);
 
-        markup = ReplaceRequired(markup,
-            "<button type=\"button\" class=\"kt-drill-mode-back\" aria-label=\"とっくんの いちらんに もどる\" onclick=\"{{ drillModeView.onBack }}\">← もどる</button>",
-            "<div class=\"kt-drill-mode-head\">\n"
-            + "        <button type=\"button\" class=\"kt-drill-mode-back\" aria-label=\"とっくんの いちらんに もどる\" onclick=\"{{ drillModeView.onBack }}\">← もどる</button>\n"
-            + "        " + SoundToggle + "\n"
-            + "      </div>",
-            StringComparison.Ordinal);
+        // The stage and answer-mode screens share one header: the back button and the toggle.
+        foreach (var backButton in new[]
+        {
+            "<button type=\"button\" class=\"kt-drill-mode-back\" aria-label=\"とっくんの いちらんに もどる\" onclick=\"{{ drillStageView.onBack }}\">← もどる</button>",
+            "<button type=\"button\" class=\"kt-drill-mode-back\" aria-label=\"ステージの いちらんに もどる\" onclick=\"{{ drillModeView.onBack }}\">← もどる</button>",
+        })
+        {
+            markup = ReplaceRequired(markup, backButton,
+                "<div class=\"kt-drill-mode-head\">\n"
+                + "        " + backButton + "\n"
+                + "        " + SoundToggle + "\n"
+                + "      </div>",
+                StringComparison.Ordinal);
+        }
 
         // The drill header sits outside the playing and finished blocks, so the finish screen keeps it.
         markup = ReplaceRequired(markup,

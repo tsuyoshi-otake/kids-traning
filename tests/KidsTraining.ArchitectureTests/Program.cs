@@ -437,6 +437,18 @@ internal static class Program
             html.Contains("firstAria:kanjiMode?'1ばん、読みを選ぶ':'1ばん、数字を入力'", StringComparison.Ordinal) &&
             html.Contains("secondAria:kanjiMode?'2ばん、漢字を選ぶ':'2ばん、こたえをえらぶ'", StringComparison.Ordinal),
             "the arithmetic and kanji drills do not offer keyboard-reachable answer-mode choices before starting");
+        // A course is asked one 25-question stage at a time, chosen before the answer mode, and a
+        // stage opens once the stage before it has finished a run (issue #117).
+        Assert(
+            html.Contains("<sc-if value=\"{{ isDrillStage }}\" hint-placeholder-val=\"{{ false }}\">", StringComparison.Ordinal) &&
+            html.Contains("isDrillStage:sc==='drill-stage'", StringComparison.Ordinal) &&
+            html.Contains("this.setState({screen:'drill-stage',drillCourseChoice:id,drillStageChoice:0});", StringComparison.Ordinal) &&
+            html.Contains("this.setState({screen:'drill-mode',drillStageChoice:s});", StringComparison.Ordinal) &&
+            html.Contains("drillStageSize(){return 25;}", StringComparison.Ordinal) &&
+            html.Contains("drillStageOpen(record,stage){return stage===0||!!(record&&record.stages&&record.stages[stage-1]&&record.stages[stage-1].runs>0);}", StringComparison.Ordinal) &&
+            html.Contains("<button type=\"button\" class=\"kt-drill-stage-option\" style=\"{{ t.style }}\" aria-disabled=\"{{ t.ariaDisabled }}\" aria-label=\"{{ t.ariaLabel }}\" onclick=\"{{ t.onClick }}\">", StringComparison.Ordinal) &&
+            html.Contains("this.startDrill(id,false,mode,this.state.drillStageChoice);", StringComparison.Ordinal),
+            "the drill courses are not split into keyboard-reachable stages chosen before the answer mode");
         Assert(
             html.Contains("title:'たしざん・ひきざん'", StringComparison.Ordinal) &&
             html.Contains("title:'かけざん（九九）'", StringComparison.Ordinal) &&
@@ -491,9 +503,9 @@ internal static class Program
         // At six options the dial counts first-attempt answers instead, and three in a row retire
         // the question from later runs; the run itself skips retired positions (issue #104).
         Assert(
-            html.Contains("drillRetiredIndexes(opts,runs)", StringComparison.Ordinal) &&
-            html.Contains("skip=this.drillRetiredIndexes(saved.opts,saved.runs)", StringComparison.Ordinal) &&
-            html.Contains("next.idx=this.drillActiveFrom(d.skip,d.idx+1,total)", StringComparison.Ordinal),
+            html.Contains("drillRetiredIndexes(opts,runs,from,to)", StringComparison.Ordinal) &&
+            html.Contains("skip=this.drillRetiredIndexes(record.opts,saved.runs,from,to)", StringComparison.Ordinal) &&
+            html.Contains("next.idx=this.drillActiveFrom(d.skip,d.idx+1,end)", StringComparison.Ordinal),
             "the arithmetic drill does not retire questions answered three times in a row at six options");
         Assert(
             html.Contains("drillKanjiWritingChoices(d,q)", StringComparison.Ordinal) &&
@@ -540,7 +552,7 @@ internal static class Program
 
         int Count(string text, string value) => text.Split(value).Length - 1;
 
-        foreach (var label in new[] { "開始", "初回チェック", "出題", "こたえかた", "とっくん" })
+        foreach (var label in new[] { "開始", "初回チェック", "出題", "ステージ", "こたえかた", "とっくん" })
         {
             Assert(Count(Screen(label), headerToggle) == 1, $"the {label} screen does not carry exactly one sound toggle in its header");
         }
@@ -565,9 +577,10 @@ internal static class Program
 
         Assert(
             Screen("開始").Contains("🔑 解除</span>\n          <span role=\"button\" tabindex=\"0\" " + headerToggle, StringComparison.Ordinal) &&
+            Screen("ステージ").Contains("<div class=\"kt-drill-mode-head\">", StringComparison.Ordinal) &&
             Screen("こたえかた").Contains("<div class=\"kt-drill-mode-head\">", StringComparison.Ordinal) &&
             Screen("とっくん").Contains("<div class=\"kt-drill-count\">{{ drillView.countText }}</div>\n        <span role=\"button\" tabindex=\"0\" " + headerToggle, StringComparison.Ordinal),
-            "the start, answer-mode or drill toggle left its top-right spot");
+            "the start, stage, answer-mode or drill toggle left its top-right spot");
         Assert(
             Count(html, "onclick=\"{{ toggleMute }}\" class=\"kt-mute-fab\"") == 1 &&
             html.Contains("body:has(.kt-sound-toggle) .kt-mute-fab{display:none!important;}", StringComparison.Ordinal) &&
