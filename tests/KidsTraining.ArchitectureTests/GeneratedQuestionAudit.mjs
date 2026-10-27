@@ -13,7 +13,6 @@
 // combinations, and a different seed to confirm a clean sweep was not luck.
 
 import { readFileSync } from 'node:fs';
-import { auditThinkingQuestions } from './ThinkingQuestionAudit.mjs';
 import { auditQuestionQuality } from './QuestionQualityAudit.mjs';
 import { createFuriganaCorpusAudit } from './FuriganaCorpusAudit.mjs';
 
@@ -704,7 +703,7 @@ const TOPICS = [
   'add', 'sub', 'hissan', 'mul', 'clock', 'kokugo', 'moji', 'measure', 'kazu', 'shape',
   'div', 'frac', 'chart', 'story', 'bun', 'goi', 'dokkai', 'eigo', 'money', 'groups',
   'order', 'soroban', 'shakai', 'rika', 'gijutsu', 'sougou',
-  'keyboard', 'thinking',
+  'keyboard',
 ];
 const STAGES = [1, 2, 3, 4, 5];
 const SAMPLES_PER_COMBINATION = Math.max(1, Number(process.argv[3]) || 300);
@@ -808,7 +807,6 @@ let generated = 0;
 const UNITS = app.curriculumCatalog();
 auditQuestionQuality(app, UNITS, profileFor, observe, violated);
 const furiganaCorpus = createFuriganaCorpusAudit(app, UNITS);
-auditThinkingQuestions(app, observe, violated);
 observe('common IME romaji spellings are equivalent', 10);
 for (const [standard, ime] of [['shi', 'si'], ['chi', 'ti'], ['tsu', 'tu'], ['fu', 'hu'], ['sha', 'sya'], ['cha', 'tya'], ['ja', 'zya']]) {
   if (!app.romajiInputEquivalent(standard, ime)) {
@@ -1619,6 +1617,11 @@ if (sparseBank && fullBank) {
   // The confirmations can only arrive as due review questions, so the session planner has
   // to keep offering the retained unit at its terminal stage.
   const REVIEW_REACH_CHECK = 'a unit in retention is still offered as a due review at its terminal stage';
+  // The full bank is a grade-4+ unit since #114 retired the grade-1 reasoning bank. A fresh
+  // profile starts at grade 1 unless the school grade is preferred, so these checks ask as a
+  // learner working at the unit's own grade, the only way the unit could have reached retention.
+  const settingsBeforeRetention = app.state.settings;
+  app.state.settings = { ...app.defaultSettings(), preferSchoolGrade: true };
   const fullRetentionStat = fullProgressProfile.unitStats[fullBank.id];
   fullRetentionStat.nextReviewAt = Date.now() - 1;
   const retentionSession = {
@@ -1673,6 +1676,7 @@ if (sparseBank && fullBank) {
   if (repeatOffer === fullBank.id) {
     violated(SPACING_CHECK, 'the same session offered ' + fullBank.id + ' a second confirmation', fullBank.id);
   }
+  app.state.settings = settingsBeforeRetention;
 }
 app.state.session = null;
 
@@ -1890,22 +1894,25 @@ if (!prerequisitePair) {
   }
 }
 
-const thinkingGradeOne = UNITS.find((unit) => unit.topicId === 'thinking' && unit.grade === 1);
-observe('reasoning questions rotate across sessions and stay balanced at the 30-question limit', thinkingGradeOne ? 36 : 0);
-if (!thinkingGradeOne) {
+// A curriculum-bank unit has a small authored pool, so a session can exhaust it. This one
+// has three stage-1 questions, which makes both the cross-session recycling and the
+// balanced fallback at the 30-question limit visible (#114 retired the larger 思考トレーニング bank).
+const bankUnit = UNITS.find((unit) => unit.id === 'math.g4.number-calculation' && unit.generatorKey === 'curriculum-bank');
+observe('bank questions rotate across sessions and stay balanced at the 30-question limit', bankUnit ? 34 : 0);
+if (!bankUnit) {
   violated(
-    'reasoning questions rotate across sessions and stay balanced at the 30-question limit',
-    'the grade-one reasoning unit is missing',
-    'thinking grade 1',
+    'bank questions rotate across sessions and stay balanced at the 30-question limit',
+    'the grade-4 number-calculation bank unit is missing',
+    'math.g4.number-calculation',
   );
 } else {
-  const reasoningSession = () => ({
+  const bankSession = () => ({
     questions: [],
     rolePlan: [],
     idx: 0,
     correct: 0,
-    activeTargetTopic: thinkingGradeOne.id,
-    targetTopics: [thinkingGradeOne.id],
+    activeTargetTopic: bankUnit.id,
+    targetTopics: [bankUnit.id],
     targetAsked: 0,
     targetIndependent: 0,
     reviewTopics: [],
@@ -1917,28 +1924,28 @@ if (!thinkingGradeOne) {
     startXp: 0,
   });
 
-  const crossSessionProfile = beginnerAtGrade(1);
+  const crossSessionProfile = beginnerAtGrade(bankUnit.grade);
   const crossSessionPrompts = [];
-  const reasoningPoolSize = app.curriculumBankPool(thinkingGradeOne, 1).length;
-  for (let index = 0; index < reasoningPoolSize; index += 1) {
-    crossSessionPrompts.push(app.generateSessionQuestion(crossSessionProfile, reasoningSession(), 'target').prompt);
+  const bankPoolSize = app.curriculumBankPool(bankUnit, 1).length;
+  for (let index = 0; index < bankPoolSize; index += 1) {
+    crossSessionPrompts.push(app.generateSessionQuestion(crossSessionProfile, bankSession(), 'target').prompt);
   }
-  const recycledPrompt = app.generateSessionQuestion(crossSessionProfile, reasoningSession(), 'target').prompt;
-  const recentFingerprints = crossSessionProfile.unitStats[thinkingGradeOne.id].recentQuestionFingerprints;
+  const recycledPrompt = app.generateSessionQuestion(crossSessionProfile, bankSession(), 'target').prompt;
+  const recentFingerprints = crossSessionProfile.unitStats[bankUnit.id].recentQuestionFingerprints;
   if (
-    new Set(crossSessionPrompts).size !== reasoningPoolSize ||
+    new Set(crossSessionPrompts).size !== bankPoolSize ||
     recycledPrompt !== crossSessionPrompts[0] ||
-    recentFingerprints.length !== reasoningPoolSize
+    recentFingerprints.length !== bankPoolSize
   ) {
     violated(
-      'reasoning questions rotate across sessions and stay balanced at the 30-question limit',
+      'bank questions rotate across sessions and stay balanced at the 30-question limit',
       'cross-session selection repeated early or did not recycle the oldest exhausted candidate',
       JSON.stringify({ crossSessionPrompts, recycledPrompt, recentFingerprints }),
     );
   }
 
-  const maxSessionProfile = beginnerAtGrade(1);
-  const maxSession = reasoningSession();
+  const maxSessionProfile = beginnerAtGrade(bankUnit.grade);
+  const maxSession = bankSession();
   const maxSessionPrompts = [];
   for (let index = 0; index < 30; index += 1) {
     maxSessionPrompts.push(app.generateSessionQuestion(maxSessionProfile, maxSession, 'target').prompt);
@@ -1948,12 +1955,12 @@ if (!thinkingGradeOne) {
   const adjacentDuplicate = maxSessionPrompts.some((prompt, index) => index > 0 && prompt === maxSessionPrompts[index - 1]);
   const counts = [...promptCounts.values()];
   if (
-    promptCounts.size !== reasoningPoolSize ||
+    promptCounts.size !== bankPoolSize ||
     adjacentDuplicate ||
     Math.max(...counts) - Math.min(...counts) > 1
   ) {
     violated(
-      'reasoning questions rotate across sessions and stay balanced at the 30-question limit',
+      'bank questions rotate across sessions and stay balanced at the 30-question limit',
       'the bounded fallback repeated immediately or distributed an exhausted bank unevenly',
       JSON.stringify({ maxSessionPrompts, counts }),
     );

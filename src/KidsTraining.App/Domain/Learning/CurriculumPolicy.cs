@@ -52,7 +52,7 @@ internal static partial class CurriculumPolicy
     [
         "add", "sub", "mul", "clock", "kokugo", "hissan", "moji", "measure", "kazu", "shape", "div",
         "frac", "chart", "story", "bun", "goi", "dokkai", "eigo", "money", "groups", "order", "keyboard",
-        "soroban", "shakai", "rika", "gijutsu", "sougou", "thinking"
+        "soroban", "shakai", "rika", "gijutsu", "sougou"
     ];
 
     private static readonly IReadOnlyList<CurriculumUnit> Units = BuildUnits();
@@ -166,8 +166,6 @@ internal static partial class CurriculumPolicy
         AddLegacyLane("english", 3, EnglishSource, "eigo");
         AddLegacyLane("integrated", 3, GeneralSource, "sougou");
         AddLegacyLane("keyboard", 3, GeneralSource, "keyboard");
-
-        AddThinkingUnits(AddBank);
 
         AddUpperGradeUnits(AddBank, Add);
         AddMiddleCore(AddBank);
@@ -413,7 +411,6 @@ internal static partial class CurriculumPolicy
         "rika" => "理科",
         "gijutsu" => "技術",
         "sougou" => "総合",
-        "thinking" => "思考トレーニング",
         _ => topic
     };
 

@@ -231,23 +231,6 @@ internal static class Program
         var units = CurriculumPolicy.AllUnits;
         Assert(units.Count > 0, "the curriculum catalog is empty");
         Assert(units.Select(static unit => unit.Id).Distinct(StringComparer.Ordinal).Count() == units.Count, "curriculum unit IDs are not unique");
-        var thinkingUnits = units
-            .Where(static unit => unit.TopicId == "thinking")
-            .OrderBy(static unit => unit.Grade)
-            .ToArray();
-        Assert(
-            thinkingUnits.Length == 6 &&
-            thinkingUnits.Select(static unit => unit.Grade).SequenceEqual([1, 2, 3, 4, 5, 6]) &&
-            thinkingUnits.All(static unit => unit.SubjectId == "thinking" && unit.GeneratorKey == "curriculum-bank" && unit.Questions.Count > 0),
-            "the grade 1-6 reasoning practice category is incomplete");
-        Assert(
-            thinkingUnits.All(static unit => Enumerable.Range(1, 5).All(stage =>
-            {
-                var stageQuestions = unit.Questions.Where(question => question.Stage == stage).ToArray();
-                return stageQuestions.Length >= 24 &&
-                       stageQuestions.Select(static question => question.Prompt).Distinct(StringComparer.Ordinal).Count() == stageQuestions.Length;
-            })),
-            "the reasoning practice category does not provide 24 distinct prompts at every difficulty stage");
         Assert(
             Enumerable.Range(1, 9).All(grade => units.Any(unit => unit.Grade == grade)),
             "one or more grades from elementary 1 through junior-high 3 have no curriculum units");
@@ -305,7 +288,7 @@ internal static class Program
             !CurriculumPolicy.AllTopics.Contains("taiiku", StringComparer.Ordinal) &&
             !CurriculumPolicy.AllTopics.Contains("zukou", StringComparer.Ordinal),
             "an explicitly excluded subject entered the curriculum");
-        var removedTopics = new[] { "kateika", "doutoku", "tokubetsu", "seikatsu", "jouhou" };
+        var removedTopics = new[] { "kateika", "doutoku", "tokubetsu", "seikatsu", "jouhou", "thinking" };
         Assert(removedTopics.All(topic => !CurriculumPolicy.AllTopics.Contains(topic) &&
             Enumerable.Range(1, 9).All(grade => !CurriculumPolicy.IsAvailable(grade, topic))) &&
             units.All(unit => !removedTopics.Contains(unit.TopicId)), "retired topics remain selectable or gate progression");
