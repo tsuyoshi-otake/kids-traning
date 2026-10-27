@@ -449,6 +449,12 @@ internal static class Program
             html.Contains("<button type=\"button\" class=\"kt-drill-stage-option\" style=\"{{ t.style }}\" aria-disabled=\"{{ t.ariaDisabled }}\" aria-label=\"{{ t.ariaLabel }}\" onclick=\"{{ t.onClick }}\">", StringComparison.Ordinal) &&
             html.Contains("this.startDrill(id,false,mode,this.state.drillStageChoice);", StringComparison.Ordinal),
             "the drill courses are not split into keyboard-reachable stages chosen before the answer mode");
+        // The sc renderer keeps a node for an empty binding, so the section pill is hidden by style
+        // when no question names a section (the finish screen showed an empty pill, issue #119).
+        Assert(
+            html.Contains("<span class=\"kt-drill-section\" style=\"{{ drillView.sectionStyle }}\">{{ drillView.section }}</span>", StringComparison.Ordinal) &&
+            html.Contains("sectionStyle:dq&&dq.sec?'':'display:none;'", StringComparison.Ordinal),
+            "the drill header can show an empty section pill");
         Assert(
             html.Contains("title:'たしざん・ひきざん'", StringComparison.Ordinal) &&
             html.Contains("title:'かけざん（九九）'", StringComparison.Ordinal) &&
@@ -586,6 +592,26 @@ internal static class Program
             html.Contains("body:has(.kt-sound-toggle) .kt-mute-fab{display:none!important;}", StringComparison.Ordinal) &&
             html.Contains(".kt-sound-toggle-corner{position:fixed;top:24px;right:44px;z-index:50;}", StringComparison.Ordinal),
             "the corner sound button is not hidden while an in-page toggle is on screen");
+
+        // On a phone the drill-only page keeps ✕ やめる, the count and the toggle in the drill
+        // header's first row; the title chips and the streak chip wrap below a zero-height break,
+        // so a long streak never pushes the toggle off the top right. The streak chip is always
+        // in the header and only hidden below three in a row: wide screens drop it from the
+        // layout as before, a phone keeps its place so the question does not move (Issue #119).
+        var phone = KidsTraining.RuntimeExport.MobileDrillOnlyPatch.Apply(html);
+        var phoneStyle = phone[phone.IndexOf("<style id=\"kt-mobile-drill-only\">", StringComparison.Ordinal)..];
+        var narrow = phoneStyle[phoneStyle.IndexOf("@media (max-width:700px){", StringComparison.Ordinal)..phoneStyle.IndexOf("</style>", StringComparison.Ordinal)];
+        Assert(
+            Screen("とっくん").Contains("</div>\n        <div class=\"kt-drill-streak\" aria-hidden=\"{{ drillView.streakHidden }}\">🔥 {{ drillView.streakText }}</div>\n        <div class=\"kt-drill-count\">", StringComparison.Ordinal) &&
+            html.Contains("streakHidden:d.streak>=3?'false':'true',", StringComparison.Ordinal) &&
+            html.Contains(".kt-drill-streak[aria-hidden=\"true\"]{display:none;}", StringComparison.Ordinal) &&
+            narrow.Contains(".kt-drill-head{flex-wrap:wrap;column-gap:8px;row-gap:0;}", StringComparison.Ordinal) &&
+            narrow.Contains(".kt-drill-head::before{content:'';order:1;flex-basis:100%;height:0;}", StringComparison.Ordinal) &&
+            narrow.Contains(".kt-drill-head .kt-drill-titles{display:contents;}", StringComparison.Ordinal) &&
+            narrow.Contains(".kt-drill-head .kt-drill-titles>*,\n    .kt-drill-head .kt-drill-streak{order:2;margin-top:8px;}", StringComparison.Ordinal) &&
+            narrow.Contains(".kt-drill-head .kt-drill-streak{padding:3px 12px;font-size:15px;min-width:12.2em;}", StringComparison.Ordinal) &&
+            narrow.Contains(".kt-drill-head .kt-drill-streak[aria-hidden=\"true\"]{display:block;visibility:hidden;}", StringComparison.Ordinal),
+            "on a phone the drill header's first row is not kept to ✕ やめる, the count and the sound toggle");
     }
 
     private static void TestEducationalProgressionMarkup(string repositoryRoot)

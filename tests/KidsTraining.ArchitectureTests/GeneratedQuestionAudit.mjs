@@ -3432,8 +3432,14 @@ drillStorage.clear();
 // has finished a run. Dials stay per question; position, scores and runs are kept per stage.
 const DRILL_STAGE_CHECK = 'a drill course is asked one 25-question stage at a time and each stage opens the next';
 const DRILL_STAGE_RECORD_CHECK = 'drill progress saved before stages keeps its position, retirements and finished runs';
+// The sc renderer keeps a node for an empty binding, so the section pill is hidden by style when
+// no question is on screen; otherwise the finish screen showed an empty pill. The streak chip
+// stays in the header and is only marked hidden below three in a row, so a phone can keep its
+// place (issue #119).
+const DRILL_HEAD_CHECK = 'the drill header hides the section pill without a section and the streak chip below three in a row';
 observe(DRILL_STAGE_CHECK, 12);
 observe(DRILL_STAGE_RECORD_CHECK, 4);
+observe(DRILL_HEAD_CHECK, 2);
 for (const course of drillCourses) {
   const count = app.drillStageCount(course);
   const ranges = Array.from({ length: count }, (_, stage) => app.drillStageRange(course, stage));
@@ -3492,12 +3498,21 @@ for (const course of drillCourses) {
     stageApp.cancelDrillStage();
     if (stageApp.state.screen !== 'start' || stageApp.state.drillCourseChoice !== '') violated(DRILL_STAGE_CHECK, 'back from the stages did not return to the start screen', stageApp.state.screen);
 
+    stageApp.startDrill('g2', true, 'input', 0);
+    const playingHead = stageApp.renderVals().drillView;
+    if (!playingHead.section || playingHead.sectionStyle !== '' || playingHead.streakHidden !== 'true') {
+      violated(DRILL_HEAD_CHECK, `a fresh run's head read section ${JSON.stringify(playingHead.section)} with style ${JSON.stringify(playingHead.sectionStyle)}, streak hidden ${playingHead.streakHidden}`, 'expected a shown section name and a hidden streak chip');
+    }
+    stageApp.exitDrill();
     // A stage run asks exactly its 25 questions; the first finished run opens the next stage.
     const firstRun = runStage(0, true);
     if (firstRun.join(',') !== g2Bank.slice(0, 25).map((row) => row.no).join(',')) {
       violated(DRILL_STAGE_CHECK, `stage 1 asked ${firstRun.join(',')}`, 'expected questions 1-25 in order');
     }
     const firstFinish = stageApp.renderVals().drillView;
+    if (firstFinish.section || firstFinish.sectionStyle !== 'display:none;' || firstFinish.streakHidden !== 'false' || firstFinish.streakText !== 'れんぞく 25もん！') {
+      violated(DRILL_HEAD_CHECK, `the finish screen's head read section ${JSON.stringify(firstFinish.section)} with style ${JSON.stringify(firstFinish.sectionStyle)}, streak hidden ${firstFinish.streakHidden}`, 'expected the empty pill hidden and the 25 streak shown');
+    }
     if (stageRecord().stages.map((row) => row.runs).join(',') !== '1,0,0,0' || firstFinish.finishTitle !== 'ステージ 1 クリア！' ||
         !firstFinish.showUnlockNote || firstFinish.unlockNote !== 'ステージ 2が あそべるように なったよ！' || !firstFinish.showGoNextStage || firstFinish.countText !== '25 / 25') {
       violated(DRILL_STAGE_CHECK, 'finishing stage 1 did not record its run, open stage 2, and offer it', JSON.stringify({ record: stageRecord(), firstFinish }));

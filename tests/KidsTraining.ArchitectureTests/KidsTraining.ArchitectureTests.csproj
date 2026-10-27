@@ -13,6 +13,12 @@
     <ProjectReference Include="..\..\src\KidsTraining.App\KidsTraining.App.csproj" />
   </ItemGroup>
 
+  <!-- The APK's drill-only page is MobileDrillOnlyPatch applied to the same generated runtime;
+       compiling the patch here lets the tests check that page without running the export tool. -->
+  <ItemGroup>
+    <Compile Include="..\..\tools\KidsTraining.RuntimeExport\MobileDrillOnlyPatch.cs" Link="RuntimeExport\MobileDrillOnlyPatch.cs" />
+  </ItemGroup>
+
   <!-- ProjectReference evaluation re-imports WebView2's unused WPF assembly into this
        WinForms architecture harness, so mirror the application-side exclusion. -->
   <Target Name="RemoveUnusedWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences">
