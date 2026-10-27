@@ -221,7 +221,9 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("kanji-drill-choices", "class=\"kt-drill-pick-btn\""),
         ("answer-copy-gate", "next(){if(this.answerCopyPending())return;"),
         ("drill-answer-copy", "copyMiss:(d.copyMiss||0)+1"),
-        ("drill-retirement", "drillRetiredIndexes(opts,runs)"),
+        ("drill-retirement", "drillRetiredIndexes(opts,runs,from,to)"),
+        ("drill-stage-screen", "isDrillStage:sc==='drill-stage'"),
+        ("drill-stage-unlock", "drillStageOpen(record,stage)"),
         ("drill-answer-speech", "drillSpeechText(d,q)"),
         ("drill-android-speech", "KtAndroid.speak(value,String(token))"),
         ("drill-written-columns", "drillHissanColumns(d,q)")

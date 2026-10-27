@@ -2922,9 +2922,14 @@ const hissanMarkup = ['kt-drill-hissan-row', '{{ drillView.hissanLeft }}', '{{ d
 if (!hissanMarkup) violated(DRILL_HISSAN_VIEW_CHECK, 'the generated page is missing the stacked operands, rule, or answer row', runtimePagePath);
 const hissanViewApp = new app.constructor();
 hissanViewApp.props = hissanViewApp.props || {};
+// A course is asked one 25-question stage at a time (issue #117). A record saved before stages,
+// with one finished run, opens every stage, so any question can be reached through its stage.
+const openEveryDrillStage = (...ids) => drillStorage.set('kt_drill_v1', JSON.stringify(Object.fromEntries(ids.map((id) => [id, { idx: 0, runs: 1 }]))));
+const drillStageOf = (index) => Math.floor(index / app.drillStageSize());
+openEveryDrillStage('h2', 'h2n');
 for (const [courseId, index, mode] of [['h2', 0, 'input'], ['h2', 90, 'input'], ['h2', 0, 'choice'], ['h2n', 0, 'input'], ['h2n', 60, 'input']]) {
   try {
-    hissanViewApp.startDrill(courseId, true, mode);
+    hissanViewApp.startDrill(courseId, true, mode, drillStageOf(index));
     hissanViewApp.state.drill.idx = index;
     const question = app.drillBank(courseId)[index];
     const parts = /^(\d+) (＋|−) (\d+)$/.exec(question.text);
@@ -3147,8 +3152,12 @@ observe(DRILL_FLOW_CHECK, 4);
 drillStorage.clear();
 app.state.screen = 'start';
 app.selectDrillCourse('g1');
-if (app.state.screen !== 'drill-mode' || app.state.drillCourseChoice !== 'g1') {
-  violated(DRILL_FLOW_CHECK, 'selecting an arithmetic course did not ask how to answer', JSON.stringify(app.state));
+if (app.state.screen !== 'drill-stage' || app.state.drillCourseChoice !== 'g1') {
+  violated(DRILL_FLOW_CHECK, 'selecting an arithmetic course did not ask for a stage', JSON.stringify(app.state));
+}
+app.selectDrillStage(0);
+if (app.state.screen !== 'drill-mode' || app.state.drillCourseChoice !== 'g1' || app.state.drillStageChoice !== 0) {
+  violated(DRILL_FLOW_CHECK, 'choosing the first stage did not ask how to answer', JSON.stringify(app.state));
 }
 
 // A correct answer holds the completed pair on screen before the next question replaces it, so
@@ -3189,17 +3198,18 @@ for (const answerMode of ['reading', 'writing']) {
   }
 }
 
+const firstStageLength = app.drillStageSize();
 app.startDrill('g1', true);
 let drillAsked = 0;
 while (!app.state.drill.done && drillAsked <= gradeOneBank.length) {
   drillAsked += 1;
   submitDrillAnswer(app.drillQuestion().ans);
 }
-if (drillAsked !== gradeOneBank.length || app.state.drill.perfect !== gradeOneBank.length) {
-  violated(DRILL_FLOW_CHECK, `a clean run asked ${drillAsked} questions and scored ${app.state.drill.perfect} of ${gradeOneBank.length}`, 'clean run');
+if (drillAsked !== firstStageLength || app.state.drill.perfect !== firstStageLength) {
+  violated(DRILL_FLOW_CHECK, `a clean run asked ${drillAsked} questions and scored ${app.state.drill.perfect} of ${firstStageLength}`, 'clean run of the first stage');
 }
-if (JSON.parse(drillStorage.get('kt_drill_v1')).g1.runs !== 1) {
-  violated(DRILL_FLOW_CHECK, 'finishing the course did not record exactly one completed run', drillStorage.get('kt_drill_v1'));
+if (JSON.parse(drillStorage.get('kt_drill_v1')).g1.stages[0].runs !== 1) {
+  violated(DRILL_FLOW_CHECK, 'finishing the first stage did not record exactly one completed run', drillStorage.get('kt_drill_v1'));
 }
 
 app.startDrill('g1', true);
@@ -3244,7 +3254,7 @@ while (!app.state.drill.done && requeueAsked <= gradeOneBank.length) {
 if (lastPrompt !== revealedQuestion.text) {
   violated(DRILL_FLOW_CHECK, `a revealed question was not asked again at the end (last prompt was ${lastPrompt})`, revealedQuestion.text);
 }
-if (app.state.drill.perfect !== gradeOneBank.length - 1) {
+if (app.state.drill.perfect !== firstStageLength - 1) {
   violated(DRILL_FLOW_CHECK, `a requeued question inflated the first-try score to ${app.state.drill.perfect}`, 'requeued run');
 }
 
@@ -3278,6 +3288,7 @@ if (app.state.drill.idx !== 2 || app.state.drill.perfect !== 1) {
 }
 // Both kanji modes answer by choosing, so the same run has to work without the keypad.
 app.selectDrillCourse('k1');
+app.selectDrillStage(0);
 if (app.state.screen !== 'drill-mode' || app.state.drillCourseChoice !== 'k1') {
   violated(DRILL_FLOW_CHECK, 'selecting a kanji course did not ask which answer direction to use', JSON.stringify(app.state));
 }
@@ -3353,8 +3364,8 @@ if (app.state.drill.idx !== 0 || app.drillQuestion().no !== 1 || app.state.drill
 app.exitDrill();
 writeDrillRecord('g1', { runs: 5, opts: { '1': { c: 6, t: 3, r: 4 } } });
 const retiredView = drillViewOf('g1', true, 'choice');
-if (hissanViewApp.drillQuestion().no !== 2 || retiredView.countText !== '0 / 99') {
-  violated(DRILL_RETIRE_CHECK, `the next run started at question ${hissanViewApp.drillQuestion().no} counting ${retiredView.countText}`, 'expected question 2 and 0 / 99');
+if (hissanViewApp.drillQuestion().no !== 2 || retiredView.countText !== '0 / 24') {
+  violated(DRILL_RETIRE_CHECK, `the next run started at question ${hissanViewApp.drillQuestion().no} counting ${retiredView.countText}`, 'expected question 2 and 0 / 24');
 }
 hissanViewApp.exitDrill();
 writeDrillRecord('g1', { runs: 5, opts: { '3': { c: 6, t: 3, r: 0 }, '4': { c: 6, t: 3, r: 1 } } });
@@ -3369,8 +3380,9 @@ while (!app.state.drill.done && retireAsked <= 100) {
   retireAsked += 1;
   chooseDrillAnswer(app.drillQuestion().ans);
 }
-if (retireAsked !== 98 || app.state.drill.perfect !== 98 || storedDrillRecord('g1').runs !== 6) {
-  violated(DRILL_RETIRE_CHECK, `a run without two retired questions asked ${retireAsked}, scored ${app.state.drill.perfect}, runs ${storedDrillRecord('g1').runs}`, 'expected 98 questions and one more run');
+const retireRuns = storedDrillRecord('g1').stages.map((stage) => stage.runs).join(',');
+if (retireAsked !== 23 || app.state.drill.perfect !== 23 || retireRuns !== '6,5,5,5') {
+  violated(DRILL_RETIRE_CHECK, `a stage run without two retired questions asked ${retireAsked}, scored ${app.state.drill.perfect}, runs ${retireRuns}`, 'expected 23 questions and one more run of the first stage only');
 }
 app.exitDrill();
 writeDrillRecord('g1', { runs: 2, opts: { '1': { c: 6, t: 2 } } });
@@ -3395,11 +3407,13 @@ if (!hissanViewApp.state.drill.done || !hissanViewApp.state.drill.allRetired || 
   violated(DRILL_RETIRE_CHECK, 'a course with every question retired did not open on its finish screen', JSON.stringify(allRetiredView));
 }
 hissanViewApp.relearnDrill();
-if (hissanViewApp.state.drill.done || hissanViewApp.state.drill.idx !== 0 || Object.keys(storedDrillRecord('g1').opts).length !== 0 || storedDrillRecord('g1').runs !== 1) {
-  violated(DRILL_RETIRE_CHECK, 'starting a fully retired course over did not bring every question back', drillStorage.get('kt_drill_v1'));
+const relearnedKeys = Object.keys(storedDrillRecord('g1').opts).map(Number);
+if (hissanViewApp.state.drill.done || hissanViewApp.state.drill.idx !== 0 || relearnedKeys.length !== 75 || relearnedKeys.some((no) => no <= 25) ||
+    storedDrillRecord('g1').stages[0].runs !== 1) {
+  violated(DRILL_RETIRE_CHECK, 'starting a fully retired stage over did not bring back exactly that stage\'s questions', drillStorage.get('kt_drill_v1'));
 }
 hissanViewApp.exitDrill();
-for (const [opts, expected] of [[{ '1': { c: 6, t: 3, r: 4 } }, '99もん'], [everyRetired, 'ぜんぶ おぼえた']]) {
+for (const [opts, expected] of [[{ '1': { c: 6, t: 3, r: 4 } }, 'クリア 4 / 4'], [everyRetired, 'ぜんぶ おぼえた']]) {
   writeDrillRecord('g1', { runs: 5, opts });
   hissanViewApp.state.screen = 'start';
   try {
@@ -3412,6 +3426,220 @@ for (const [opts, expected] of [[{ '1': { c: 6, t: 3, r: 4 } }, '99もん'], [ev
   }
 }
 drillStorage.clear();
+
+// Issue #117: a course is asked one 25-question stage at a time. The child picks a stage before
+// the answer mode, stage 1 is always open, and each later stage opens once the stage before it
+// has finished a run. Dials stay per question; position, scores and runs are kept per stage.
+const DRILL_STAGE_CHECK = 'a drill course is asked one 25-question stage at a time and each stage opens the next';
+const DRILL_STAGE_RECORD_CHECK = 'drill progress saved before stages keeps its position, retirements and finished runs';
+observe(DRILL_STAGE_CHECK, 12);
+observe(DRILL_STAGE_RECORD_CHECK, 4);
+for (const course of drillCourses) {
+  const count = app.drillStageCount(course);
+  const ranges = Array.from({ length: count }, (_, stage) => app.drillStageRange(course, stage));
+  const contiguous = ranges.every((range, stage) => range.from === stage * 25 && range.to === Math.min(course.total, range.from + 25));
+  if (count !== 4 || !contiguous || ranges.at(-1).to !== app.drillBank(course.id).length) {
+    violated(DRILL_STAGE_CHECK, `${course.id} splits into ${JSON.stringify(ranges)}`, 'expected four contiguous stages of 25 covering the bank');
+  }
+}
+{
+  const stageApp = hissanViewApp;
+  const g2Bank = app.drillBank('g2');
+  const stageRecord = () => JSON.parse(drillStorage.get('kt_drill_v1')).g2;
+  const stageView = () => stageApp.renderVals().drillStageView;
+  const runStage = (stage, firstTry) => {
+    stageApp.startDrill('g2', true, 'input', stage);
+    const asked = [];
+    let guard = 0;
+    while (!stageApp.state.drill.done && guard <= 100) {
+      guard += 1;
+      const question = stageApp.drillQuestion();
+      asked.push(question.no);
+      if (!firstTry && asked.length === 1) {
+        stageApp.setState({ input: String(question.ans + 1) });
+        stageApp.drillSubmit();
+      }
+      stageApp.setState({ input: String(question.ans) });
+      stageApp.drillSubmit();
+      stageApp.drillFlushEcho();
+    }
+    return asked;
+  };
+  try {
+    drillStorage.clear();
+    stageApp.state.screen = 'start';
+    stageApp.state.drill = null;
+    // Only stage 1 is open on a fresh course, and a closed stage neither opens nor starts.
+    stageApp.selectDrillCourse('g2');
+    const fresh = stageView();
+    if (stageApp.state.screen !== 'drill-stage' || fresh.stages.length !== 4 ||
+        fresh.stages.map((row) => row.ariaDisabled).join(',') !== 'false,true,true,true' ||
+        fresh.stages[0].status !== '25もん' || fresh.stages[1].status !== '🔒 ステージ 1を クリアしてね' || fresh.stages[1].range !== '26〜50もんめ') {
+      violated(DRILL_STAGE_CHECK, 'a fresh course does not show stage 1 open and stages 2-4 locked', JSON.stringify(fresh && fresh.stages));
+    }
+    stageApp.selectDrillStage(1);
+    if (stageApp.state.screen !== 'drill-stage') violated(DRILL_STAGE_CHECK, 'a locked stage opened the answer-mode screen', stageApp.state.screen);
+    stageApp.startDrill('g2', true, 'input', 1);
+    if (stageApp.state.screen !== 'drill-stage' || stageApp.state.drill) violated(DRILL_STAGE_CHECK, 'a locked stage started a run', JSON.stringify(stageApp.state.drill));
+    // course -> stage -> answer mode, and each back step goes up one screen.
+    stageApp.selectDrillStage(0);
+    const mode = stageApp.renderVals().drillModeView;
+    if (stageApp.state.screen !== 'drill-mode' || stageApp.state.drillStageChoice !== 0 || mode.stageText !== 'ステージ 1（1〜25もんめ）') {
+      violated(DRILL_STAGE_CHECK, 'choosing stage 1 did not ask how to answer that stage', JSON.stringify({ screen: stageApp.state.screen, mode }));
+    }
+    stageApp.cancelDrillMode();
+    if (stageApp.state.screen !== 'drill-stage' || stageApp.state.drillCourseChoice !== 'g2') violated(DRILL_STAGE_CHECK, 'back from the answer mode did not return to the stages', stageApp.state.screen);
+    stageApp.cancelDrillStage();
+    if (stageApp.state.screen !== 'start' || stageApp.state.drillCourseChoice !== '') violated(DRILL_STAGE_CHECK, 'back from the stages did not return to the start screen', stageApp.state.screen);
+
+    // A stage run asks exactly its 25 questions; the first finished run opens the next stage.
+    const firstRun = runStage(0, true);
+    if (firstRun.join(',') !== g2Bank.slice(0, 25).map((row) => row.no).join(',')) {
+      violated(DRILL_STAGE_CHECK, `stage 1 asked ${firstRun.join(',')}`, 'expected questions 1-25 in order');
+    }
+    const firstFinish = stageApp.renderVals().drillView;
+    if (stageRecord().stages.map((row) => row.runs).join(',') !== '1,0,0,0' || firstFinish.finishTitle !== 'ステージ 1 クリア！' ||
+        !firstFinish.showUnlockNote || firstFinish.unlockNote !== 'ステージ 2が あそべるように なったよ！' || !firstFinish.showGoNextStage || firstFinish.countText !== '25 / 25') {
+      violated(DRILL_STAGE_CHECK, 'finishing stage 1 did not record its run, open stage 2, and offer it', JSON.stringify({ record: stageRecord(), firstFinish }));
+    }
+    stageApp.drillGoNextStage();
+    if (stageApp.state.screen !== 'drill-mode' || stageApp.state.drillCourseChoice !== 'g2' || stageApp.state.drillStageChoice !== 1 || stageApp.state.drill) {
+      violated(DRILL_STAGE_CHECK, 'the next-stage button did not ask how to answer stage 2', JSON.stringify({ screen: stageApp.state.screen, stage: stageApp.state.drillStageChoice }));
+    }
+    stageApp.renderVals().drillModeView.onFirst();
+    if (!stageApp.state.drill || stageApp.state.drill.stage !== 1 || stageApp.drillQuestion().no !== 26 || stageApp.state.drill.answerMode !== 'input') {
+      violated(DRILL_STAGE_CHECK, 'starting stage 2 from the answer mode did not begin at question 26', JSON.stringify(stageApp.state.drill));
+    }
+    stageApp.drillToStages();
+    // Replaying a finished stage (one retried miss, so nothing is re-queued) counts its run again
+    // but announces nothing new.
+    const replay = runStage(0, false);
+    const replayFinish = stageApp.renderVals().drillView;
+    if (replay.length !== 25 || stageRecord().stages[0].runs !== 2 || replayFinish.showUnlockNote || !replayFinish.showGoNextStage) {
+      violated(DRILL_STAGE_CHECK, 'replaying stage 1 changed what it asks or announced stage 2 again', JSON.stringify({ asked: replay.length, record: stageRecord(), replayFinish }));
+    }
+    stageApp.drillToStages();
+    if (stageApp.state.screen !== 'drill-stage' || stageApp.state.drillCourseChoice !== 'g2' || stageApp.state.drill) {
+      violated(DRILL_STAGE_CHECK, 'the stage list button did not return to the stages of the same course', stageApp.state.screen);
+    }
+    // A stage left part way resumes at its own position; the stage screen and card show the stage count.
+    stageApp.startDrill('g2', true, 'choice', 1);
+    for (let step = 0; step < 7; step += 1) {
+      stageApp.drillChoose(stageApp.drillQuestion().ans);
+      stageApp.drillFlushEcho();
+    }
+    stageApp.exitDrill();
+    stageApp.selectDrillCourse('g2');
+    const midway = stageView();
+    if (midway.stages.map((row) => row.status).join('|') !== 'クリア ✓|つづき 7 / 25|🔒 ステージ 2を クリアしてね|🔒 ステージ 3を クリアしてね') {
+      violated(DRILL_STAGE_CHECK, `the stage screen read ${midway.stages.map((row) => row.status).join('|')}`, 'stage 1 cleared, stage 2 at 7 of 25, stages 3-4 locked');
+    }
+    stageApp.startDrill('g2', false, 'input', 1);
+    if (stageApp.state.drill.idx !== 32 || stageApp.drillQuestion().no !== 33) {
+      violated(DRILL_STAGE_CHECK, `resuming stage 2 started at index ${stageApp.state.drill.idx}`, 'expected question 33');
+    }
+    stageApp.exitDrill();
+    const card = stageApp.renderVals().drillCards.find((row) => row.id === 'g2');
+    if (!card || card.progressText !== 'クリア 1 / 4' || card.actionText !== 'つづきから ▶') {
+      violated(DRILL_STAGE_CHECK, `the start card read ${card && card.progressText} / ${card && card.actionText}`, 'クリア 1 / 4 and つづきから');
+    }
+    // The last stage has no next stage to offer.
+    drillStorage.set('kt_drill_v1', JSON.stringify({ g2: { opts: {}, stages: [{ runs: 1 }, { runs: 1 }, { runs: 1 }, { runs: 0 }] } }));
+    const lastRun = runStage(3, true);
+    const lastFinish = stageApp.renderVals().drillView;
+    if (lastRun[0] !== 76 || lastRun.length !== 25 || lastFinish.showGoNextStage || lastFinish.showUnlockNote || lastFinish.finishTitle !== 'ステージ 4 クリア！') {
+      violated(DRILL_STAGE_CHECK, 'the last stage did not run questions 76-100 and finish without a next stage', JSON.stringify({ first: lastRun[0], asked: lastRun.length, lastFinish }));
+    }
+    stageApp.exitDrill();
+    // さいしょから on the card resets every stage's position and every dial, but keeps the stages open.
+    drillStorage.set('kt_drill_v1', JSON.stringify({ g2: { opts: { '3': { c: 4 }, '40': { c: 6, t: 3, r: 0 } }, stages: [{ runs: 2 }, { idx: 9, runs: 1 }, { idx: 3 }, {}] } }));
+    stageApp.confirmDrillReset('g2');
+    const reset = stageRecord();
+    if (Object.keys(reset.opts).length || reset.stages.map((row) => `${row.idx}:${row.runs}`).join(',') !== '0:2,0:1,0:0,0:0') {
+      violated(DRILL_STAGE_CHECK, 'resetting the course did not clear every stage while keeping the open ones', JSON.stringify(reset));
+    }
+    // Retirement is judged per stage: a question retired in stage 2 leaves stage 2 only.
+    drillStorage.set('kt_drill_v1', JSON.stringify({ g2: { opts: { '26': { c: 6, t: 3, r: 0 } }, stages: [{ runs: 1 }, { runs: 1 }, {}, {}] } }));
+    stageApp.startDrill('g2', true, 'input', 1);
+    const retiredStage = stageApp.state.drill;
+    if (!retiredStage || retiredStage.skip.join(',') !== '25' || stageApp.drillQuestion().no !== 27 || stageApp.renderVals().drillView.countText !== '0 / 24') {
+      violated(DRILL_STAGE_CHECK, 'a question retired in stage 2 did not leave only stage 2', JSON.stringify(retiredStage));
+    }
+    stageApp.exitDrill();
+    stageApp.startDrill('g2', true, 'input', 0);
+    if (stageApp.state.drill.skip.length || stageApp.renderVals().drillView.countText !== '0 / 25') {
+      violated(DRILL_STAGE_CHECK, 'a question retired in stage 2 was left out of stage 1', JSON.stringify(stageApp.state.drill.skip));
+    }
+    stageApp.exitDrill();
+    // さいしょから after a fully retired stage clears only that stage: the other stages keep their
+    // positions and their questions' dials.
+    drillStorage.set('kt_drill_v1', JSON.stringify({ g2: { opts: { '3': { c: 4 }, '30': { c: 6, t: 3, r: 0 } }, stages: [{ idx: 5, runs: 1 }, { idx: 9, runs: 1 }, { idx: 3 }, {}] } }));
+    stageApp.startDrill('g2', false, 'input', 1);
+    stageApp.relearnDrill();
+    const relearned = stageRecord();
+    if (relearned.stages.map((row) => row.idx).join(',') !== '5,0,3,0' || JSON.stringify(relearned.opts) !== JSON.stringify({ '3': { c: 4 } })) {
+      violated(DRILL_STAGE_CHECK, 'starting one stage over changed another stage', JSON.stringify(relearned));
+    }
+    stageApp.exitDrill();
+    // Within one stage run the answer positions spread evenly for every option count. The order is
+    // the one startDrill builds for the run, so it has to be sized to the stage, not the bank.
+    drillStorage.set('kt_drill_v1', JSON.stringify({ g2: { opts: {}, stages: [{ runs: 1 }, { runs: 1 }, { runs: 1 }, {}] } }));
+    for (let stage = 0; stage < 4; stage += 1) {
+      stageApp.startDrill('g2', true, 'choice', stage);
+      const run = stageApp.state.drill;
+      stageApp.exitDrill();
+      for (const count of [2, 3, 4, 5, 6]) {
+        const drill = { ...run, count };
+        const positions = new Array(count).fill(0);
+        for (const question of g2Bank.slice(run.from, run.to)) positions[app.drillNumericChoices(drill, question).indexOf(question.ans)] += 1;
+        if (run.choiceOrder.length !== 25 || Math.max(...positions) - Math.min(...positions) > 1) {
+          violated(DRILL_STAGE_CHECK, `stage ${stage + 1} at count ${count} puts the answer at ${positions.join(' / ')}`, 'expected a near-even spread inside one stage');
+        }
+      }
+    }
+
+    // A record saved before stages: the passed stages finished a run, the current one resumes,
+    // retirements keep meaning the same runs, and the first write stores the stage form.
+    drillStorage.set('kt_drill_v1', JSON.stringify({ g2: { idx: 58, perfect: 55, mistakes: 9, runs: 0, best: 0, opts: { '1': { c: 6, t: 3, r: 0 }, '30': { c: 4 } } } }));
+    const migrated = stageApp.readDrillProgress().g2;
+    if (JSON.stringify(migrated.stages) !== JSON.stringify([
+      { idx: 0, perfect: 0, mistakes: 0, runs: 1, best: 0 }, { idx: 0, perfect: 0, mistakes: 0, runs: 1, best: 0 },
+      { idx: 8, perfect: 5, mistakes: 0, runs: 0, best: 0 }, { idx: 0, perfect: 0, mistakes: 0, runs: 0, best: 0 }]) ||
+        JSON.stringify(migrated.opts) !== JSON.stringify({ '1': { c: 6, t: 3, r: 0 }, '30': { c: 4 } })) {
+      violated(DRILL_STAGE_RECORD_CHECK, `58 of 100 was read as ${JSON.stringify(migrated)}`, 'stages 1-2 finished, stage 3 at 8 with at most 5 first-try answers');
+    }
+    stageApp.startDrill('g2', false, 'input', 2);
+    if (stageApp.state.drill.idx !== 58 || stageApp.state.drill.perfect !== 5) {
+      violated(DRILL_STAGE_RECORD_CHECK, `the saved position resumed at ${stageApp.state.drill.idx}`, 'expected question 59');
+    }
+    stageApp.exitDrill();
+    stageApp.startDrill('g2', true, 'input', 0);
+    if (stageApp.drillQuestion().no !== 2) {
+      violated(DRILL_STAGE_RECORD_CHECK, 'a question retired before stages came back in stage 1', JSON.stringify(stageApp.state.drill.skip));
+    }
+    stageApp.exitDrill();
+    const stored = JSON.parse(drillStorage.get('kt_drill_v1'));
+    if (!Array.isArray(stored.g2.stages) || 'idx' in stored.g2 || 'runs' in stored.g2 || !Array.isArray(stored.g1.stages)) {
+      violated(DRILL_STAGE_RECORD_CHECK, 'the first write did not store every course in the stage form', JSON.stringify(stored));
+    }
+    drillStorage.set('kt_drill_v1', JSON.stringify({ g2: { idx: 0, perfect: 0, runs: 2, opts: {} } }));
+    if (stageApp.readDrillProgress().g2.stages.some((row) => row.runs !== 2 || row.idx !== 0)) {
+      violated(DRILL_STAGE_RECORD_CHECK, 'a course finished before stages did not open every stage', JSON.stringify(stageApp.readDrillProgress().g2));
+    }
+    drillStorage.set('kt_drill_v1', JSON.stringify({ g2: { opts: {}, stages: [{ idx: 99, perfect: -3, mistakes: 'x', runs: 2.7, best: 40 }, 'junk'] } }));
+    if (JSON.stringify(stageApp.readDrillProgress().g2.stages) !== JSON.stringify([
+      { idx: 25, perfect: 0, mistakes: 0, runs: 2, best: 25 }, { idx: 0, perfect: 0, mistakes: 0, runs: 0, best: 0 },
+      { idx: 0, perfect: 0, mistakes: 0, runs: 0, best: 0 }, { idx: 0, perfect: 0, mistakes: 0, runs: 0, best: 0 }])) {
+      violated(DRILL_STAGE_RECORD_CHECK, `malformed stage records were read as ${JSON.stringify(stageApp.readDrillProgress().g2.stages)}`, 'clamped stages padded to four');
+    }
+  } catch (error) {
+    violated(DRILL_STAGE_CHECK, 'the drill stages threw', String(error && error.stack));
+  } finally {
+    if (stageApp.state.drill) stageApp.exitDrill();
+    stageApp.state.screen = 'start';
+    drillStorage.clear();
+  }
+}
 
 // Issue #105: a correct answer, first try or copied, is read aloud as one sentence, and the
 // pair stays up until the reading ends (capped so a stuck engine never holds the drill).
@@ -3554,7 +3782,8 @@ const widerAnswer = hissanBank.find((row) => String(row.ans).length > Math.max(.
 const shorterAnswer = hissanBank.find((row) => String(row.ans).length < Math.max(...row.text.split(/ [＋−] /).map((part) => part.length)));
 for (const row of [widerAnswer, shorterAnswer]) {
   if (!row) { violated(DRILL_COLUMN_CHECK, 'h2 has no question whose answer width differs from its numbers', ''); continue; }
-  app.startDrill('h2', true, 'input');
+  openEveryDrillStage('h2');
+  app.startDrill('h2', true, 'input', drillStageOf(row.no - 1));
   app.state.drill.idx = row.no - 1;
   const width = Math.max(String(row.ans).length, ...row.text.split(/ [＋−] /).map((part) => part.length));
   for (const digit of String(row.ans).split('').reverse()) app.drillPress(digit);

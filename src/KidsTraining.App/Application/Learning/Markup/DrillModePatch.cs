@@ -8,6 +8,9 @@ namespace KidsTraining.App.Application.Learning.Markup;
 /// its own fixed course, its own storage key, and no connection to curriculum evidence: drilling can
 /// never inflate mastery, stars, or XP.
 ///
+/// A course is asked in stages of 25 questions (issue #117): course card → stage → answer mode →
+/// drill. A stage opens once the stage before it has finished a run.
+///
 /// This patch runs last, so every anchor below is matched against markup that earlier patches have
 /// already rewritten. In particular the accessibility patch has already expanded every `onclick=`
 /// into a focusable button, so the markup added here spells out `role="button" tabindex="0"` itself.
@@ -19,7 +22,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "    muted:false, speakingEnglish:'', setupName:''",
-            "    drill:null, drillAsk:'', drillCourseChoice:'',\n    muted:false, speakingEnglish:'', setupName:''",
+            "    drill:null, drillAsk:'', drillCourseChoice:'', drillStageChoice:0,\n    muted:false, speakingEnglish:'', setupName:''",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -59,6 +62,7 @@ internal static partial class LearningMarkupPatcher
             markup,
             "      profiles:profiles, goCalib:()=>this.goCalib(),",
             "      profiles:profiles, goCalib:()=>this.goCalib(),\n" +
+            "      isDrillStage:sc==='drill-stage', drillStageView:drillStageView,\n" +
             "      isDrillMode:sc==='drill-mode', drillModeView:drillModeView,\n" +
             "      isDrill:sc==='drill', drillCards:drillCards, drillView:drillView,",
             StringComparison.Ordinal);
@@ -100,7 +104,7 @@ internal static partial class LearningMarkupPatcher
         markup = ReplaceRequired(
             markup,
             "  <!-- ============ QUIZ ============ -->",
-            BuildDrillModeScreenTemplate() + "\n\n" + BuildDrillScreenTemplate() + "\n\n  <!-- ============ QUIZ ============ -->",
+            BuildDrillStageScreenTemplate() + "\n\n" + BuildDrillModeScreenTemplate() + "\n\n" + BuildDrillScreenTemplate() + "\n\n  <!-- ============ QUIZ ============ -->",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -115,7 +119,7 @@ internal static partial class LearningMarkupPatcher
     private static string BuildDrillKeyHandlerScript()
     {
         return """
-this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlKey||e.altKey||e.metaKey)return;const sc=this.state.screen;if(sc==='drill-mode'){const id=String(this.state.drillCourseChoice||'');if(e.key==='Escape'){e.preventDefault();this.cancelDrillMode();return;}if((e.key==='1'||e.key==='2')&&id){e.preventDefault();const kanji=id==='k1'||id==='k2',mode=e.key==='1'?(kanji?'reading':'input'):(kanji?'writing':'choice');this.startDrill(id,false,mode);}return;}if(sc!=='drill')return;const d=this.state.drill;if(!d||d.done)return;const roleButton=!!(e.target&&e.target.getAttribute&&(e.target.getAttribute('role')==='button'||e.target.tagName==='BUTTON'));if(roleButton&&(e.key==='Enter'||e.key===' '))return;if(d.echo){if(e.key==='Enter'||e.key===' '){e.preventDefault();this.drillFlushEcho();}return;}const base=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,base),choices=this.drillChoices(d,dq);if(choices.length){const choiceIndex=Number(e.key)-1;if(choiceIndex>=0&&choiceIndex<choices.length){e.preventDefault();this.drillChoose(choices[choiceIndex]);}return;}if(/^[0-9]$/.test(e.key)){e.preventDefault();this.drillPress(e.key);return;}if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();this.del();return;}if(e.key!=='Enter'||!this.state.input)return;e.preventDefault();this.drillSubmit();};document.addEventListener('keydown',this._drillKeyHandler);
+this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlKey||e.altKey||e.metaKey)return;const sc=this.state.screen;if(sc==='drill-stage'){if(e.key==='Escape'){e.preventDefault();this.cancelDrillStage();return;}const stage=/^[1-9]$/.test(e.key)?Number(e.key)-1:-1;if(stage>=0&&stage<this.drillStageCount(this.drillCourse(String(this.state.drillCourseChoice||'')))){e.preventDefault();this.selectDrillStage(stage);}return;}if(sc==='drill-mode'){const id=String(this.state.drillCourseChoice||'');if(e.key==='Escape'){e.preventDefault();this.cancelDrillMode();return;}if((e.key==='1'||e.key==='2')&&id){e.preventDefault();const kanji=id==='k1'||id==='k2',mode=e.key==='1'?(kanji?'reading':'input'):(kanji?'writing':'choice');this.startDrill(id,false,mode,this.state.drillStageChoice);}return;}if(sc!=='drill')return;const d=this.state.drill;if(!d||d.done)return;const roleButton=!!(e.target&&e.target.getAttribute&&(e.target.getAttribute('role')==='button'||e.target.tagName==='BUTTON'));if(roleButton&&(e.key==='Enter'||e.key===' '))return;if(d.echo){if(e.key==='Enter'||e.key===' '){e.preventDefault();this.drillFlushEcho();}return;}const base=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,base),choices=this.drillChoices(d,dq);if(choices.length){const choiceIndex=Number(e.key)-1;if(choiceIndex>=0&&choiceIndex<choices.length){e.preventDefault();this.drillChoose(choices[choiceIndex]);}return;}if(/^[0-9]$/.test(e.key)){e.preventDefault();this.drillPress(e.key);return;}if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();this.del();return;}if(e.key!=='Enter'||!this.state.input)return;e.preventDefault();this.drillSubmit();};document.addEventListener('keydown',this._drillKeyHandler);
 """.TrimEnd('\r', '\n');
     }
 
@@ -137,7 +141,35 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     {id:'k2',grade:2,total:100,badge:'2年生',title:'かんじ・ことば',sub:'1・2年生で ならった 漢字の ことばを 100もん',color:'#b07ae0',edge:'#8d55c4',shade:'#f4ecff'}
   ];}
   drillCourse(id){const list=this.drillCourses();for(let i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
-  drillDefaultRecord(){return {idx:0,perfect:0,mistakes:0,runs:0,best:0,opts:{}};}
+  // A course is asked one stage of 25 questions at a time (issue #117): stage s holds the bank
+  // positions [from, to). Stage 1 is always open, and stage s+1 opens once stage s has finished
+  // a run, so the run counts double as the unlock record.
+  drillStageSize(){return 25;}
+  drillStageCount(c){return c?Math.max(1,Math.ceil(c.total/this.drillStageSize())):0;}
+  drillStageRange(c,stage){const from=stage*this.drillStageSize();return {from:from,to:Math.min(c.total,from+this.drillStageSize())};}
+  drillStageOpen(record,stage){return stage===0||!!(record&&record.stages&&record.stages[stage-1]&&record.stages[stage-1].runs>0);}
+  drillDefaultRecord(c){const stages=[];for(let s=0;s<this.drillStageCount(c);s++)stages.push({idx:0,perfect:0,mistakes:0,runs:0,best:0});return {opts:{},stages:stages};}
+  readDrillStages(c,row,whole){
+    // Each stage keeps its own run: idx is the position inside the stage, runs the finished runs.
+    const stages=[];
+    if(Array.isArray(row.stages)){
+      for(let s=0;s<this.drillStageCount(c);s++){
+        const range=this.drillStageRange(c,s),len=range.to-range.from,st=row.stages[s]&&typeof row.stages[s]==='object'?row.stages[s]:{};
+        stages.push({idx:this.clamp(whole(st.idx),0,len),perfect:this.clamp(whole(st.perfect),0,len),mistakes:whole(st.mistakes),runs:whole(st.runs),best:this.clamp(whole(st.best),0,len)});
+      }
+      return stages;
+    }
+    // A record saved before stages kept one position over the whole course. Every stage that
+    // position has passed finished a run, so retirements stamped with the course run keep their
+    // meaning; the stage holding the position resumes there. Its first-try count is the part of
+    // the saved count the earlier stages cannot hold, so it never claims more than was answered.
+    const at=this.clamp(whole(row.idx),0,c.total),runs=whole(row.runs),perfect=whole(row.perfect);
+    for(let s=0;s<this.drillStageCount(c);s++){
+      const range=this.drillStageRange(c,s),here=at>range.from&&at<range.to,local=here?at-range.from:0;
+      stages.push({idx:local,perfect:here?this.clamp(perfect-range.from,0,local):0,mistakes:0,runs:runs+(at>=range.to?1:0),best:0});
+    }
+    return stages;
+  }
   readDrillProgress(){
     let raw=null;try{raw=localStorage.getItem(this.drillStorageKey());}catch(e){raw=null;}
     let data=null;try{data=raw?JSON.parse(raw):null;}catch(e){data=null;}
@@ -157,15 +189,16 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
           opts[no]=retired?{c:6,t:3,r:entry.r}:run>0?{c:6,t:Math.min(2,run)}:{c:entry.c};
         }
       }
-      out[c.id]={idx:this.clamp(whole(row.idx),0,c.total),perfect:this.clamp(whole(row.perfect),0,c.total),mistakes:whole(row.mistakes),runs:whole(row.runs),best:this.clamp(whole(row.best),0,c.total),opts:opts};
+      out[c.id]={opts:opts,stages:this.readDrillStages(c,row,whole)};
     });
     return out;
   }
   writeDrillProgress(map){try{localStorage.setItem(this.drillStorageKey(),JSON.stringify(map));}catch(e){}}
   saveDrillProgress(d,countRun){
     if(!d)return;const course=this.drillCourse(d.id);if(!course)return;
-    const total=course.total,progress=this.readDrillProgress(),prev=progress[d.id]||this.drillDefaultRecord(),finished=d.idx>=total;
-    progress[d.id]={idx:finished?0:this.clamp(d.idx,0,total),perfect:finished?0:d.perfect,mistakes:finished?0:d.mistakes,runs:prev.runs+(countRun?1:0),best:countRun?Math.max(prev.best,d.perfect):prev.best,opts:d.opts&&typeof d.opts==='object'?d.opts:{}};
+    const progress=this.readDrillProgress(),record=progress[d.id],stage=this.clamp(Math.floor(Number(d.stage))||0,0,record.stages.length-1),range=this.drillStageRange(course,stage),prev=record.stages[stage],finished=d.idx>=range.to;
+    record.stages[stage]={idx:finished?0:this.clamp(d.idx-range.from,0,range.to-range.from),perfect:finished?0:d.perfect,mistakes:finished?0:d.mistakes,runs:prev.runs+(countRun?1:0),best:countRun?Math.max(prev.best,d.perfect):prev.best};
+    record.opts=d.opts&&typeof d.opts==='object'?d.opts:{};
     this.writeDrillProgress(progress);
   }
   drillBank(id){if(!this._drillBanks)this._drillBanks={};if(!this._drillBanks[id])this._drillBanks[id]=this.buildDrillBank(id);return this._drillBanks[id];}
@@ -318,15 +351,25 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     const writing=!!(d&&d.answerMode==='writing');
     return {main:writing?String(q.ans):String(q.text),sub:writing?String(q.text):String(q.ans)};
   }
+  // The run asks its stage's positions up to drillEnd(d), then the re-queued "again" questions.
+  drillEnd(d){const n=this.drillBank(d.id).length;return Number.isInteger(d.to)?this.clamp(d.to,0,n):n;}
   drillQuestionAt(d,index){
-    if(!d)return null;const bank=this.drillBank(d.id),again=Array.isArray(d.again)?d.again:[];
-    if(index<bank.length)return bank[index]||null;
-    const extra=index-bank.length;
+    if(!d)return null;const bank=this.drillBank(d.id),again=Array.isArray(d.again)?d.again:[],end=this.drillEnd(d);
+    if(index<end)return bank[index]||null;
+    const extra=index-end;
     return extra<again.length?(bank[again[extra]]||null):null;
   }
   drillQuestion(){const d=this.state.drill;return d?this.drillQuestionAt(d,d.idx):null;}
-  selectDrillCourse(id){const course=this.drillCourse(id);if(!course)return;this.sfx('select');this.setState({screen:'drill-mode',drillCourseChoice:id});}
-  cancelDrillMode(){this.sfx('tap');this.setState({screen:'start',drillCourseChoice:''});}
+  // course card -> stage -> answer mode -> drill; every back step goes up exactly one screen.
+  selectDrillCourse(id){const course=this.drillCourse(id);if(!course)return;this.sfx('select');this.setState({screen:'drill-stage',drillCourseChoice:id,drillStageChoice:0});}
+  selectDrillStage(stage){
+    const course=this.drillCourse(String(this.state.drillCourseChoice||''));if(!course)return;
+    const s=Math.floor(Number(stage));if(!Number.isInteger(s)||s<0||s>=this.drillStageCount(course))return;
+    if(!this.drillStageOpen(this.readDrillProgress()[course.id],s)){this.sfx('wrong');return;}
+    this.sfx('select');this.setState({screen:'drill-mode',drillStageChoice:s});
+  }
+  cancelDrillStage(){this.sfx('tap');this.setState({screen:'start',drillCourseChoice:'',drillStageChoice:0});}
+  cancelDrillMode(){this.sfx('tap');this.setState({screen:'drill-stage'});}
   drillChoiceOrder(total,seed){
     // Slots cycle through 0..59 (the lcm of every possible option count, 2-6) before the
     // seeded shuffle, so the correct position spreads evenly no matter how many choices a
@@ -337,7 +380,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     return order;
   }
   drillChoicePosition(d,q,count){
-    const size=Math.max(1,Math.floor(Number(count))||1),index=Math.max(0,Number(q&&q.no)-1),order=d&&Array.isArray(d.choiceOrder)?d.choiceOrder:[];
+    // A run's order covers its own stage, so the index counts from the stage's first position.
+    const size=Math.max(1,Math.floor(Number(count))||1),index=Math.max(0,Number(q&&q.no)-1-(Number(d&&d.from)||0)),order=d&&Array.isArray(d.choiceOrder)?d.choiceOrder:[];
     if(order.length)return order[index%order.length]%size;
     return this.drillChoiceOrder(index+1,(Number(q&&q.no)||1)*2654435761)[index]%size;
   }
@@ -358,12 +402,13 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     opts[no]=!correct?{c:Math.max(2,count-1)}:count<6?{c:count+1}:run+1>=3?{c:6,t:3,r:Math.floor(Number(d&&d.run))||0}:{c:6,t:run+1};
     return opts;
   }
-  drillRetiredIndexes(opts,runs){
+  drillRetiredIndexes(opts,runs,from,to){
     // A retired question finishes the run that retired it (r === runs), so a resumed run keeps
     // its length; every later run leaves it out. Bank positions are no-1 because every bank
-    // builder numbers its rows list.length+1.
-    const map=opts&&typeof opts==='object'?opts:{},current=Number(runs)||0,out=[];
-    for(const key of Object.keys(map)){const no=Math.floor(Number(key)),row=map[key];if(Number.isInteger(no)&&no>=1&&row&&row.c===6&&row.t>=3&&Number.isInteger(row.r)&&row.r<current)out.push(no-1);}
+    // builder numbers its rows list.length+1. A question's r is a run of its own stage, so only
+    // the positions [from, to) of that stage are judged against that stage's runs.
+    const map=opts&&typeof opts==='object'?opts:{},current=Number(runs)||0,lo=Number(from)||0,hi=to==null?Infinity:Number(to),out=[];
+    for(const key of Object.keys(map)){const no=Math.floor(Number(key)),row=map[key];if(Number.isInteger(no)&&no-1>=lo&&no-1<hi&&row&&row.c===6&&row.t>=3&&Number.isInteger(row.r)&&row.r<current)out.push(no-1);}
     return out.sort((a,b)=>a-b);
   }
   drillActiveFrom(skip,from,total){const list=Array.isArray(skip)?skip:[];let i=from;while(i<total&&list.indexOf(i)>=0)i++;return i;}
@@ -394,29 +439,32 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     return Object.assign({},q,{text:String(q.ans),ans:answer,choices:this.drillKanjiWritingChoices(d,q),hint:label+'だよ。おなじ がくねんで ならう かんじから えらぼう。'});
   }
   drillChoices(d,q){if(!d||!q)return [];if(q.kind==='pick')return Array.isArray(q.choices)?q.choices:[];return d.answerMode==='choice'?this.drillNumericChoices(d,q):[];}
-  startDrill(id,restart,answerMode){
+  startDrill(id,restart,answerMode,stage){
     const course=this.drillCourse(id);if(!course)return;
-    const progress=this.readDrillProgress(),saved=progress[id]||this.drillDefaultRecord(),bank=this.drillBank(id),skip=this.drillRetiredIndexes(saved.opts,saved.runs);
-    let idx=restart?0:this.clamp(saved.idx,0,bank.length);
-    if(this.drillActiveFrom(skip,idx,bank.length)>=bank.length)idx=0;
-    const fresh=restart||idx===0;
-    idx=this.drillActiveFrom(skip,idx,bank.length);
-    // Every question retired: nothing is left to ask, so the run ends before it starts.
-    const allRetired=idx>=bank.length;
-    const mode=id==='k1'||id==='k2'?(answerMode==='writing'?'writing':'reading'):(answerMode==='choice'?'choice':'input'),choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder(bank.length,choiceSeed);
-    if(fresh){progress[id]={idx:0,perfect:0,mistakes:0,runs:saved.runs,best:saved.best,opts:saved.opts};this.writeDrillProgress(progress);}
+    const progress=this.readDrillProgress(),record=progress[id],s=this.clamp(Math.floor(Number(stage))||0,0,record.stages.length-1);
+    // A stage that is not open yet never starts; its button on the stage screen is locked.
+    if(!this.drillStageOpen(record,s))return;
+    const range=this.drillStageRange(course,s),from=range.from,to=range.to,saved=record.stages[s],bank=this.drillBank(id),skip=this.drillRetiredIndexes(record.opts,saved.runs,from,to);
+    let idx=restart?from:from+this.clamp(saved.idx,0,to-from);
+    if(this.drillActiveFrom(skip,idx,to)>=to)idx=from;
+    const fresh=restart||idx===from;
+    idx=this.drillActiveFrom(skip,idx,to);
+    // Every question of the stage retired: nothing is left to ask, so the run ends before it starts.
+    const allRetired=idx>=to;
+    const mode=id==='k1'||id==='k2'?(answerMode==='writing'?'writing':'reading'):(answerMode==='choice'?'choice':'input'),choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder(to-from,choiceSeed);
+    if(fresh){record.stages[s]={idx:0,perfect:0,mistakes:0,runs:saved.runs,best:saved.best};this.writeDrillProgress(progress);}
     this.clearDrillEcho();this.stopDrillSpeech();
     this.sfx('select');
-    const opts=Object.assign({},saved.opts);
-    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,answerMode:mode,choiceSeed:choiceSeed,choiceOrder:choiceOrder,idx:idx,miss:0,copyMiss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:allRetired,allRetired:allRetired,echo:null,opts:opts,run:saved.runs,skip:skip,count:allRetired?2:this.drillOptionCount({opts:opts},bank[idx])}});
+    const opts=Object.assign({},record.opts);
+    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,stage:s,from:from,to:to,answerMode:mode,choiceSeed:choiceSeed,choiceOrder:choiceOrder,idx:idx,miss:0,copyMiss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:allRetired,allRetired:allRetired,echo:null,opts:opts,run:saved.runs,skip:skip,count:allRetired?2:this.drillOptionCount({opts:opts},bank[idx])}});
   }
   drillAdvance(patch){
     const d=this.state.drill;if(!d)return;
-    const total=this.drillBank(d.id).length,next=Object.assign({},d,{miss:0,copyMiss:0,mark:'',hint:'',revealed:false,echo:null},patch||{});
-    next.idx=this.drillActiveFrom(d.skip,d.idx+1,total);
-    const again=Array.isArray(next.again)?next.again:[],countRun=!d.counted&&next.idx>=total;
+    const end=this.drillEnd(d),next=Object.assign({},d,{miss:0,copyMiss:0,mark:'',hint:'',revealed:false,echo:null},patch||{});
+    next.idx=this.drillActiveFrom(d.skip,d.idx+1,end);
+    const again=Array.isArray(next.again)?next.again:[],countRun=!d.counted&&next.idx>=end;
     if(countRun)next.counted=true;
-    next.done=next.idx>=total+again.length;
+    next.done=next.idx>=end+again.length;
     next.count=this.drillOptionCount(next,this.drillQuestionAt(next,next.idx));
     this.saveDrillProgress(next,countRun);
     if(next.done)this.sfx('clear');
@@ -516,14 +564,14 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       // the again queue, exactly as the つぎへ button that this replaces did.
       if(!this.drillMatches(q,raw)){this.sfx('wrong');this.setState({input:'',drill:Object.assign({},d,{copyMiss:(d.copyMiss||0)+1})});return;}
       const again=Array.isArray(d.again)?d.again.slice():[];
-      if(d.idx<this.drillBank(d.id).length&&again.indexOf(d.idx)<0)again.push(d.idx);
+      if(d.idx<this.drillEnd(d)&&again.indexOf(d.idx)<0)again.push(d.idx);
       this.sfx('correct');
       this.setState({drill:Object.assign({},d,{mark:'',hint:'',echo:this.drillPair(d,q)})});
       this.scheduleDrillAdvance({again:again,streak:0},this.drillSpeechText(d,base));
       return;
     }
     if(this.drillMatches(q,raw)){
-      const clean=d.miss===0,firstPass=d.idx<this.drillBank(d.id).length;
+      const clean=d.miss===0,firstPass=d.idx<this.drillEnd(d);
       // Only the first pass of the first attempt moves a question's dial; retries and the
       // re-queued "again" questions leave the record alone, and the on-screen count stays
       // frozen in d.count until the question is replaced.
@@ -534,63 +582,104 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       return;
     }
     this.sfx('wrong');
-    const miss=d.miss+1,revealed=miss>=2,firstMiss=miss===1&&q.kind==='num'&&d.idx<this.drillBank(d.id).length;
+    const miss=d.miss+1,revealed=miss>=2,firstMiss=miss===1&&q.kind==='num'&&d.idx<this.drillEnd(d);
     const nextDrill=Object.assign({},d,{miss:miss,mistakes:d.mistakes+1,mark:revealed?'answer':'wrong',hint:q.hint,revealed:revealed,streak:0,opts:firstMiss?this.drillBumpOption(d,q,false):d.opts});
     this.setState({input:'',drill:nextDrill});
     if(firstMiss)this.saveDrillProgress(nextDrill,false);
   }
   exitDrill(){const d=this.state.drill;this.clearDrillEcho();this.stopDrillSpeech();this.saveDrillProgress(d,false);this.sfx('tap');this.setState({screen:'start',drill:null,drillAsk:'',drillCourseChoice:'',input:''});}
+  // From the finish screen: back to the course's stages, or on to the answer mode of the next stage.
+  leaveDrillTo(screen,stage){const d=this.state.drill;if(!d)return;this.clearDrillEcho();this.stopDrillSpeech();this.saveDrillProgress(d,false);this.sfx('tap');this.setState({screen:screen,drill:null,drillAsk:'',drillCourseChoice:d.id,drillStageChoice:stage,input:''});}
+  drillToStages(){const d=this.state.drill;if(d)this.leaveDrillTo('drill-stage',d.stage||0);}
+  drillGoNextStage(){const d=this.state.drill;if(d)this.leaveDrillTo('drill-mode',(d.stage||0)+1);}
   askDrillReset(id){this.sfx('tap');this.setState({drillAsk:this.state.drillAsk===id?'':id});}
-  drillClearRecord(id){
-    // Back to question 1 with every dial at two options, which also brings retired questions back.
-    const progress=this.readDrillProgress(),prev=progress[id]||this.drillDefaultRecord();
-    progress[id]={idx:0,perfect:0,mistakes:0,runs:prev.runs,best:prev.best,opts:{}};
+  drillClearRecord(id,stage){
+    // Back to the first question with every dial at two options, which also brings retired
+    // questions back: one stage when a stage is given, otherwise the whole course. Run counts
+    // stay, so every stage that was open stays open.
+    const course=this.drillCourse(id);if(!course)return;
+    const progress=this.readDrillProgress(),record=progress[id],only=stage==null?-1:stage;
+    record.stages=record.stages.map((st,s)=>only<0||s===only?{idx:0,perfect:0,mistakes:0,runs:st.runs,best:st.best}:st);
+    if(only<0)record.opts={};
+    else{const range=this.drillStageRange(course,only);for(const key of Object.keys(record.opts)){const no=Number(key);if(no>range.from&&no<=range.to)delete record.opts[key];}}
     this.writeDrillProgress(progress);
   }
   confirmDrillReset(id){this.drillClearRecord(id);this.sfx('select');this.setState({drillAsk:''});}
-  relearnDrill(){const d=this.state.drill;if(!d)return;this.drillClearRecord(d.id);this.startDrill(d.id,true,d.answerMode);}
+  relearnDrill(){const d=this.state.drill;if(!d)return;this.drillClearRecord(d.id,d.stage||0);this.startDrill(d.id,true,d.answerMode,d.stage||0);}
 """.TrimEnd('\r', '\n');
     }
 
     private static string BuildDrillViewScript()
     {
         return """
-    let drillCards=[],drillModeView=null,drillView=null;
+    let drillCards=[],drillStageView=null,drillModeView=null,drillView=null;
+    // One stage as the next run of it would ask: retired questions (issue #104) leave its count.
+    const drillStageState=(c,record,s)=>{
+      const st=record.stages[s],range=this.drillStageRange(c,s),skip=this.drillRetiredIndexes(record.opts,st.runs,range.from,range.to);
+      const active=Math.max(0,range.to-range.from-skip.length),done=st.idx-skip.filter(i=>i<range.from+st.idx).length;
+      return {range:range,active:active,done:done,retired:skip.length,open:this.drillStageOpen(record,s),cleared:st.runs>0,started:st.idx>0};
+    };
     if(sc==='start'){
       const drillProgress=this.readDrillProgress(),drillAsk=String(S.drillAsk||'');
       drillCards=this.drillCourses().map(c=>{
-        // Retired questions (issue #104) leave the count, so the card shows what the next run asks.
-        const row=drillProgress[c.id]||this.drillDefaultRecord(),skip=this.drillRetiredIndexes(row.opts,row.runs),active=Math.max(0,c.total-skip.length),done=row.idx-skip.filter(i=>i<row.idx).length;
-        const pct=Math.round((active?this.clamp(done/active,0,1):1)*100),asking=drillAsk===c.id;
+        const record=drillProgress[c.id],stages=record.stages.map((st,s)=>drillStageState(c,record,s)),count=stages.length;
+        const active=stages.reduce((sum,x)=>sum+x.active,0),retired=stages.reduce((sum,x)=>sum+x.retired,0),cleared=stages.filter(x=>x.cleared).length,moved=stages.some(x=>x.cleared||x.started);
+        const fill=stages.reduce((sum,x)=>sum+(x.cleared||!x.active?1:this.clamp(x.done/x.active,0,1)),0);
+        const pct=Math.round((count?fill/count:1)*100),asking=drillAsk===c.id;
         return {
           id:c.id, badge:c.badge, cardTitle:c.cardTitle||c.title, cardTag:c.cardTag||'', tagStyle:c.cardTag?'':'display:none;',
           cardStyle:'background:'+c.shade+'; border-color:'+c.edge+'; color:'+c.edge+';',
           barStyle:'width:'+pct+'%; background:'+c.color+';',
-          progressText:!active?'ぜんぶ おぼえた':row.idx>0?(done+' / '+active):(active+'もん'),
-          actionText:row.idx>0?'つづきから ▶':'はじめる ▶',
+          progressText:!active?'ぜんぶ おぼえた':moved?('クリア '+cleared+' / '+count):(count+'ステージ'),
+          actionText:moved?'つづきから ▶':'はじめる ▶',
           resetText:asking?'ほんとうに もどす？':'さいしょから',
           resetStyle:asking?'background:#ffe0da; border-color:#e08a7a; color:#b23b23;':'',
-          ariaLabel:c.badge+'の とっくんモード、'+c.title+'。'+c.sub+'。'+active+'もん中 '+done+'もん'+(skip.length?'。おぼえた '+skip.length+'もんは でない':''),
+          ariaLabel:c.badge+'の とっくんモード、'+c.title+'。'+c.sub+'。'+count+'ステージの うち '+cleared+'ステージ クリア'+(retired?'。おぼえた '+retired+'もんは でない':''),
           resetAria:asking?c.title+'の しんちょくを 0にもどす':c.title+'を さいしょから',
           onStart:()=>this.selectDrillCourse(c.id),
           onReset:()=>{if(this.state.drillAsk===c.id)this.confirmDrillReset(c.id);else this.askDrillReset(c.id);}
         };
       });
     }
+    const stageCourse=sc==='drill-stage'?this.drillCourse(String(S.drillCourseChoice||'')):null;
+    if(stageCourse){
+      const record=this.readDrillProgress()[stageCourse.id];
+      drillStageView={
+        badge:stageCourse.badge, title:stageCourse.title, headStyle:'background:'+stageCourse.color+';',
+        stages:record.stages.map((st,s)=>{
+          const x=drillStageState(stageCourse,record,s),name='ステージ '+(s+1);
+          const status=!x.open?'🔒 ステージ '+s+'を クリアしてね':!x.active?'ぜんぶ おぼえた':x.started?('つづき '+x.done+' / '+x.active):x.cleared?'クリア ✓':(x.active+'もん');
+          const pct=Math.round((x.started&&x.active?this.clamp(x.done/x.active,0,1):x.cleared||!x.active?1:0)*100);
+          return {
+            no:String(s+1), name:name, range:(x.range.from+1)+'〜'+x.range.to+'もんめ', status:status,
+            style:!x.open?'background:#f4f1ea; border-color:#ddd5c4; color:#a39579; box-shadow:none; cursor:default;':x.cleared?'background:#f0faf3; border-color:#9dd3ae;':'border-color:'+stageCourse.edge+';',
+            barStyle:'width:'+(x.open?pct:0)+'%; background:'+stageCourse.color+';',
+            ariaDisabled:x.open?'false':'true',
+            ariaLabel:(s+1)+'ばん、'+name+'、'+(x.range.from+1)+'もんめから'+x.range.to+'もんめ。'+status.replace('🔒 ',''),
+            onClick:()=>this.selectDrillStage(s)
+          };
+        }),
+        onBack:()=>this.cancelDrillStage()
+      };
+    }
     if(sc==='drill-mode'){
       const modeCourse=this.drillCourse(String(S.drillCourseChoice||''))||{};
-      const kanjiMode=modeCourse.id==='k1'||modeCourse.id==='k2';
+      const kanjiMode=modeCourse.id==='k1'||modeCourse.id==='k2',modeStage=Math.floor(Number(S.drillStageChoice))||0,modeRange=modeCourse.total?this.drillStageRange(modeCourse,modeStage):{from:0,to:0};
       drillModeView={
         badge:modeCourse.badge||'',title:modeCourse.title||'',headStyle:'background:'+(modeCourse.color||'#ff8a3d')+';',
+        stageText:'ステージ '+(modeStage+1)+'（'+(modeRange.from+1)+'〜'+modeRange.to+'もんめ）',
         firstAria:kanjiMode?'1ばん、読みを選ぶ':'1ばん、数字を入力',firstSymbol:kanjiMode?'漢 → かん':'123',firstName:kanjiMode?'よみを えらぶ':'すうじを 入力',firstHelp:kanjiMode?'かんじの よみかたを 4つから':'じぶんで こたえを いれる',
         secondAria:kanjiMode?'2ばん、漢字を選ぶ':'2ばん、こたえをえらぶ',secondSymbol:kanjiMode?'かん → 漢':'A / B',secondName:kanjiMode?'かんじを えらぶ':'えらんで こたえる',secondHelp:kanjiMode?'ただしい かきかたを 4つから':'ただしい こたえを えらぶ',
-        onFirst:()=>this.startDrill(modeCourse.id,false,kanjiMode?'reading':'input'),onSecond:()=>this.startDrill(modeCourse.id,false,kanjiMode?'writing':'choice'),onBack:()=>this.cancelDrillMode()
+        onFirst:()=>this.startDrill(modeCourse.id,false,kanjiMode?'reading':'input',modeStage),onSecond:()=>this.startDrill(modeCourse.id,false,kanjiMode?'writing':'choice',modeStage),onBack:()=>this.cancelDrillMode()
       };
     }
     if(sc==='drill'&&S.drill){
-      const d=S.drill,course=this.drillCourse(d.id)||{},total=this.drillBank(d.id).length,baseQuestion=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,baseQuestion);
-      const dAgain=Array.isArray(d.again)?d.again:[],dSkip=Array.isArray(d.skip)?d.skip:[],passed=Math.min(d.idx,total),inMain=d.idx<total;
-      const activeTotal=Math.max(0,total-dSkip.length),seen=passed-dSkip.filter(i=>i<passed).length,retiredNow=this.drillRetiredIndexes(d.opts,Infinity).length;
+      const d=S.drill,course=this.drillCourse(d.id)||{},from=Number(d.from)||0,end=this.drillEnd(d),stageNo=(Number(d.stage)||0)+1,baseQuestion=this.drillQuestionAt(d,d.idx),dq=this.drillPresentedQuestion(d,baseQuestion);
+      const dAgain=Array.isArray(d.again)?d.again:[],dSkip=Array.isArray(d.skip)?d.skip:[],passed=Math.min(d.idx,end),inMain=d.idx<end;
+      const activeTotal=Math.max(0,end-from-dSkip.length),seen=passed-from-dSkip.filter(i=>i<passed).length,retiredNow=this.drillRetiredIndexes(d.opts,Infinity,from,end).length;
+      // The next stage opens with the first finished run of this one; the finish screen says so once.
+      const nextStage=!!d.done&&!!course.total&&stageNo<this.drillStageCount(course)&&this.drillStageOpen(this.readDrillProgress()[d.id],stageNo);
+      const unlockedNow=nextStage&&!d.allRetired&&!!d.counted&&(Number(d.run)||0)===0;
       const drillPad=['1','2','3','4','5','6','7','8','9'].map(n=>({label:n,ariaLabel:n,style:keyTile,onClick:()=>this.drillPress(n)}));
       drillPad.push({label:'けす',ariaLabel:'ひとつ けす',style:keyClear,onClick:()=>this.del()});
       drillPad.push({label:'0',ariaLabel:'0',style:keyTile,onClick:()=>this.drillPress('0')});
@@ -612,8 +701,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       for(let i=0;i<hissanColumns;i++){const place=hissanColumns-1-i;hissanCells.push({text:place<typed.length?typed[place]:'',style:dEcho?'background:#e8f7ec; box-shadow:inset 0 0 0 3px #3aa655; color:#22683c;':place===typed.length?'box-shadow:inset 0 0 0 5px #ff8a3d; background:#fff0de;':(d.mark?'box-shadow:inset 0 0 0 3px #e08a7a; color:#b23b23;':'')});}
       const copyAsk=dPick?'おなじ こたえを えらんで すすもう':hissanColumns?'おなじ こたえを みぎの くらいから いれよう':'おなじ こたえを いれて すすもう';
       drillView={
-        badge:course.badge||'', title:course.title||'', section:dq?dq.sec:'',
-        countText:d.done?(d.allRetired?'':activeTotal+' / '+activeTotal):inMain?(seen+' / '+activeTotal):('なおし '+(d.idx-total+1)+' / '+dAgain.length),
+        badge:course.badge||'', title:course.title||'', stageText:'ステージ '+stageNo, section:dq?dq.sec:'',
+        countText:d.done?(d.allRetired?'':activeTotal+' / '+activeTotal):inMain?(seen+' / '+activeTotal):('なおし '+(d.idx-end+1)+' / '+dAgain.length),
         headStyle:'background:'+(course.color||'#ff8a3d')+';',
         barStyle:'width:'+Math.round((activeTotal?this.clamp(seen/activeTotal,0,1):1)*100)+'%; background:'+(course.color||'#ff8a3d')+';',
         prompt:dq?this.drillPrompt(dq):'', ansBox:S.input||'?',
@@ -630,12 +719,16 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         showCopy:!!d.revealed&&!dEcho, copyText:d.copyMiss>0?'もういちど。うえの こたえを よく みてね':copyAsk,
         showStreak:d.streak>=3, streakText:'れんぞく '+d.streak+'もん！',
         playing:!d.done, finished:!!d.done,
-        finishMark:d.allRetired?'🎓':'🏅', finishTitle:d.allRetired?'ぜんぶ おぼえたよ！':'ぜんぶ おわったよ！',
+        finishMark:d.allRetired?'🎓':'🏅', finishTitle:d.allRetired?'ぜんぶ おぼえたよ！':'ステージ '+stageNo+' クリア！',
         clearBody:d.allRetired?'どの もんだいも 6つから 3かい つづけて せいかい できたよ':(d.perfect+' / '+activeTotal+'もんを 1かいめで せいかい'),
         showRetiredNote:!d.allRetired&&retiredNow>0, retiredNote:'おぼえた もんだい '+retiredNow+'もんは つぎから でないよ',
+        showUnlockNote:unlockedNow, unlockNote:'ステージ '+(stageNo+1)+'が あそべるように なったよ！',
+        showGoNextStage:nextStage, goNextStageText:'つぎの ステージへ ▶',
         restartText:d.allRetired?'さいしょから':'もういちど',
+        restartStyle:nextStage?'background:#fff; color:#6b5e45; border-color:#f0e2c8; box-shadow:none;':'',
         pad:drillPad,
-        onExit:()=>this.exitDrill(), onRestart:()=>{if(d.allRetired)this.relearnDrill();else this.startDrill(d.id,true,d.answerMode);}
+        onExit:()=>this.exitDrill(), onStages:()=>this.drillToStages(), onGoNextStage:()=>this.drillGoNextStage(),
+        onRestart:()=>{if(d.allRetired)this.relearnDrill();else this.startDrill(d.id,true,d.answerMode,d.stage);}
       };
     }
 """.TrimEnd('\r', '\n');
@@ -666,16 +759,48 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
 """.TrimEnd('\r', '\n');
     }
 
+    // The stage screen shares the answer-mode screen's layout and back button class, so the
+    // Android back key (MainActivity.BACK_STEP_SCRIPT) steps out of it the same way.
+    private static string BuildDrillStageScreenTemplate()
+    {
+        return """
+  <!-- ============ DRILL STAGE ============ -->
+  <sc-if value="{{ isDrillStage }}" hint-placeholder-val="{{ false }}">
+    <div data-screen-label="ステージ" class="kt-drill-mode-screen">
+      <button type="button" class="kt-drill-mode-back" aria-label="とっくんの いちらんに もどる" onclick="{{ drillStageView.onBack }}">← もどる</button>
+      <div class="kt-drill-mode-panel">
+        <span class="kt-drill-badge" style="{{ drillStageView.headStyle }}">{{ drillStageView.badge }}</span>
+        <div class="kt-drill-mode-title">{{ drillStageView.title }}</div>
+        <div class="kt-drill-mode-question">ステージを えらんでね</div>
+        <div class="kt-drill-stage-options" aria-label="ステージ">
+          <sc-for list="{{ drillStageView.stages }}" as="t" hint-placeholder-count="4">
+            <button type="button" class="kt-drill-stage-option" style="{{ t.style }}" aria-disabled="{{ t.ariaDisabled }}" aria-label="{{ t.ariaLabel }}" onclick="{{ t.onClick }}">
+              <span class="kt-drill-mode-number">{{ t.no }}</span>
+              <span class="kt-drill-stage-name">{{ t.name }}</span>
+              <span class="kt-drill-stage-range">{{ t.range }}</span>
+              <span class="kt-drill-bar"><span style="{{ t.barStyle }}"></span></span>
+              <span class="kt-drill-stage-status">{{ t.status }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div class="kt-drill-mode-key-help">キーボードの 1〜4 でも えらべるよ</div>
+      </div>
+    </div>
+  </sc-if>
+""".TrimEnd('\r', '\n');
+    }
+
     private static string BuildDrillModeScreenTemplate()
     {
         return """
   <!-- ============ DRILL ANSWER MODE ============ -->
   <sc-if value="{{ isDrillMode }}" hint-placeholder-val="{{ false }}">
     <div data-screen-label="こたえかた" class="kt-drill-mode-screen">
-      <button type="button" class="kt-drill-mode-back" aria-label="とっくんの いちらんに もどる" onclick="{{ drillModeView.onBack }}">← もどる</button>
+      <button type="button" class="kt-drill-mode-back" aria-label="ステージの いちらんに もどる" onclick="{{ drillModeView.onBack }}">← もどる</button>
       <div class="kt-drill-mode-panel">
         <span class="kt-drill-badge" style="{{ drillModeView.headStyle }}">{{ drillModeView.badge }}</span>
         <div class="kt-drill-mode-title">{{ drillModeView.title }}</div>
+        <div class="kt-drill-mode-stage">{{ drillModeView.stageText }}</div>
         <div class="kt-drill-mode-question">こたえかたを えらんでね</div>
         <div class="kt-drill-mode-options" aria-label="こたえかた">
           <button type="button" class="kt-drill-mode-option" aria-label="{{ drillModeView.firstAria }}" onclick="{{ drillModeView.onFirst }}">
@@ -709,6 +834,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         <div class="kt-drill-titles">
           <span class="kt-drill-badge" style="{{ drillView.headStyle }}">{{ drillView.badge }}</span>
           <span class="kt-drill-title">{{ drillView.title }}</span>
+          <span class="kt-drill-stage-chip">{{ drillView.stageText }}</span>
           <span class="kt-drill-section">{{ drillView.section }}</span>
         </div>
         <sc-if value="{{ drillView.showStreak }}" hint-placeholder-val="{{ false }}">
@@ -793,12 +919,18 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
           <div class="kt-drill-finish-mark">{{ drillView.finishMark }}</div>
           <div class="kt-drill-finish-title">{{ drillView.finishTitle }}</div>
           <div class="kt-drill-finish-body">{{ drillView.clearBody }}</div>
+          <sc-if value="{{ drillView.showUnlockNote }}" hint-placeholder-val="{{ false }}">
+            <div class="kt-drill-finish-note is-unlock" role="status">🔓 {{ drillView.unlockNote }}</div>
+          </sc-if>
           <sc-if value="{{ drillView.showRetiredNote }}" hint-placeholder-val="{{ false }}">
             <div class="kt-drill-finish-note">🎓 {{ drillView.retiredNote }}</div>
           </sc-if>
           <div class="kt-drill-finish-row">
-            <div class="kt-drill-next" role="button" tabindex="0" onclick="{{ drillView.onRestart }}">{{ drillView.restartText }}</div>
-            <div class="kt-drill-back" role="button" tabindex="0" onclick="{{ drillView.onExit }}">トップへ</div>
+            <sc-if value="{{ drillView.showGoNextStage }}" hint-placeholder-val="{{ false }}">
+              <div class="kt-drill-next" role="button" tabindex="0" onclick="{{ drillView.onGoNextStage }}">{{ drillView.goNextStageText }}</div>
+            </sc-if>
+            <div class="kt-drill-next" role="button" tabindex="0" style="{{ drillView.restartStyle }}" onclick="{{ drillView.onRestart }}">{{ drillView.restartText }}</div>
+            <div class="kt-drill-back" role="button" tabindex="0" onclick="{{ drillView.onStages }}">ステージを えらぶ</div>
           </div>
         </div>
       </sc-if>
@@ -846,6 +978,16 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-mode-name{font-size:27px;font-weight:900;}
   .kt-drill-mode-help{font-size:16px;font-weight:700;color:#6b5e45;}
   .kt-drill-mode-key-help{font-size:15px;font-weight:700;color:#7b6a4d;}
+  .kt-drill-mode-stage{background:#fff;border:3px solid #f0e2c8;border-radius:16px;padding:3px 14px;font-size:18px;font-weight:800;color:#6b5e45;}
+  /* Four stages read left to right in order; the number in the corner is the key that picks one. */
+  .kt-drill-stage-options{width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:8px;}
+  .kt-drill-stage-option{position:relative;min-height:190px;min-width:0;background:#fff;border:4px solid #f0e2c8;border-radius:24px;padding:46px 12px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font:inherit;color:#3a3326;box-shadow:0 6px 0 #ecd9b9;cursor:pointer;word-break:keep-all;overflow-wrap:anywhere;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease,transform .2s ease;}
+  .kt-drill-stage-option .kt-drill-mode-number{top:10px;left:10px;min-width:30px;height:30px;border-radius:10px;font-size:16px;}
+  .kt-drill-stage-name{font-size:24px;font-weight:900;white-space:nowrap;}
+  .kt-drill-stage-range{font-size:15px;font-weight:700;color:#6b5e45;}
+  .kt-drill-stage-option .kt-drill-bar{display:block;width:100%;margin-top:2px;}
+  .kt-drill-stage-status{font-size:15px;font-weight:800;line-height:1.3;}
+  .kt-drill-stage-chip{flex:none;background:#fff;border:3px solid #f0e2c8;border-radius:16px;padding:3px 12px;font-size:15px;font-weight:900;color:#3a3326;}
   .kt-drill-screen{position:relative;min-height:100vh;display:flex;flex-direction:column;gap:12px;padding:22px 44px 30px;}
   .kt-drill-head{display:flex;align-items:center;gap:14px;}
   .kt-drill-quit{flex:none;background:#fff;border:3px solid #f0e2c8;border-radius:20px;padding:6px 14px;font-size:16px;font-weight:700;color:#6b5e45;cursor:pointer;}
@@ -895,12 +1037,13 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-finish-title{font-size:44px;font-weight:900;}
   .kt-drill-finish-body{font-size:24px;font-weight:700;color:#6b5e45;}
   .kt-drill-finish-note{font-size:20px;font-weight:700;color:#3f7a4f;background:#e8f7ec;border:3px solid #9dd3ae;border-radius:16px;padding:6px 16px;}
-  .kt-drill-finish-row{display:flex;gap:16px;margin-top:8px;}
-  .kt-drill-mode-option:hover,.kt-drill-pick-btn:hover{border-color:#ffb170;background:#fffaf4;transform:translateY(-2px);box-shadow:0 8px 0 #ecd9b9;}
-  .kt-drill-mode-option:active,.kt-drill-pick-btn:active{transform:translateY(3px);box-shadow:0 2px 0 #dcc49c;}
+  .kt-drill-finish-note.is-unlock{color:#2f5f9e;background:#eaf3ff;border-color:#a8c8f0;}
+  .kt-drill-finish-row{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin-top:8px;}
+  .kt-drill-mode-option:hover,.kt-drill-stage-option:not([aria-disabled="true"]):hover,.kt-drill-pick-btn:hover{border-color:#ffb170;background:#fffaf4;transform:translateY(-2px);box-shadow:0 8px 0 #ecd9b9;}
+  .kt-drill-mode-option:active,.kt-drill-stage-option:not([aria-disabled="true"]):active,.kt-drill-pick-btn:active{transform:translateY(3px);box-shadow:0 2px 0 #dcc49c;}
   .kt-drill-mode-back:hover,.kt-drill-quit:hover,.kt-drill-back:hover,.kt-drill-reset:hover{background:#fff8ee;border-color:#d9bd8c;}
   .kt-drill-mode-back:active,.kt-drill-quit:active,.kt-drill-back:active,.kt-drill-reset:active{transform:translateY(2px);}
-  .kt-drill-mode-option:focus-visible,.kt-drill-mode-back:focus-visible,.kt-drill-card-body:focus-visible,.kt-drill-reset:focus-visible,.kt-drill-quit:focus-visible,.kt-drill-pick-btn:focus-visible,.kt-drill-next:focus-visible,.kt-drill-back:focus-visible,.kt-drill-pad [role="button"]:focus-visible{outline:4px solid #2f7ccd;outline-offset:3px;}
+  .kt-drill-mode-option:focus-visible,.kt-drill-stage-option:focus-visible,.kt-drill-mode-back:focus-visible,.kt-drill-card-body:focus-visible,.kt-drill-reset:focus-visible,.kt-drill-quit:focus-visible,.kt-drill-pick-btn:focus-visible,.kt-drill-next:focus-visible,.kt-drill-back:focus-visible,.kt-drill-pad [role="button"]:focus-visible{outline:4px solid #2f7ccd;outline-offset:3px;}
 
   @media (max-width: 1100px) {
     .kt-drill-screen{padding:18px 26px 24px;}
@@ -931,6 +1074,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     .kt-drill-mode-screen{padding-top:16px;padding-bottom:20px;}
     .kt-drill-mode-panel{gap:9px;}
     .kt-drill-mode-option{min-height:170px;padding:14px;}
+    .kt-drill-stage-option{min-height:150px;padding-top:40px;}
     .kt-drill-mode-symbol{font-size:36px;}
   }
 
@@ -943,10 +1087,13 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     .kt-drill-mode-question{font-size:30px;}
     .kt-drill-mode-options{grid-template-columns:minmax(0,1fr);gap:14px;}
     .kt-drill-mode-option{min-height:150px;}
+    .kt-drill-stage-options{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+    .kt-drill-stage-option{min-height:140px;padding:44px 10px 12px;}
+    .kt-drill-stage-name{font-size:20px;}
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .kt-drill-mode-option{transition:none;}
+    .kt-drill-mode-option,.kt-drill-stage-option{transition:none;}
   }
 </style>
 """.TrimEnd('\r', '\n');
