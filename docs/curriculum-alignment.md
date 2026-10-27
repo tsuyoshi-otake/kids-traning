@@ -4,7 +4,7 @@
 
 登録学校学年は保護者向けの表示・記録属性であり、出題上限ではない。通常モードは登録学年にかかわらず小学1年から開始し、「登録学年の単元を優先する」をONにした場合だけ登録学年から開始する。どちらのモードでも教科別の順序を保ちながら、現在学年の有効な全単元が難易度5を合格して定着確認へ入るまで次学年を解放しない。無効な単元は完了条件から除外し、上位学年の履歴や保存セッションは進級ゲートを迂回できない。1日・3日・7日後の定着確認は、すでに解放された同一学年内の学習を妨げない。
 
-特別活動・家庭科（中学校の家庭分野を含む）・道徳・生活・情報活用は全学年で出題・選択設定・進級条件から除外する。過去の履歴と獲得済みXP・星は保持する。削除科目を含む保存セッションは再開せず開始画面へ戻す。
+特別活動・家庭科（中学校の家庭分野を含む）・道徳・生活・情報活用・思考トレーニングは全学年で出題・選択設定・進級条件から除外する。過去の履歴と獲得済みXP・星は保持する。削除科目を含む保存セッションは再開せず開始画面へ戻す。
 
 ## 根拠資料
 
@@ -32,16 +32,13 @@
 | 1 | 算数 | `math.g1.kazu`, `math.g1.shape`, `math.g1.add`, `math.g1.sub`, `math.g1.clock`, `math.g1.measure`, `math.g1.story`, `math.g1.money`, `math.g1.groups`, `math.g1.chart` | 自動採点 |
 | 1 | 国語 | `japanese.g1.moji`, `japanese.g1.bun`, `japanese.g1.kokugo`, `japanese.g1.goi`, `japanese.g1.dokkai` | 自動採点 |
 | 1 | キーボード | `keyboard.g1.keyboard` | 自動採点＋既存活動 |
-| 1 | 思考トレーニング | `thinking.g1.patterns-and-logic` | 自動採点 |
 | 2 | 算数 | `math.g2.chart`, `math.g2.clock`, `math.g2.add`, `math.g2.sub`, `math.g2.measure`, `math.g2.hissan`, `math.g2.story`, `math.g2.kazu`, `math.g2.money`, `math.g2.order`, `math.g2.groups`, `math.g2.mul`, `math.g2.shape`, `math.g2.frac` | 自動採点 |
 | 2 | 国語 | `japanese.g2.kokugo`, `japanese.g2.bun`, `japanese.g2.goi`, `japanese.g2.dokkai`, `japanese.g2.moji` | 自動採点 |
 | 2 | キーボード | `keyboard.g2.keyboard` | 自動採点＋既存活動 |
-| 2 | 思考トレーニング | `thinking.g2.patterns-and-space` | 自動採点 |
 | 3 | 算数 | `math.g3.mul`, `math.g3.div`, `math.g3.shape`, `math.g3.hissan`, `math.g3.kazu`, `math.g3.soroban`, `math.g3.add`, `math.g3.sub`, `math.g3.clock`, `math.g3.measure`, `math.g3.story`, `math.g3.order`, `math.g3.chart`, `math.g3.frac`, `math.g3.money`, `math.g3.groups` | 自動採点 |
 | 3 | 国語 | `japanese.g3.kokugo`, `japanese.g3.bun`, `japanese.g3.goi`, `japanese.g3.dokkai`, `japanese.g3.moji` | 自動採点 |
 | 3 | 社会・理科・外国語 | `social.g3.shakai`, `science.g3.rika`, `english.g3.eigo` | 自動採点＋活動カード |
 | 3 | 総合・キーボード | `integrated.g3.sougou`, `keyboard.g3.keyboard` | 自動採点＋活動カード |
-| 3 | 思考トレーニング | `thinking.g3.logic-and-strategy` | 自動採点 |
 
 ### 九九・かけ算とひっ算
 
@@ -144,20 +141,6 @@ Issue #95 では、[小学2年 算数の単元一覧](https://study.jitenon.jp/l
 | 5 | 外国語 | `english.g5.five-domains-foundation` | 五領域の基礎 | 問題＋会話活動 | 外国語編 |
 | 6 | 外国語 | `english.g6.five-domains-integration` | 五領域の活用 | 問題＋会話活動 | 外国語編 |
 | 4～6 | 総合 | `integrated.g4.inquiry-cycle`, `integrated.g5.inquiry-cycle`, `integrated.g6.inquiry-cycle` | 課題設定・収集・整理・表現・振り返り | 問題＋活動 | 解説一覧 |
-
-## 思考トレーニング（小学1～6年）
-
-各学年に5段階、各段階に6種類×4問＝24問、合計720問を用意する。既存の小学1～3年の単元IDは維持し、小学4～6年を追加する。
-
-| 学年 | 教科 | 単元ID | 内容 |
-|---|---|---|---|
-| 4 | 思考トレーニング | `thinking.g4.constraints-and-planning` | 条件整理・逆算・予算・作業順序・必勝手 |
-| 5 | 思考トレーニング | `thinking.g5.evidence-and-combinations` | 複数条件・組合せの限定・同時進行の計画 |
-| 6 | 思考トレーニング | `thinking.g6.deduction-and-strategy` | 情報不足の判断・多段階の逆算・最適化・相手の全応手を考える戦略 |
-
-6種類は「ならびの推理」「わりあての推理」「うしろから考える」「道すじをたどる」「組合せをしぼる」「かならずを考える」。低学年は具体物と小さな数で考え、角度・文字式・抽象的な集合の知識を前提としない。高学年には予算の上限、同時進行できる作業と待つ作業、石取りの作戦を含める。「きめられない」を不正解の埋め草にせず、情報不足の問題では正解にし、解説で異なる2通りを示す。
-
-解説は途中の手順と確かめ方を示す。テストは表示された問題文から条件を読み取り、並べ方・割当て・全組合せ・ゲームの全応手を別実装で検証する。問題数だけで教育効果を保証するものではない。
 
 ## 中学校1～3年の追加単元
 
