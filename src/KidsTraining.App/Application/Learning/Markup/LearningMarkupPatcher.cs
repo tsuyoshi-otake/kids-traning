@@ -234,6 +234,7 @@ internal static partial class LearningMarkupPatcher
         markup = PatchSoroban(markup);
         markup = PatchKanjiPictureQuestions(markup);
         markup = PatchDrillMode(markup);
+        markup = PatchDrillRecord(markup);
         markup = PatchParentPinGate(markup);
         markup = PatchCelebrationEffects(markup);
         markup = PatchLearningLabelWording(markup);

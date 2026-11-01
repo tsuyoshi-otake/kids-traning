@@ -485,7 +485,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     // Every question of the stage retired: nothing is left to ask, so the run ends before it starts.
     const allRetired=idx>=to;
     const mode=id==='k1'||id==='k2'?(answerMode==='writing'?'writing':'reading'):(answerMode==='choice'?'choice':'input'),choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder(to-from,choiceSeed);
-    if(fresh){record.stages[s]={idx:0,perfect:0,mistakes:0,runs:saved.runs,best:saved.best};this.writeDrillProgress(progress);}
+    if(fresh){record.stages[s]={idx:0,perfect:0,mistakes:0,runs:saved.runs,best:saved.best};this.writeDrillProgress(progress);this.clearDrillRunMisses(id,from,to);}
     this.clearDrillEcho();this.stopDrillSpeech();
     this.sfx('select');
     const opts=Object.assign({},record.opts);
@@ -500,6 +500,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     next.done=next.idx>=end+again.length;
     next.count=this.drillOptionCount(next,this.drillQuestionAt(next,next.idx));
     this.saveDrillProgress(next,countRun);
+    if(countRun)this.recordDrillRun(next);
     if(next.done)this.sfx('clear');
     this.setState({drill:next,input:''});
   }
@@ -618,6 +619,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     const miss=d.miss+1,revealed=miss>=2,firstMiss=miss===1&&q.kind==='num'&&d.idx<this.drillEnd(d);
     const nextDrill=Object.assign({},d,{miss:miss,mistakes:d.mistakes+1,mark:revealed?'answer':'wrong',hint:q.hint,revealed:revealed,streak:0,opts:firstMiss?this.drillBumpOption(d,q,false):d.opts});
     this.setState({input:'',drill:nextDrill});
+    // The record screen (DrillRecordPatch) lists every question missed on the first pass.
+    if(miss===1&&d.idx<this.drillEnd(d))this.noteDrillRunMiss(d);
     if(firstMiss)this.saveDrillProgress(nextDrill,false);
   }
   exitDrill(){const d=this.state.drill;this.clearDrillEcho();this.stopDrillSpeech();this.saveDrillProgress(d,false);this.sfx('tap');this.setState({screen:'start',drill:null,drillAsk:'',drillCourseChoice:'',input:''});}

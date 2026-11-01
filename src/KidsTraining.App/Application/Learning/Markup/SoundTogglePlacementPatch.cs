@@ -40,11 +40,12 @@ internal static partial class LearningMarkupPatcher
             "🔥 {{ comboCount }}れんぞく</span>\n        </sc-if>\n        " + SoundToggle + "\n      </div>\n      <!-- question metadata -->",
             StringComparison.Ordinal);
 
-        // The stage and answer-mode screens share one header: the back button and the toggle.
+        // The stage, answer-mode and record screens share one header: the back button and the toggle.
         foreach (var backButton in new[]
         {
             "<button type=\"button\" class=\"kt-drill-mode-back\" aria-label=\"とっくんの いちらんに もどる\" onclick=\"{{ drillStageView.onBack }}\">← もどる</button>",
             "<button type=\"button\" class=\"kt-drill-mode-back\" aria-label=\"ステージの いちらんに もどる\" onclick=\"{{ drillModeView.onBack }}\">← もどる</button>",
+            "<button type=\"button\" class=\"kt-drill-mode-back\" aria-label=\"はじめの がめんに もどる\" onclick=\"{{ drillLogView.onBack }}\">← もどる</button>",
         })
         {
             markup = ReplaceRequired(markup, backButton,
