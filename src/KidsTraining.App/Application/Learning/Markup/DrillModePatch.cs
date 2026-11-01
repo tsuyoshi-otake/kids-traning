@@ -128,36 +128,45 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         return """
   drillStorageKey(){return 'kt_drill_v1';}
   drillCourses(){return [
-    {id:'g1',grade:1,total:100,badge:'1年生',title:'たしざん・ひきざん',sub:'1＋1から じゅんばんに 100もん',color:'#ff8a3d',edge:'#e07d2a',shade:'#fff3e6'},
-    {id:'g2',grade:2,total:100,badge:'2年生',title:'かけざん（九九）',sub:'2のだんから じゅんばんに 100もん',color:'#4a9bf0',edge:'#2f7ccd',shade:'#eaf3ff'},
+    {id:'g1',grade:1,total:100,badge:'1年生',title:'たしざん・ひきざん',sub:'1＋1から じゅんばんに 100もん',cuts:[[24,'たしざんの きほんと 10の ともだち'],[42,'10の ともだち つづき'],[66,'ひきざんの きほんと 10から ひく'],[84,'10から ひく つづき'],[100,'くりあがり・くりさがり']],color:'#ff8a3d',edge:'#e07d2a',shade:'#fff3e6'},
+    {id:'g2',grade:2,total:100,badge:'2年生',title:'かけざん（九九）',sub:'2のだんから じゅんばんに 100もん',cuts:[[27,'2・5・3の だん'],[54,'4・6・7の だん'],[81,'8・9・1の だん'],[100,'しあげの ミックス']],color:'#4a9bf0',edge:'#2f7ccd',shade:'#eaf3ff'},
     // ひっ算は くりあがり・くりさがりの ない コースと ある コースに わける（Issue #95）。
     // h2 は もとの「くりあがり・くりさがりの たしざん・ひきざん」コースの id を ひきつぐ。
     // かいしがめんの カードは せまいので、cardTitle と cardTag に わけて 1ぎょうに おさめる（Issue #98）。
-    {id:'h2n',grade:2,total:100,badge:'2年生',title:'ひっ算（くりあがりなし）',cardTitle:'ひっ算',cardTag:'くりあがり なし',sub:'くりあがり・くりさがりの ない たしざん・ひきざんを 100もん',color:'#f2b134',edge:'#a8750a',shade:'#fff8e6'},
-    {id:'h2',grade:2,total:100,badge:'2年生',title:'ひっ算（くりあがりあり）',cardTitle:'ひっ算',cardTag:'くりあがり あり',sub:'くりあがり・くりさがりの たしざん・ひきざんを 100もん',color:'#e39b2e',edge:'#c47d16',shade:'#fff4e0'},
-    {id:'p2',grade:2,total:100,badge:'2年生',title:'（ ）の ある けいさん',sub:'（ ）の なかを さきに けいさんする しきを 100もん',color:'#e0607e',edge:'#b8395a',shade:'#ffeef2'},
-    {id:'d3',grade:3,total:100,badge:'3年生',title:'わりざん',sub:'九九の ぎゃくさんを 100もん',color:'#3cb8a8',edge:'#2a8f83',shade:'#e5f7f4'},
+    {id:'h2n',grade:2,total:100,badge:'2年生',title:'ひっ算（くりあがりなし）',cardTitle:'ひっ算',cardTag:'くりあがり なし',cuts:[[25,'2けたの たしざん'],[50,'2けたの ひきざん'],[75,'3けたの たしざん'],[100,'3けたの ひきざん']],sub:'くりあがり・くりさがりの ない たしざん・ひきざんを 100もん',color:'#f2b134',edge:'#a8750a',shade:'#fff8e6'},
+    {id:'h2',grade:2,total:100,badge:'2年生',title:'ひっ算（くりあがりあり）',cardTitle:'ひっ算',cardTag:'くりあがり あり',cuts:[[20,'くりあがりの たしざん'],[40,'くりさがりの ひきざん'],[70,'3けたに なる たしざん'],[100,'3けたの ひきざん']],sub:'くりあがり・くりさがりの たしざん・ひきざんを 100もん',color:'#e39b2e',edge:'#c47d16',shade:'#fff4e0'},
+    {id:'p2',grade:2,total:100,badge:'2年生',title:'（ ）の ある けいさん',cuts:[[25,'（ ）の なかを さきに'],[50,'10を つくって たす'],[75,'ひきざんと （ ）'],[100,'しあげの ミックス']],sub:'（ ）の なかを さきに けいさんする しきを 100もん',color:'#e0607e',edge:'#b8395a',shade:'#ffeef2'},
+    {id:'d3',grade:3,total:100,badge:'3年生',title:'わりざん',cuts:[[27,'2・5・3の だんで わる'],[54,'4・6・7の だんで わる'],[81,'8・9・1の だんで わる'],[100,'□と しあげの ミックス']],sub:'九九の ぎゃくさんを 100もん',color:'#3cb8a8',edge:'#2a8f83',shade:'#e5f7f4'},
     {id:'k1',grade:1,total:100,badge:'1年生',title:'かんじ・ことば',sub:'1年生の 漢字と くみあわせた ことばを 100もん',color:'#5fbf7a',edge:'#3f9a5b',shade:'#eaf7ee'},
     {id:'k2',grade:2,total:100,badge:'2年生',title:'かんじ・ことば',sub:'1・2年生で ならった 漢字の ことばを 100もん',color:'#b07ae0',edge:'#8d55c4',shade:'#f4ecff'}
   ];}
   drillCourse(id){const list=this.drillCourses();for(let i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
-  // A course is asked one stage of 25 questions at a time (issue #117): stage s holds the bank
-  // positions [from, to). Stage 1 is always open, and stage s+1 opens once stage s has finished
-  // a run, so the run counts double as the unlock record.
+  // A course is asked one stage at a time (issue #117): stage s holds the bank positions
+  // [from, to). Stage 1 is always open, and stage s+1 opens once stage s has finished a run, so
+  // the run counts double as the unlock record. A course with cuts ([end, name], cumulative)
+  // starts every stage at a group start, such as 3 × 1 rather than 3 × 8 (issue #122); a course
+  // without them is cut every 25 questions, the layout every course used in #117.
   drillStageSize(){return 25;}
-  drillStageCount(c){return c?Math.max(1,Math.ceil(c.total/this.drillStageSize())):0;}
-  drillStageRange(c,stage){const from=stage*this.drillStageSize();return {from:from,to:Math.min(c.total,from+this.drillStageSize())};}
+  drillStageEnds(c){return c?(Array.isArray(c.cuts)?c.cuts.map(cut=>cut[0]):this.drillLegacyStageEnds(c)):[];}
+  drillLegacyStageEnds(c){const ends=[];for(let to=this.drillStageSize();;to+=this.drillStageSize()){ends.push(Math.min(c.total,to));if(to>=c.total)return ends;}}
+  drillStageCount(c){return this.drillStageEnds(c).length;}
+  drillRangeIn(ends,stage){return {from:stage>0?ends[stage-1]:0,to:ends[stage]};}
+  drillStageRange(c,stage){return this.drillRangeIn(this.drillStageEnds(c),stage);}
+  drillStageName(c,stage){const range=this.drillStageRange(c,stage);return Array.isArray(c.cuts)?c.cuts[stage][1]:(range.from+1)+'〜'+range.to+'もんめ';}
   drillStageOpen(record,stage){return stage===0||!!(record&&record.stages&&record.stages[stage-1]&&record.stages[stage-1].runs>0);}
-  drillDefaultRecord(c){const stages=[];for(let s=0;s<this.drillStageCount(c);s++)stages.push({idx:0,perfect:0,mistakes:0,runs:0,best:0});return {opts:{},stages:stages};}
-  readDrillStages(c,row,whole){
+  drillDefaultRecord(c){const stages=[];for(let s=0;s<this.drillStageCount(c);s++)stages.push({idx:0,perfect:0,mistakes:0,runs:0,best:0});return {opts:{},cuts:this.drillStageEnds(c).join(','),stages:stages};}
+  readDrillStages(c,row,whole,opts){
     // Each stage keeps its own run: idx is the position inside the stage, runs the finished runs.
     const stages=[];
     if(Array.isArray(row.stages)){
-      for(let s=0;s<this.drillStageCount(c);s++){
-        const range=this.drillStageRange(c,s),len=range.to-range.from,st=row.stages[s]&&typeof row.stages[s]==='object'?row.stages[s]:{};
+      // Stage rows saved before a course had cuts (v1.44.0) were cut every 25 questions.
+      const ends=this.drillStageEnds(c),saved=typeof row.cuts==='string'?row.cuts:this.drillLegacyStageEnds(c).join(',');
+      const savedEnds=saved===ends.join(',')?ends:this.drillLegacyStageEnds(c);
+      for(let s=0;s<savedEnds.length;s++){
+        const range=this.drillRangeIn(savedEnds,s),len=range.to-range.from,st=row.stages[s]&&typeof row.stages[s]==='object'?row.stages[s]:{};
         stages.push({idx:this.clamp(whole(st.idx),0,len),perfect:this.clamp(whole(st.perfect),0,len),mistakes:whole(st.mistakes),runs:whole(st.runs),best:this.clamp(whole(st.best),0,len)});
       }
-      return stages;
+      return savedEnds===ends?stages:this.drillRestage(c,savedEnds,stages,opts);
     }
     // A record saved before stages kept one position over the whole course. Every stage that
     // position has passed finished a run, so retirements stamped with the course run keep their
@@ -167,6 +176,30 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     for(let s=0;s<this.drillStageCount(c);s++){
       const range=this.drillStageRange(c,s),here=at>range.from&&at<range.to,local=here?at-range.from:0;
       stages.push({idx:local,perfect:here?this.clamp(perfect-range.from,0,local):0,mistakes:0,runs:runs+(at>=range.to?1:0),best:0});
+    }
+    return stages;
+  }
+  drillRestage(c,savedEnds,saved,opts){
+    // Moving to new cuts (issue #122): each new stage takes the runs and best of the saved
+    // stage holding its first question, so every stage that was open stays open, and a run in
+    // progress resumes at the same question in whichever new stage now holds it.
+    const ends=this.drillStageEnds(c),holder=(list,at)=>{for(let s=0;s<list.length;s++)if(at<list[s])return s;return list.length-1;},stages=[];
+    for(let s=0;s<ends.length;s++){
+      const range=this.drillRangeIn(ends,s),len=range.to-range.from,first=saved[holder(savedEnds,range.from)];
+      let row={idx:0,perfect:0,mistakes:0,runs:first.runs,best:this.clamp(first.best,0,len)};
+      for(let t=0;t<saved.length;t++){
+        const at=this.drillRangeIn(savedEnds,t).from+saved[t].idx;
+        if(saved[t].idx>0&&at>range.from&&at<range.to){row=Object.assign(row,{idx:at-range.from,perfect:this.clamp(saved[t].perfect,0,at-range.from),mistakes:saved[t].mistakes});break;}
+      }
+      stages.push(row);
+    }
+    // A retired question's r is a run of its stage: r below the runs means it sits out, r equal
+    // to them means it retired in the run still going. Both keep their meaning in the new stage;
+    // one that sat out comes back only when its new stage has no finished run to stamp it with.
+    for(const key of Object.keys(opts||{})){
+      const entry=opts[key];if(entry.t!==3)continue;
+      const at=Number(key)-1,before=saved[holder(savedEnds,at)].runs,after=stages[holder(ends,at)].runs;
+      entry.r=entry.r<before?Math.max(0,Math.min(entry.r,after-1)):after;
     }
     return stages;
   }
@@ -189,7 +222,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
           opts[no]=retired?{c:6,t:3,r:entry.r}:run>0?{c:6,t:Math.min(2,run)}:{c:entry.c};
         }
       }
-      out[c.id]={opts:opts,stages:this.readDrillStages(c,row,whole)};
+      out[c.id]={opts:opts,cuts:this.drillStageEnds(c).join(','),stages:this.readDrillStages(c,row,whole,opts)};
     });
     return out;
   }
@@ -651,23 +684,24 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
           const status=!x.open?'🔒 ステージ '+s+'を クリアしてね':!x.active?'ぜんぶ おぼえた':x.started?('つづき '+x.done+' / '+x.active):x.cleared?'クリア ✓':(x.active+'もん');
           const pct=Math.round((x.started&&x.active?this.clamp(x.done/x.active,0,1):x.cleared||!x.active?1:0)*100);
           return {
-            no:String(s+1), name:name, range:(x.range.from+1)+'〜'+x.range.to+'もんめ', status:status,
+            no:String(s+1), name:name, range:this.drillStageName(stageCourse,s), status:status,
             style:!x.open?'background:#f4f1ea; border-color:#ddd5c4; color:#a39579; box-shadow:none; cursor:default;':x.cleared?'background:#f0faf3; border-color:#9dd3ae;':'border-color:'+stageCourse.edge+';',
             barStyle:'width:'+(x.open?pct:0)+'%; background:'+stageCourse.color+';',
             ariaDisabled:x.open?'false':'true',
-            ariaLabel:(s+1)+'ばん、'+name+'、'+(x.range.from+1)+'もんめから'+x.range.to+'もんめ。'+status.replace('🔒 ',''),
+            ariaLabel:(s+1)+'ばん、'+name+'、'+this.drillStageName(stageCourse,s)+'。'+status.replace('🔒 ',''),
             onClick:()=>this.selectDrillStage(s)
           };
         }),
+        keyHelp:'キーボードの 1〜'+record.stages.length+' でも えらべるよ',
         onBack:()=>this.cancelDrillStage()
       };
     }
     if(sc==='drill-mode'){
       const modeCourse=this.drillCourse(String(S.drillCourseChoice||''))||{};
-      const kanjiMode=modeCourse.id==='k1'||modeCourse.id==='k2',modeStage=Math.floor(Number(S.drillStageChoice))||0,modeRange=modeCourse.total?this.drillStageRange(modeCourse,modeStage):{from:0,to:0};
+      const kanjiMode=modeCourse.id==='k1'||modeCourse.id==='k2',modeStage=Math.floor(Number(S.drillStageChoice))||0;
       drillModeView={
         badge:modeCourse.badge||'',title:modeCourse.title||'',headStyle:'background:'+(modeCourse.color||'#ff8a3d')+';',
-        stageText:'ステージ '+(modeStage+1)+'（'+(modeRange.from+1)+'〜'+modeRange.to+'もんめ）',
+        stageText:'ステージ '+(modeStage+1)+'（'+(modeCourse.total?this.drillStageName(modeCourse,modeStage):'')+'）',
         firstAria:kanjiMode?'1ばん、読みを選ぶ':'1ばん、数字を入力',firstSymbol:kanjiMode?'漢 → かん':'123',firstName:kanjiMode?'よみを えらぶ':'すうじを 入力',firstHelp:kanjiMode?'かんじの よみかたを 4つから':'じぶんで こたえを いれる',
         secondAria:kanjiMode?'2ばん、漢字を選ぶ':'2ばん、こたえをえらぶ',secondSymbol:kanjiMode?'かん → 漢':'A / B',secondName:kanjiMode?'かんじを えらぶ':'えらんで こたえる',secondHelp:kanjiMode?'ただしい かきかたを 4つから':'ただしい こたえを えらぶ',
         onFirst:()=>this.startDrill(modeCourse.id,false,kanjiMode?'reading':'input',modeStage),onSecond:()=>this.startDrill(modeCourse.id,false,kanjiMode?'writing':'choice',modeStage),onBack:()=>this.cancelDrillMode()
@@ -783,7 +817,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
             </button>
           </sc-for>
         </div>
-        <div class="kt-drill-mode-key-help">キーボードの 1〜4 でも えらべるよ</div>
+        <div class="kt-drill-mode-key-help">{{ drillStageView.keyHelp }}</div>
       </div>
     </div>
   </sc-if>
@@ -978,7 +1012,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-mode-key-help{font-size:15px;font-weight:700;color:#7b6a4d;}
   .kt-drill-mode-stage{background:#fff;border:3px solid #f0e2c8;border-radius:16px;padding:3px 14px;font-size:18px;font-weight:800;color:#6b5e45;}
   /* Four stages read left to right in order; the number in the corner is the key that picks one. */
-  .kt-drill-stage-options{width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:8px;}
+  /* One row of stages on a wide screen, however many the course has (four, or five for grade 1, #122). */
+  .kt-drill-stage-options{width:100%;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:14px;margin-top:8px;}
   .kt-drill-stage-option{position:relative;min-height:190px;min-width:0;background:#fff;border:4px solid #f0e2c8;border-radius:24px;padding:46px 12px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font:inherit;color:#3a3326;box-shadow:0 6px 0 #ecd9b9;cursor:pointer;word-break:keep-all;overflow-wrap:anywhere;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease,transform .2s ease;}
   .kt-drill-stage-option .kt-drill-mode-number{top:10px;left:10px;min-width:30px;height:30px;border-radius:10px;font-size:16px;}
   .kt-drill-stage-name{font-size:24px;font-weight:900;white-space:nowrap;}
@@ -1086,7 +1121,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     .kt-drill-mode-question{font-size:30px;}
     .kt-drill-mode-options{grid-template-columns:minmax(0,1fr);gap:14px;}
     .kt-drill-mode-option{min-height:150px;}
-    .kt-drill-stage-options{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
+    .kt-drill-stage-options{grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
     .kt-drill-stage-option{min-height:140px;padding:44px 10px 12px;}
     .kt-drill-stage-name{font-size:20px;}
   }
