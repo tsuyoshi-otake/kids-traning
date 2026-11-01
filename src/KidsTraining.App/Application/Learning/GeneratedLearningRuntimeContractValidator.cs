@@ -224,6 +224,9 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("drill-retirement", "drillRetiredIndexes(opts,runs,from,to)"),
         ("drill-stage-screen", "isDrillStage:sc==='drill-stage'"),
         ("drill-stage-unlock", "drillStageOpen(record,stage)"),
+        ("drill-record-storage", "kt_drill_log_v1"),
+        ("drill-record-screen", "isDrillLog:sc==='drill-log'"),
+        ("drill-record-run", "if(countRun)this.recordDrillRun(next);"),
         ("drill-answer-speech", "drillSpeechText(d,q)"),
         ("drill-android-speech", "KtAndroid.speak(value,String(token))"),
         ("drill-written-columns", "drillHissanColumns(d,q)")

@@ -17,6 +17,7 @@ namespace KidsTraining.ArchitectureTests;
 internal static class Program
 {
     private static readonly List<string> Failures = [];
+    private static int TestCount;
 
     private static int Main(string[] args)
     {
@@ -34,6 +35,7 @@ internal static class Program
         Run("Review schedule uses bounded spaced intervals", TestReviewSchedule);
         Run("Learning markup contains evidence-based progression", () => TestEducationalProgressionMarkup(repositoryRoot));
         Run("Arithmetic drill mode is selectable from the start screen", () => TestDrillModeMarkup(repositoryRoot));
+        Run("Drill runs are logged and listed on the child's record screen", () => TestDrillRecordMarkup(repositoryRoot));
         Run("Sound toggle sits at the top right of every child screen", () => TestSoundToggleMarkup(repositoryRoot));
         Run("Learning hot paths retain bounded-work performance contracts", () => TestPerformanceContracts(repositoryRoot));
         Run("Generated learning algorithms keep bounded operation counts", () => TestAlgorithmPerformanceAudit(repositoryRoot));
@@ -60,7 +62,7 @@ internal static class Program
 
         if (Failures.Count == 0)
         {
-            Console.WriteLine("Architecture tests passed: 30");
+            Console.WriteLine($"Architecture tests passed: {TestCount}");
             return 0;
         }
 
@@ -538,6 +540,41 @@ internal static class Program
         }
     }
 
+    // Every finished drill stage run is logged with its first-pass misses, and the record screen
+    // (きろく) lists the runs; the audit (GeneratedQuestionAudit, issue #123) drives the behavior,
+    // this test pins the wiring that the audit cannot see: the entry, the keys and the phone page.
+    private static void TestDrillRecordMarkup(string repositoryRoot)
+    {
+        var (template, appDefinition) = ReadLearningSource(repositoryRoot);
+        var html = new LearningPageBuilder().Build(template, appDefinition, "Record Test", ParentPin.Default);
+        const string entry = "<div class=\"kt-log-entry\" role=\"button\" tabindex=\"0\" aria-label=\"これまでの きろくを みる\" onclick=\"{{ goDrillLog }}\">";
+        var entryAt = html.IndexOf(entry, StringComparison.Ordinal);
+
+        Assert(
+            html.Contains("drillLogKey(){return 'kt_drill_log_v1';}", StringComparison.Ordinal) &&
+            html.Contains("drillLogLimit(){return 200;}", StringComparison.Ordinal) &&
+            html.Contains("if(countRun)this.recordDrillRun(next);", StringComparison.Ordinal) &&
+            html.Contains("this.writeDrillProgress(progress);this.clearDrillRunMisses(id,from,to);}", StringComparison.Ordinal) &&
+            html.Contains("if(miss===1&&d.idx<this.drillEnd(d))this.noteDrillRunMiss(d);", StringComparison.Ordinal),
+            "the drill does not report its runs and first-pass misses to the run log");
+        Assert(
+            entryAt > html.IndexOf("<div class=\"kt-drill-grid\">", StringComparison.Ordinal) &&
+            entryAt < html.IndexOf("<!-- start button -->", StringComparison.Ordinal) &&
+            html.Contains("<sc-if value=\"{{ isDrillLog }}\" hint-placeholder-val=\"{{ false }}\">", StringComparison.Ordinal) &&
+            html.Contains("isDrillLog:sc==='drill-log'", StringComparison.Ordinal),
+            "the record screen is not reachable from under the drill courses on the start screen");
+        // Esc on Windows and the Android back key (MainActivity clicks .kt-drill-mode-back) leave it.
+        Assert(
+            html.Contains("this._drillLogKeyHandler=e=>{if(e.key!=='Escape'||this.state.screen!=='drill-log')return;e.preventDefault();this.closeDrillLog();};", StringComparison.Ordinal) &&
+            html.Contains("if(this._drillLogKeyHandler)document.removeEventListener('keydown',this._drillLogKeyHandler);", StringComparison.Ordinal) &&
+            html.Contains("<button type=\"button\" class=\"kt-drill-mode-back\" aria-label=\"はじめの がめんに もどる\" onclick=\"{{ drillLogView.onBack }}\">← もどる</button>", StringComparison.Ordinal),
+            "the record screen cannot be left with Esc or the Android back key");
+        var phone = KidsTraining.RuntimeExport.MobileDrillOnlyPatch.Apply(html);
+        Assert(
+            phone.IndexOf(entry, StringComparison.Ordinal) > phone.IndexOf("<div class=\"kt-mobile-panel\"", StringComparison.Ordinal),
+            "the drill-only phone page hides the record screen entry");
+    }
+
     private static void TestSoundToggleMarkup(string repositoryRoot)
     {
         var (template, appDefinition) = ReadLearningSource(repositoryRoot);
@@ -558,7 +595,7 @@ internal static class Program
 
         int Count(string text, string value) => text.Split(value).Length - 1;
 
-        foreach (var label in new[] { "開始", "初回チェック", "出題", "ステージ", "こたえかた", "とっくん" })
+        foreach (var label in new[] { "開始", "初回チェック", "出題", "ステージ", "こたえかた", "とっくん", "きろく" })
         {
             Assert(Count(Screen(label), headerToggle) == 1, $"the {label} screen does not carry exactly one sound toggle in its header");
         }
@@ -585,8 +622,9 @@ internal static class Program
             Screen("開始").Contains("🔑 解除</span>\n          <span role=\"button\" tabindex=\"0\" " + headerToggle, StringComparison.Ordinal) &&
             Screen("ステージ").Contains("<div class=\"kt-drill-mode-head\">", StringComparison.Ordinal) &&
             Screen("こたえかた").Contains("<div class=\"kt-drill-mode-head\">", StringComparison.Ordinal) &&
+            Screen("きろく").Contains("<div class=\"kt-drill-mode-head\">", StringComparison.Ordinal) &&
             Screen("とっくん").Contains("<div class=\"kt-drill-count\">{{ drillView.countText }}</div>\n        <span role=\"button\" tabindex=\"0\" " + headerToggle, StringComparison.Ordinal),
-            "the start, stage, answer-mode or drill toggle left its top-right spot");
+            "the start, stage, answer-mode, record or drill toggle left its top-right spot");
         Assert(
             Count(html, "onclick=\"{{ toggleMute }}\" class=\"kt-mute-fab\"") == 1 &&
             html.Contains("body:has(.kt-sound-toggle) .kt-mute-fab{display:none!important;}", StringComparison.Ordinal) &&
@@ -1868,6 +1906,7 @@ internal static class Program
 
     private static void Run(string name, Action test)
     {
+        TestCount++;
         try
         {
             test();

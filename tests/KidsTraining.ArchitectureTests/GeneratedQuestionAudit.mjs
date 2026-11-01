@@ -3320,7 +3320,8 @@ if (app.state.drill.idx !== 1 || app.state.drill.perfect !== 0) {
   violated(DRILL_FLOW_CHECK, 'choosing the right kanji spelling did not advance without first-try credit', JSON.stringify(app.state.drill));
 }
 
-if ([...drillStorage.keys()].join(',') !== 'kt_drill_v1') {
+// The drill keeps its progress and its run log (issue #123) and touches nothing else.
+if ([...drillStorage.keys()].sort().join(',') !== 'kt_drill_log_v1,kt_drill_v1') {
   violated(DRILL_FLOW_CHECK, `the drill wrote outside its own storage key: ${[...drillStorage.keys()].join(',')}`, 'storage isolation');
 }
 app.exitDrill();
@@ -3736,6 +3737,131 @@ for (const course of drillCourses) {
   } finally {
     if (stageApp.state.drill) stageApp.exitDrill();
     stageApp.state.screen = 'start';
+    drillStorage.clear();
+  }
+}
+
+// Issue #123: every finished stage run is logged with the questions missed on its first pass,
+// and the record screen (きろく) lists the runs newest first, with learning answers by day.
+const DRILL_LOG_CHECK = 'a finished drill stage run is logged with its first-pass misses and the record screen lists it';
+const DRILL_LOG_RECORD_CHECK = 'the drill log keeps the latest 200 runs and drops malformed data';
+observe(DRILL_LOG_CHECK, 6);
+observe(DRILL_LOG_RECORD_CHECK, 3);
+{
+  const logApp = hissanViewApp;
+  const g2Bank = app.drillBank('g2');
+  const drillLog = () => JSON.parse(drillStorage.get('kt_drill_log_v1') || 'null');
+  const answer = (value) => { logApp.setState({ input: String(value) }); logApp.drillSubmit(); };
+  // Plays a stage to its end; misses[n] wrong answers go in before the n-th question asked.
+  const playStage = (stage, restart, misses = {}, stopAfter = Infinity) => {
+    logApp.startDrill('g2', restart, 'input', stage);
+    const asked = [];
+    while (!logApp.state.drill.done && asked.length < Math.min(stopAfter, 200)) {
+      const question = logApp.drillQuestion();
+      for (let miss = 0; miss < (misses[asked.length] || 0); miss += 1) answer(question.ans + 1);
+      asked.push(question.text);
+      answer(question.ans);
+      logApp.drillFlushEcho();
+    }
+    return asked;
+  };
+  const logView = () => { logApp.setState({ screen: 'drill-log' }); return logApp.renderVals().drillLogView; };
+  try {
+    drillStorage.clear();
+    logApp.state.screen = 'start';
+    logApp.state.drill = null;
+    // Stage 1 of かけざん with 2 × 1 retired: one miss on 2 × 2, a revealed answer on 2 × 3, and one
+    // more miss when 2 × 3 is asked again after the first pass, which is not a first-pass miss.
+    drillStorage.set('kt_drill_v1', JSON.stringify({ g2: { opts: { '1': { c: 6, t: 3, r: 0 } }, stages: [{ runs: 1 }, {}, {}, {}] } }));
+    const asked = playStage(0, true, { 0: 1, 1: 2, 26: 1 });
+    const first = drillLog();
+    const run = first && first.runs[0];
+    if (asked[0] !== '2 × 2' || !run || first.runs.length !== 1 || run.course !== 'g2' || run.stage !== 0 || run.name !== '2・5・3の だん' ||
+        asked[26] !== '2 × 3' || run.mode !== 'input' || run.total !== 26 || run.perfect !== 24 || run.mistakes !== 3 || !Number.isFinite(Date.parse(run.at)) ||
+        JSON.stringify(run.missed) !== JSON.stringify([{ q: '2 × 2', a: '4' }, { q: '2 × 3', a: '6' }]) || Object.keys(first.open).length) {
+      violated(DRILL_LOG_CHECK, `a finished stage was logged as ${JSON.stringify(first)}`, 'g2 stage 1, 24 / 26, missed 2 × 2 and 2 × 3, nothing left open');
+    }
+    // A run left midway is not logged; resuming it keeps the miss made before leaving.
+    playStage(1, true, { 0: 1 }, 3);
+    logApp.exitDrill();
+    if (drillLog().runs.length !== 1 || drillLog().open.g2.join(',') !== '27') {
+      violated(DRILL_LOG_CHECK, `leaving stage 2 midway left the log as ${JSON.stringify(drillLog())}`, 'one run, 4 × 1 (index 27) open');
+    }
+    playStage(1, false);
+    const resumed = drillLog().runs[1];
+    if (!resumed || JSON.stringify(resumed.missed) !== JSON.stringify([{ q: g2Bank[27].text, a: String(g2Bank[27].ans) }]) || resumed.total !== 27 || resumed.perfect !== 26) {
+      violated(DRILL_LOG_CHECK, `the resumed stage 2 was logged as ${JSON.stringify(resumed)}`, '26 / 27 with 4 × 1 missed');
+    }
+    // Starting a stage over forgets the misses of the run that was left.
+    playStage(1, true, { 2: 1 }, 4);
+    logApp.exitDrill();
+    playStage(1, true);
+    const again = drillLog().runs[2];
+    if (!again || again.missed.length || again.perfect !== 27 || drillLog().open.g2) {
+      violated(DRILL_LOG_CHECK, `a stage started over was logged as ${JSON.stringify(again)}`, '27 / 27 with no misses');
+    }
+    // The screen: newest first, the stage name and answer mode, the misses as the child reads them.
+    logApp.setState({ screen: 'start' });
+    if (logApp.renderVals().drillLogEntryText !== 'とっくん 3かい') {
+      violated(DRILL_LOG_CHECK, `the start screen entry read ${logApp.renderVals().drillLogEntryText}`, 'とっくん 3かい');
+    }
+    const view = logView();
+    const rows = view.rows;
+    if (rows.length !== 3 || rows[0].title !== 'かけざん（九九） ステージ 2' || rows[0].score !== '💯 27 / 27' || rows[0].missedStyle !== 'display:none;' ||
+        rows[0].sub !== '4・6・7の だん・すうじを 入力' || rows[1].missedText !== 'まちがえた もんだい：4 × 1 ＝ 4' ||
+        rows[2].title !== 'かけざん（九九） ステージ 1' || rows[2].score !== '24 / 26' || rows[2].missedText !== 'まちがえた もんだい：2 × 2 ＝ 4 ／ 2 × 3 ＝ 6' ||
+        view.tabsStyle !== 'display:none;' || view.emptyStyle !== 'display:none;') {
+      violated(DRILL_LOG_CHECK, `the record screen read ${JSON.stringify(view)}`, 'three runs newest first, no learning tab');
+    }
+    const blank = logApp.drillLogMissLine({ q: '10 − □ ＝ 3', a: '7' }), kanji = logApp.drillLogMissLine({ q: '山', a: 'やま' });
+    if (blank !== '10 − □ ＝ 3（□＝7）' || kanji !== '山 → やま') {
+      violated(DRILL_LOG_CHECK, `a missed □ question read ${blank} and a kanji question ${kanji}`, '10 − □ ＝ 3（□＝7） and 山 → やま');
+    }
+    // Learning answers show as a second tab, one row per day, listing what was not answered alone.
+    drillStorage.set('kt_learning_history_v1', JSON.stringify([
+      { timestamp: '2026-10-30T01:00:00Z', outcome: 'independent', question: { prompt: '3 + 4', answer: 7 } },
+      { timestamp: '2026-10-30T01:01:00Z', outcome: 'revealed', question: { prompt: '8 + 5', answer: 13 } },
+      { timestamp: '2026-10-30T01:02:00Z', outcome: 'assisted', question: { prompt: '8 + 5', answer: 13 } },
+      { timestamp: 'junk', outcome: 'independent' },
+    ]));
+    const withTab = logView();
+    withTab.onLearning();
+    const learning = logApp.renderVals().drillLogView;
+    if (withTab.tabsStyle !== '' || withTab.drillPressed !== 'true' || learning.learningPressed !== 'true' || learning.rows.length !== 1 ||
+        learning.rows[0].score !== '1 / 3' || learning.rows[0].missedText !== 'まちがえた もんだい：8 + 5 → 13') {
+      violated(DRILL_LOG_CHECK, `the learning tab read ${JSON.stringify(learning)}`, 'one day, 1 / 3 alone, 8 + 5 listed once');
+    }
+    learning.onBack();
+    if (logApp.state.screen !== 'start') violated(DRILL_LOG_CHECK, 'the record screen back button did not return to the start screen', logApp.state.screen);
+    // An empty log says so instead of showing nothing.
+    drillStorage.clear();
+    const empty = logView();
+    if (empty.rows.length || empty.emptyStyle !== '' || !empty.emptyText) {
+      violated(DRILL_LOG_CHECK, `an empty record screen read ${JSON.stringify(empty)}`, 'the empty message');
+    }
+    // The log keeps the latest 200 runs and drops what it cannot read.
+    const stored = Array.from({ length: 205 }, (_, n) => ({ at: new Date(Date.UTC(2026, 0, 1, 0, n)).toISOString(), course: 'g2', title: 't', stage: 0, name: 'n', mode: 'input', perfect: n % 30, total: 27, mistakes: 0, missed: [] }));
+    drillStorage.set('kt_drill_log_v1', JSON.stringify({ runs: [...stored, 'junk', { at: 'yesterday', course: 'g2' }, { at: '2026-02-01T00:00:00Z' }], open: { g2: [1, 1, 'x', 500], zz: [1] } }));
+    const read = logApp.readDrillLog();
+    if (read.runs.length !== 200 || read.runs[0].at !== stored[5].at || read.runs.some((row) => row.perfect > row.total) || JSON.stringify(read.open) !== '{"g2":[1]}') {
+      violated(DRILL_LOG_RECORD_CHECK, `a 205-run log with junk was read as ${read.runs.length} runs from ${read.runs[0] && read.runs[0].at}, open ${JSON.stringify(read.open)}`, '200 runs from the sixth, open {"g2":[1]}');
+    }
+    playStage(0, true);
+    const capped = drillLog();
+    if (capped.runs.length !== 200 || capped.runs[0].at !== stored[6].at || capped.runs[199].total !== 27 || capped.runs[199].course !== 'g2' || capped.runs[199].perfect !== 27) {
+      violated(DRILL_LOG_RECORD_CHECK, `a run logged onto a full log left ${capped.runs.length} runs from ${capped.runs[0].at}`, '200 runs ending with the new one');
+    }
+    drillStorage.set('kt_drill_log_v1', 'not json');
+    playStage(0, true, { 0: 1 });
+    const recovered = drillLog();
+    if (!recovered || recovered.runs.length !== 1 || recovered.runs[0].missed.length !== 1) {
+      violated(DRILL_LOG_RECORD_CHECK, `a run logged onto an unreadable log left ${JSON.stringify(recovered)}`, 'a fresh log with the one run');
+    }
+  } catch (error) {
+    violated(DRILL_LOG_CHECK, 'the drill log threw', String(error && error.stack));
+  } finally {
+    if (logApp.state.drill) logApp.exitDrill();
+    logApp.state.screen = 'start';
     drillStorage.clear();
   }
 }
