@@ -2583,7 +2583,7 @@ observe(DRILL_COURSE_CHECK, drillCourses.length);
 if (drillCourses.length !== 8) {
   violated(DRILL_COURSE_CHECK, `expected eight 100-question courses, found ${drillCourses.length}`, JSON.stringify(drillCourses.map((c) => c.id)));
 }
-const DRILL_FIRST_PROMPT = { g1: '1 ＋ 1', g2: '2 × 1', d3: '2 ÷ 1', h2n: '21 ＋ 11', h2: '24 ＋ 16', p2: '(2 ＋ 1) ＋ 1' };
+const DRILL_FIRST_PROMPT = { g1: '1 ＋ 1', g2: '1 × 1', d3: '2 ÷ 1', h2n: '21 ＋ 11', h2: '24 ＋ 16', p2: '(2 ＋ 1) ＋ 1' };
 for (const course of drillCourses) {
   const bank = app.drillBank(course.id);
   if (bank.length !== course.total) {
@@ -3450,7 +3450,8 @@ observe(DRILL_CUT_CHECK, drillCourses.length);
 observe(DRILL_CUT_RECORD_CHECK, 3);
 const expectedDrillCuts = {
   g1: { ends: [24, 42, 66, 84, 100], first: ['1 ＋ 1', '9 ＋ 1', '2 − 1', '10 − 9', '9 ＋ 2'], names: ['たしざんの きほんと 10の ともだち', '10の ともだち つづき', 'ひきざんの きほんと 10から ひく', '10から ひく つづき', 'くりあがり・くりさがり'] },
-  g2: { ends: [27, 54, 81, 100], first: ['2 × 1', '4 × 1', '8 × 1', '7 × 8'], names: ['2・5・3の だん', '4・6・7の だん', '8・9・1の だん', 'しあげの ミックス'] },
+  // One stage per table (issue #127); a table's out-of-order review closes its stage.
+  g2: { ends: [9, 18, 27, 38, 47, 60, 74, 87, 100], first: ['1 × 1', '2 × 1', '3 × 1', '4 × 1', '5 × 1', '6 × 1', '7 × 1', '8 × 1', '9 × 1'], names: ['1の だん', '2の だん', '3の だん', '4の だん', '5の だん', '6の だん', '7の だん', '8の だん', '9の だん'] },
   d3: { ends: [27, 54, 81, 100], first: ['2 ÷ 1', '4 ÷ 1', '8 ÷ 1', '56 ÷ □ ＝ 8'], names: ['2・5・3の だんで わる', '4・6・7の だんで わる', '8・9・1の だんで わる', '□と しあげの ミックス'] },
   h2: { ends: [20, 40, 70, 100], names: ['くりあがりの たしざん', 'くりさがりの ひきざん', '3けたに なる たしざん', '3けたの ひきざん'] },
   h2n: { ends: [25, 50, 75, 100], names: ['2けたの たしざん', '2けたの ひきざん', '3けたの たしざん', '3けたの ひきざん'] },
@@ -3489,36 +3490,36 @@ for (const course of drillCourses) {
   cutApp.props = cutApp.props || {};
   try {
     drillStorage.clear();
-    drillStorage.set('kt_drill_v1', JSON.stringify({ g2: { opts: { '26': { c: 6, t: 3, r: 1 }, '40': { c: 4 }, '41': { c: 6, t: 3, r: 2 } }, stages: [{ runs: 1, best: 22 }, { idx: 7, perfect: 5, mistakes: 2, runs: 2 }, {}, {}] } }));
-    const moved = cutApp.readDrillProgress().g2;
+    drillStorage.set('kt_drill_v1', JSON.stringify({ d3: { opts: { '26': { c: 6, t: 3, r: 1 }, '40': { c: 4 }, '41': { c: 6, t: 3, r: 2 } }, stages: [{ runs: 1, best: 22 }, { idx: 7, perfect: 5, mistakes: 2, runs: 2 }, {}, {}] } }));
+    const moved = cutApp.readDrillProgress().d3;
     if (JSON.stringify(moved.stages) !== JSON.stringify([
       { idx: 0, perfect: 0, mistakes: 0, runs: 1, best: 22 }, { idx: 5, perfect: 5, mistakes: 2, runs: 2, best: 0 },
       { idx: 0, perfect: 0, mistakes: 0, runs: 0, best: 0 }, { idx: 0, perfect: 0, mistakes: 0, runs: 0, best: 0 }]) ||
         moved.cuts !== '27,54,81,100' || JSON.stringify(moved.opts) !== JSON.stringify({ '26': { c: 6, t: 3, r: 0 }, '40': { c: 4 }, '41': { c: 6, t: 3, r: 2 } })) {
-      violated(DRILL_CUT_RECORD_CHECK, `a 25-cut g2 record was read as ${JSON.stringify(moved)}`, 'stage 1 cleared, stage 2 at question 33 with its runs, question 26 still retired, question 41 still finishing the run that retired it');
+      violated(DRILL_CUT_RECORD_CHECK, `a 25-cut d3 record was read as ${JSON.stringify(moved)}`, 'stage 1 cleared, stage 2 at question 33 with its runs, question 26 still retired, question 41 still finishing the run that retired it');
     }
-    cutApp.startDrill('g2', false, 'input', 1);
+    cutApp.startDrill('d3', false, 'input', 1);
     if (!cutApp.state.drill || cutApp.drillQuestion().no !== 33 || cutApp.state.drill.perfect !== 5 || cutApp.state.drill.skip.length) {
-      violated(DRILL_CUT_RECORD_CHECK, `the moved run resumed at ${cutApp.state.drill && cutApp.drillQuestion().no}`, 'expected question 33 (4 × 6) as before the move, with question 41 still in the run');
+      violated(DRILL_CUT_RECORD_CHECK, `the moved run resumed at ${cutApp.state.drill && cutApp.drillQuestion().no}`, 'expected question 33 (24 ÷ 6) as before the move, with question 41 still in the run');
     }
     cutApp.exitDrill();
-    cutApp.startDrill('g2', true, 'input', 0);
+    cutApp.startDrill('d3', true, 'input', 0);
     if (cutApp.state.drill.skip.join(',') !== '25' || cutApp.renderVals().drillView.countText !== '0 / 26') {
       violated(DRILL_CUT_RECORD_CHECK, 'a question retired under the old cuts came back under the new ones', JSON.stringify(cutApp.state.drill.skip));
     }
     cutApp.exitDrill();
     // The first write stores the new cuts, so reading again leaves the record as it is.
-    const stored = JSON.parse(drillStorage.get('kt_drill_v1')).g2;
-    if (stored.cuts !== '27,54,81,100' || JSON.stringify(cutApp.readDrillProgress().g2.stages.map((row) => row.runs)) !== '[1,2,0,0]') {
+    const stored = JSON.parse(drillStorage.get('kt_drill_v1')).d3;
+    if (stored.cuts !== '27,54,81,100' || JSON.stringify(cutApp.readDrillProgress().d3.stages.map((row) => row.runs)) !== '[1,2,0,0]') {
       violated(DRILL_CUT_RECORD_CHECK, 'the moved record was not stored with the new cuts', JSON.stringify(stored));
     }
     // The stage screen and the answer-mode screen name the stage.
-    cutApp.selectDrillCourse('g2');
+    cutApp.selectDrillCourse('d3');
     const view = cutApp.renderVals().drillStageView;
     cutApp.selectDrillStage(1);
     const mode = cutApp.renderVals().drillModeView;
-    if (view.stages.map((row) => row.range).join('|') !== expectedDrillCuts.g2.names.join('|') || view.keyHelp !== 'キーボードの 1〜4 でも えらべるよ' ||
-        mode.stageText !== 'ステージ 2（4・6・7の だん）') {
+    if (view.stages.map((row) => row.range).join('|') !== expectedDrillCuts.d3.names.join('|') || view.keyHelp !== 'キーボードの 1〜4 でも えらべるよ' ||
+        mode.stageText !== 'ステージ 2（4・6・7の だんで わる）') {
       violated(DRILL_CUT_CHECK, 'the stage screens do not name the stages', JSON.stringify({ stages: view.stages.map((row) => row.range), keyHelp: view.keyHelp, mode: mode.stageText }));
     }
     cutApp.cancelDrillMode();
@@ -3530,6 +3531,88 @@ for (const course of drillCourses) {
     violated(DRILL_CUT_RECORD_CHECK, 'moving to the new cuts threw', String(error && error.stack));
   } finally {
     if (cutApp.state.drill) cutApp.exitDrill();
+    drillStorage.clear();
+  }
+}
+// Issue #127: かけざん is one stage per table, 1のだん to 9のだん. Records saved while the bank
+// asked the tables in 2, 5, 3, 4, 6, 7, 8, 9, 1 order move question by question: each option dial
+// follows its question, a stage counts as finished only if all its questions had been, and a
+// finished stage behind an unfinished one stays shut until the stages ahead of it are done.
+const DRILL_REORDER_CHECK = 'kuku drill records saved in the old table order follow their questions into the one-table stages';
+observe(DRILL_REORDER_CHECK, 5);
+{
+  const kukuApp = new app.constructor();
+  kukuApp.props = kukuApp.props || {};
+  const kuku = drillCourses.find((course) => course.id === 'g2');
+  const runsOf = () => JSON.stringify(kukuApp.readDrillProgress().g2.stages.map((row) => row.runs));
+  const save = (row) => { drillStorage.clear(); drillStorage.set('kt_drill_v1', JSON.stringify({ g2: row })); };
+  try {
+    // Every saved dial lands on the same question text, the second copy of a fact on its review copy.
+    const before = kukuApp.drillBankBefore('g2'), bank = kukuApp.drillBank('g2'), all = {};
+    before.forEach((_, at) => { all[at + 1] = { c: 2 + (at % 5) }; });
+    save({ opts: all, cuts: '27,54,81,100', stages: [{}, {}, {}, {}] });
+    const movedAll = kukuApp.readDrillProgress().g2.opts, keys = Object.keys(movedAll);
+    // The k-th saved copy of a fact belongs on the k-th copy in the new bank; a second copy is the review one.
+    const copyAt = (list, at) => list.slice(0, at + 1).filter((text) => text === list[at]).length;
+    const wrong = before.filter((text, at) => {
+      const k = copyAt(before, at), n = bank.findIndex((q, i) => q.text === text && copyAt(bank.map((row) => row.text), i) === k);
+      return n < 0 || !movedAll[n + 1] || movedAll[n + 1].c !== all[at + 1].c || (k === 2) !== (bank[n].sec === 'ばらばらで おさらい');
+    });
+    if (before.length !== 100 || keys.length !== 100 || wrong.length) {
+      violated(DRILL_REORDER_CHECK, `100 saved dials moved to ${keys.length} positions, ${wrong.length} on another question`, JSON.stringify(wrong.slice(0, 5)));
+    }
+    // A v1.45.0 record: 2・5・3 cleared twice, 4・6・7 cleared once and part way through again.
+    save({
+      opts: { '1': { c: 6, t: 3, r: 1 }, '46': { c: 6, t: 3, r: 1 }, '82': { c: 5 } }, cuts: '27,54,81,100',
+      stages: [{ runs: 2, best: 27 }, { idx: 5, perfect: 4, mistakes: 1, runs: 1 }, {}, {}],
+    });
+    const moved = kukuApp.readDrillProgress().g2;
+    if (runsOf() !== '[0,2,2,0,2,0,0,0,0]' || moved.cuts !== kukuApp.drillStageEnds(kuku).join(',') || moved.stages.some((row) => row.idx || row.perfect || row.mistakes || row.best) ||
+        JSON.stringify(moved.opts) !== JSON.stringify({ '10': { c: 6, t: 3, r: 1 }, '61': { c: 6, t: 3, r: 0 }, '70': { c: 5 } })) {
+      violated(DRILL_REORDER_CHECK, `a v1.45.0 kuku record was read as ${JSON.stringify(moved)}`, 'runs [0,2,2,0,2,0,0,0,0], every run back at its start, 2 × 1 still sitting out, 7 × 1 finishing out its run, the 7 × 8 review dial on question 70');
+    }
+    kukuApp.selectDrillCourse('g2');
+    const shut = kukuApp.renderVals().drillStageView.stages;
+    if (shut[0].ariaDisabled !== 'false' || shut.slice(1).some((row) => row.ariaDisabled !== 'true') || shut[4].status !== '🔒 ステージ 1を クリアしてね' ||
+        kukuApp.renderVals().drillStageView.many !== 'true' || kukuApp.renderVals().drillStageView.keyHelp !== 'キーボードの 1〜9 でも えらべるよ') {
+      violated(DRILL_REORDER_CHECK, `before 1のだん the stage screen read ${JSON.stringify(shut.map((row) => [row.ariaDisabled, row.status]))}`, 'only stage 1 open; the cleared 5のだん waits for stage 1');
+    }
+    kukuApp.cancelDrillStage();
+    kukuApp.startDrill('g2', false, 'input', 1);
+    if (kukuApp.state.drill) {
+      violated(DRILL_REORDER_CHECK, 'the cleared 2のだん started before 1のだん was done', JSON.stringify(kukuApp.state.drill.stage));
+      kukuApp.exitDrill();
+    }
+    kukuApp.startDrill('g2', false, 'input', 0);
+    while (kukuApp.state.drill && !kukuApp.state.drill.done) { const q = kukuApp.drillQuestion(); kukuApp.setState({ input: String(q.ans) }); kukuApp.drillSubmit(); kukuApp.drillFlushEcho(); }
+    if (kukuApp.state.drill) kukuApp.exitDrill();
+    kukuApp.selectDrillCourse('g2');
+    const opened = kukuApp.renderVals().drillStageView.stages.map((row) => row.ariaDisabled).join(',');
+    kukuApp.cancelDrillStage();
+    kukuApp.startDrill('g2', true, 'input', 1);
+    const skip = kukuApp.state.drill ? kukuApp.state.drill.skip.join(',') : '(not started)';
+    if (kukuApp.state.drill) kukuApp.exitDrill();
+    if (opened !== 'false,false,false,false,true,true,true,true,true' || skip !== '9' || runsOf() !== '[1,2,2,0,2,0,0,0,0]') {
+      violated(DRILL_REORDER_CHECK, `after 1のだん stages opened ${opened}, 2のだん skipped ${skip}, runs ${runsOf()}`, 'stages 1-4 open, 2 × 1 still sitting out, the stored record not moved again');
+    }
+    // A v1.44.0 record (no cuts, 25-question stages) and a record from before stages.
+    save({ stages: [{ runs: 1 }, {}, {}, {}] });
+    const v144 = runsOf();
+    save({ idx: 30, runs: 1, perfect: 3 });
+    const whole = runsOf();
+    if (v144 !== '[0,1,0,0,1,0,0,0,0]' || whole !== '[1,2,1,1,2,1,1,1,1]') {
+      violated(DRILL_REORDER_CHECK, `older kuku records were read with runs ${v144} and ${whole}`, '[0,1,0,0,1,0,0,0,0] (3 × 8 was in the unfinished stage) and [1,2,1,1,2,1,1,1,1]');
+    }
+    // A record already in the new layout is read as saved, run in progress included.
+    save({ opts: { '5': { c: 3 } }, cuts: kukuApp.drillStageEnds(kuku).join(','), stages: [{ runs: 1 }, { runs: 1 }, { runs: 1 }, { idx: 4, perfect: 4, runs: 0 }, {}, {}, {}, {}, {}] });
+    const kept = kukuApp.readDrillProgress().g2;
+    if (JSON.stringify(kept.opts) !== '{"5":{"c":3}}' || kept.stages[3].idx !== 4 || runsOf() !== '[1,1,1,0,0,0,0,0,0]') {
+      violated(DRILL_REORDER_CHECK, `a record in the new layout was read as ${JSON.stringify(kept)}`, 'unchanged, 4のだん at its fifth question');
+    }
+  } catch (error) {
+    violated(DRILL_REORDER_CHECK, 'moving a kuku record threw', String(error && error.stack));
+  } finally {
+    if (kukuApp.state.drill) kukuApp.exitDrill();
     drillStorage.clear();
   }
 }
@@ -3631,7 +3714,7 @@ for (const course of drillCourses) {
     stageApp.exitDrill();
     stageApp.selectDrillCourse('p2');
     const midway = stageView();
-    if (midway.stages.map((row) => row.status).join('|') !== 'クリア ✓|つづき 7 / 25|🔒 ステージ 2を クリアしてね|🔒 ステージ 3を クリアしてね') {
+    if (midway.stages.map((row) => row.status).join('|') !== 'クリア ✓|つづき 7 / 25|🔒 ステージ 2を クリアしてね|🔒 ステージ 2を クリアしてね') {
       violated(DRILL_STAGE_CHECK, `the stage screen read ${midway.stages.map((row) => row.status).join('|')}`, 'stage 1 cleared, stage 2 at 7 of 25, stages 3-4 locked');
     }
     stageApp.startDrill('p2', false, 'input', 1);
@@ -3749,12 +3832,13 @@ observe(DRILL_LOG_CHECK, 6);
 observe(DRILL_LOG_RECORD_CHECK, 3);
 {
   const logApp = hissanViewApp;
-  const g2Bank = app.drillBank('g2');
+  // わりざん keeps the 27-question stages of #122, so a stage here is long enough to re-ask in.
+  const d3Bank = app.drillBank('d3');
   const drillLog = () => JSON.parse(drillStorage.get('kt_drill_log_v1') || 'null');
   const answer = (value) => { logApp.setState({ input: String(value) }); logApp.drillSubmit(); };
   // Plays a stage to its end; misses[n] wrong answers go in before the n-th question asked.
   const playStage = (stage, restart, misses = {}, stopAfter = Infinity) => {
-    logApp.startDrill('g2', restart, 'input', stage);
+    logApp.startDrill('d3', restart, 'input', stage);
     const asked = [];
     while (!logApp.state.drill.done && asked.length < Math.min(stopAfter, 200)) {
       const question = logApp.drillQuestion();
@@ -3770,34 +3854,34 @@ observe(DRILL_LOG_RECORD_CHECK, 3);
     drillStorage.clear();
     logApp.state.screen = 'start';
     logApp.state.drill = null;
-    // Stage 1 of かけざん with 2 × 1 retired: one miss on 2 × 2, a revealed answer on 2 × 3, and one
-    // more miss when 2 × 3 is asked again after the first pass, which is not a first-pass miss.
-    drillStorage.set('kt_drill_v1', JSON.stringify({ g2: { opts: { '1': { c: 6, t: 3, r: 0 } }, stages: [{ runs: 1 }, {}, {}, {}] } }));
+    // Stage 1 of わりざん with 2 ÷ 1 retired: one miss on 4 ÷ 2, a revealed answer on 6 ÷ 3, and one
+    // more miss when 6 ÷ 3 is asked again after the first pass, which is not a first-pass miss.
+    drillStorage.set('kt_drill_v1', JSON.stringify({ d3: { opts: { '1': { c: 6, t: 3, r: 0 } }, stages: [{ runs: 1 }, {}, {}, {}] } }));
     const asked = playStage(0, true, { 0: 1, 1: 2, 26: 1 });
     const first = drillLog();
     const run = first && first.runs[0];
-    if (asked[0] !== '2 × 2' || !run || first.runs.length !== 1 || run.course !== 'g2' || run.stage !== 0 || run.name !== '2・5・3の だん' ||
-        asked[26] !== '2 × 3' || run.mode !== 'input' || run.total !== 26 || run.perfect !== 24 || run.mistakes !== 3 || !Number.isFinite(Date.parse(run.at)) ||
-        JSON.stringify(run.missed) !== JSON.stringify([{ q: '2 × 2', a: '4' }, { q: '2 × 3', a: '6' }]) || Object.keys(first.open).length) {
-      violated(DRILL_LOG_CHECK, `a finished stage was logged as ${JSON.stringify(first)}`, 'g2 stage 1, 24 / 26, missed 2 × 2 and 2 × 3, nothing left open');
+    if (asked[0] !== '4 ÷ 2' || !run || first.runs.length !== 1 || run.course !== 'd3' || run.stage !== 0 || run.name !== '2・5・3の だんで わる' ||
+        asked[26] !== '6 ÷ 3' || run.mode !== 'input' || run.total !== 26 || run.perfect !== 24 || run.mistakes !== 3 || !Number.isFinite(Date.parse(run.at)) ||
+        JSON.stringify(run.missed) !== JSON.stringify([{ q: '4 ÷ 2', a: '2' }, { q: '6 ÷ 3', a: '2' }]) || Object.keys(first.open).length) {
+      violated(DRILL_LOG_CHECK, `a finished stage was logged as ${JSON.stringify(first)}`, 'd3 stage 1, 24 / 26, missed 4 ÷ 2 and 6 ÷ 3, nothing left open');
     }
     // A run left midway is not logged; resuming it keeps the miss made before leaving.
     playStage(1, true, { 0: 1 }, 3);
     logApp.exitDrill();
-    if (drillLog().runs.length !== 1 || drillLog().open.g2.join(',') !== '27') {
-      violated(DRILL_LOG_CHECK, `leaving stage 2 midway left the log as ${JSON.stringify(drillLog())}`, 'one run, 4 × 1 (index 27) open');
+    if (drillLog().runs.length !== 1 || drillLog().open.d3.join(',') !== '27') {
+      violated(DRILL_LOG_CHECK, `leaving stage 2 midway left the log as ${JSON.stringify(drillLog())}`, 'one run, 4 ÷ 1 (index 27) open');
     }
     playStage(1, false);
     const resumed = drillLog().runs[1];
-    if (!resumed || JSON.stringify(resumed.missed) !== JSON.stringify([{ q: g2Bank[27].text, a: String(g2Bank[27].ans) }]) || resumed.total !== 27 || resumed.perfect !== 26) {
-      violated(DRILL_LOG_CHECK, `the resumed stage 2 was logged as ${JSON.stringify(resumed)}`, '26 / 27 with 4 × 1 missed');
+    if (!resumed || JSON.stringify(resumed.missed) !== JSON.stringify([{ q: d3Bank[27].text, a: String(d3Bank[27].ans) }]) || resumed.total !== 27 || resumed.perfect !== 26) {
+      violated(DRILL_LOG_CHECK, `the resumed stage 2 was logged as ${JSON.stringify(resumed)}`, '26 / 27 with 4 ÷ 1 missed');
     }
     // Starting a stage over forgets the misses of the run that was left.
     playStage(1, true, { 2: 1 }, 4);
     logApp.exitDrill();
     playStage(1, true);
     const again = drillLog().runs[2];
-    if (!again || again.missed.length || again.perfect !== 27 || drillLog().open.g2) {
+    if (!again || again.missed.length || again.perfect !== 27 || drillLog().open.d3) {
       violated(DRILL_LOG_CHECK, `a stage started over was logged as ${JSON.stringify(again)}`, '27 / 27 with no misses');
     }
     // The screen: newest first, the stage name and answer mode, the misses as the child reads them.
@@ -3807,9 +3891,9 @@ observe(DRILL_LOG_RECORD_CHECK, 3);
     }
     const view = logView();
     const rows = view.rows;
-    if (rows.length !== 3 || rows[0].title !== 'かけざん（九九） ステージ 2' || rows[0].score !== '💯 27 / 27' || rows[0].missedStyle !== 'display:none;' ||
-        rows[0].sub !== '4・6・7の だん・すうじを 入力' || rows[1].missedText !== 'まちがえた もんだい：4 × 1 ＝ 4' ||
-        rows[2].title !== 'かけざん（九九） ステージ 1' || rows[2].score !== '24 / 26' || rows[2].missedText !== 'まちがえた もんだい：2 × 2 ＝ 4 ／ 2 × 3 ＝ 6' ||
+    if (rows.length !== 3 || rows[0].title !== 'わりざん ステージ 2' || rows[0].score !== '💯 27 / 27' || rows[0].missedStyle !== 'display:none;' ||
+        rows[0].sub !== '4・6・7の だんで わる・すうじを 入力' || rows[1].missedText !== 'まちがえた もんだい：4 ÷ 1 ＝ 4' ||
+        rows[2].title !== 'わりざん ステージ 1' || rows[2].score !== '24 / 26' || rows[2].missedText !== 'まちがえた もんだい：4 ÷ 2 ＝ 2 ／ 6 ÷ 3 ＝ 2' ||
         view.tabsStyle !== 'display:none;' || view.emptyStyle !== 'display:none;') {
       violated(DRILL_LOG_CHECK, `the record screen read ${JSON.stringify(view)}`, 'three runs newest first, no learning tab');
     }
@@ -3848,7 +3932,7 @@ observe(DRILL_LOG_RECORD_CHECK, 3);
     }
     playStage(0, true);
     const capped = drillLog();
-    if (capped.runs.length !== 200 || capped.runs[0].at !== stored[6].at || capped.runs[199].total !== 27 || capped.runs[199].course !== 'g2' || capped.runs[199].perfect !== 27) {
+    if (capped.runs.length !== 200 || capped.runs[0].at !== stored[6].at || capped.runs[199].total !== 27 || capped.runs[199].course !== 'd3' || capped.runs[199].perfect !== 27) {
       violated(DRILL_LOG_RECORD_CHECK, `a run logged onto a full log left ${capped.runs.length} runs from ${capped.runs[0].at}`, '200 runs ending with the new one');
     }
     drillStorage.set('kt_drill_log_v1', 'not json');

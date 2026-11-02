@@ -440,14 +440,16 @@ internal static class Program
             html.Contains("secondAria:kanjiMode?'2ばん、漢字を選ぶ':'2ばん、こたえをえらぶ'", StringComparison.Ordinal),
             "the arithmetic and kanji drills do not offer keyboard-reachable answer-mode choices before starting");
         // A course is asked one 25-question stage at a time, chosen before the answer mode, and a
-        // stage opens once the stage before it has finished a run (issue #117).
+        // stage opens once every stage before it has finished a run (issue #117; every, not just the
+        // one before, since a reordered record can hold a finished stage behind an unfinished one, #127).
         Assert(
             html.Contains("<sc-if value=\"{{ isDrillStage }}\" hint-placeholder-val=\"{{ false }}\">", StringComparison.Ordinal) &&
             html.Contains("isDrillStage:sc==='drill-stage'", StringComparison.Ordinal) &&
             html.Contains("this.setState({screen:'drill-stage',drillCourseChoice:id,drillStageChoice:0});", StringComparison.Ordinal) &&
             html.Contains("this.setState({screen:'drill-mode',drillStageChoice:s});", StringComparison.Ordinal) &&
             html.Contains("drillStageSize(){return 25;}", StringComparison.Ordinal) &&
-            html.Contains("drillStageOpen(record,stage){return stage===0||!!(record&&record.stages&&record.stages[stage-1]&&record.stages[stage-1].runs>0);}", StringComparison.Ordinal) &&
+            html.Contains("drillStageOpen(record,stage){const rows=record&&Array.isArray(record.stages)?record.stages:[];for(let s=0;s<stage;s++)if(!(rows[s]&&rows[s].runs>0))return false;return true;}", StringComparison.Ordinal) &&
+            html.Contains("<div class=\"kt-drill-stage-options\" aria-label=\"ステージ\" data-many=\"{{ drillStageView.many }}\">", StringComparison.Ordinal) &&
             html.Contains("<button type=\"button\" class=\"kt-drill-stage-option\" style=\"{{ t.style }}\" aria-disabled=\"{{ t.ariaDisabled }}\" aria-label=\"{{ t.ariaLabel }}\" onclick=\"{{ t.onClick }}\">", StringComparison.Ordinal) &&
             html.Contains("this.startDrill(id,false,mode,this.state.drillStageChoice);", StringComparison.Ordinal),
             "the drill courses are not split into keyboard-reachable stages chosen before the answer mode");
