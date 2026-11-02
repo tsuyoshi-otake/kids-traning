@@ -36,8 +36,7 @@ internal static partial class LearningMarkupPatcher
             "if(this._mathKeyHandler)document.removeEventListener('keydown',this._mathKeyHandler);",
             "if(this._mathKeyHandler)document.removeEventListener('keydown',this._mathKeyHandler);" +
             "if(this._drillKeyHandler)document.removeEventListener('keydown',this._drillKeyHandler);" +
-            "this.clearDrillEcho();this.stopDrillSpeech();" +
-            "if(this.state.drill)this.saveDrillProgress(this.state.drill,false);",
+            "this.saveDrillOnLeave();",
             StringComparison.Ordinal);
 
         markup = ReplaceRequired(
@@ -169,7 +168,13 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     if(Array.isArray(row.stages)){
       for(let s=0;s<savedEnds.length;s++){
         const range=this.drillRangeIn(savedEnds,s),len=range.to-range.from,st=row.stages[s]&&typeof row.stages[s]==='object'?row.stages[s]:{};
-        stages.push({idx:this.clamp(whole(st.idx),0,len),perfect:this.clamp(whole(st.perfect),0,len),mistakes:whole(st.mistakes),runs:whole(st.runs),best:this.clamp(whole(st.best),0,len)});
+        const kept={idx:this.clamp(whole(st.idx),0,len),perfect:this.clamp(whole(st.perfect),0,len),mistakes:whole(st.mistakes),runs:whole(st.runs),best:this.clamp(whole(st.best),0,len)};
+        // A run left midway also keeps the misses on the question it stopped at and the revealed
+        // questions still to be asked again, as offsets into the stage (issue #130).
+        const miss=this.clamp(whole(st.miss),0,2),again=Array.isArray(st.again)?st.again.map(Number).filter((n,i,list)=>Number.isInteger(n)&&n>=0&&n<kept.idx&&list.indexOf(n)===i):[];
+        if(miss&&kept.mistakes>0)kept.miss=miss;
+        if(again.length)kept.again=again;
+        stages.push(kept);
       }
       return moved?this.drillReorder(c,savedEnds,stages,opts):savedEnds===ends?stages:this.drillRestage(c,savedEnds,stages,opts);
     }
@@ -266,7 +271,13 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   saveDrillProgress(d,countRun){
     if(!d)return;const course=this.drillCourse(d.id);if(!course)return;
     const progress=this.readDrillProgress(),record=progress[d.id],stage=this.clamp(Math.floor(Number(d.stage))||0,0,record.stages.length-1),range=this.drillStageRange(course,stage),prev=record.stages[stage],finished=d.idx>=range.to;
-    record.stages[stage]={idx:finished?0:this.clamp(d.idx-range.from,0,range.to-range.from),perfect:finished?0:d.perfect,mistakes:finished?0:d.mistakes,runs:prev.runs+(countRun?1:0),best:countRun?Math.max(prev.best,d.perfect):prev.best};
+    const row={idx:finished?0:this.clamp(d.idx-range.from,0,range.to-range.from),perfect:finished?0:d.perfect,mistakes:finished?0:d.mistakes,runs:prev.runs+(countRun?1:0),best:countRun?Math.max(prev.best,d.perfect):prev.best};
+    if(!finished){
+      const miss=this.clamp(Math.floor(Number(d.miss))||0,0,2),again=(Array.isArray(d.again)?d.again:[]).filter(n=>n>=range.from&&n<d.idx).map(n=>n-range.from);
+      if(miss)row.miss=miss;
+      if(again.length)row.again=again;
+    }
+    record.stages[stage]=row;
     record.opts=d.opts&&typeof d.opts==='object'?d.opts:{};
     this.writeDrillProgress(progress);
   }
@@ -434,14 +445,14 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   }
   drillQuestion(){const d=this.state.drill;return d?this.drillQuestionAt(d,d.idx):null;}
   // course card -> stage -> answer mode -> drill; every back step goes up exactly one screen.
-  selectDrillCourse(id){const course=this.drillCourse(id);if(!course)return;this.sfx('select');this.setState({screen:'drill-stage',drillCourseChoice:id,drillStageChoice:0});}
+  selectDrillCourse(id){const course=this.drillCourse(id);if(!course)return;this.sfx('select');this.setState({screen:'drill-stage',drillAsk:'',drillCourseChoice:id,drillStageChoice:0});}
   selectDrillStage(stage){
     const course=this.drillCourse(String(this.state.drillCourseChoice||''));if(!course)return;
     const s=Math.floor(Number(stage));if(!Number.isInteger(s)||s<0||s>=this.drillStageCount(course))return;
     if(!this.drillStageOpen(this.readDrillProgress()[course.id],s)){this.sfx('wrong');return;}
     this.sfx('select');this.setState({screen:'drill-mode',drillStageChoice:s});
   }
-  cancelDrillStage(){this.sfx('tap');this.setState({screen:'start',drillCourseChoice:'',drillStageChoice:0});}
+  cancelDrillStage(){this.sfx('tap');this.setState({screen:'start',drillAsk:'',drillCourseChoice:'',drillStageChoice:0});}
   cancelDrillMode(){this.sfx('tap');this.setState({screen:'drill-stage'});}
   drillChoiceOrder(total,seed){
     // Slots cycle through 0..59 (the lcm of every possible option count, 2-6) before the
@@ -518,10 +529,14 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     // A stage that is not open yet never starts; its button on the stage screen is locked.
     if(!this.drillStageOpen(record,s))return;
     const range=this.drillStageRange(course,s),from=range.from,to=range.to,saved=record.stages[s],bank=this.drillBank(id),skip=this.drillRetiredIndexes(record.opts,saved.runs,from,to);
-    let idx=restart?from:from+this.clamp(saved.idx,0,to-from);
-    if(this.drillActiveFrom(skip,idx,to)>=to)idx=from;
-    const fresh=restart||idx===from;
+    // A stage with a saved position or a saved miss resumes; a miss on its first question counts.
+    let idx=restart?from:from+this.clamp(saved.idx,0,to-from),resume=!restart&&(idx>from||saved.mistakes>0);
+    if(this.drillActiveFrom(skip,idx,to)>=to){idx=from;resume=false;}
+    const fresh=!resume,at=idx;
     idx=this.drillActiveFrom(skip,idx,to);
+    // The resumed question keeps its misses, so it no longer counts as a first try, and revealed
+    // questions from before the break are still asked again after the main pass (issue #130).
+    const miss=resume&&idx===at?this.clamp(Math.floor(Number(saved.miss))||0,0,2):0,again=resume&&Array.isArray(saved.again)?saved.again.map(n=>from+n).filter(n=>n<idx):[];
     // Every question of the stage retired: nothing is left to ask, so the run ends before it starts.
     const allRetired=idx>=to;
     const mode=id==='k1'||id==='k2'?(answerMode==='writing'?'writing':'reading'):(answerMode==='choice'?'choice':'input'),choiceSeed=this.rand(1,2147483646),choiceOrder=this.drillChoiceOrder(to-from,choiceSeed);
@@ -529,20 +544,36 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     this.clearDrillEcho();this.stopDrillSpeech();
     this.sfx('select');
     const opts=Object.assign({},record.opts);
-    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,stage:s,from:from,to:to,answerMode:mode,choiceSeed:choiceSeed,choiceOrder:choiceOrder,idx:idx,miss:0,copyMiss:0,mark:'',hint:'',revealed:false,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:[],counted:false,done:allRetired,allRetired:allRetired,echo:null,opts:opts,run:saved.runs,skip:skip,count:allRetired?2:this.drillOptionCount({opts:opts},bank[idx])}});
+    this.setState({screen:'drill',drillAsk:'',drillCourseChoice:'',input:'',drill:{id:id,stage:s,from:from,to:to,answerMode:mode,choiceSeed:choiceSeed,choiceOrder:choiceOrder,idx:idx,miss:miss,copyMiss:0,mark:miss>=2?'answer':'',hint:'',revealed:miss>=2,streak:0,perfect:fresh?0:saved.perfect,mistakes:fresh?0:saved.mistakes,again:again,counted:false,done:allRetired,allRetired:allRetired,echo:null,opts:opts,run:saved.runs,skip:skip,count:allRetired?2:this.drillOptionCount({opts:opts},bank[idx])}});
   }
-  drillAdvance(patch){
-    const d=this.state.drill;if(!d)return;
+  drillAdvanced(d,patch){
     const end=this.drillEnd(d),next=Object.assign({},d,{miss:0,copyMiss:0,mark:'',hint:'',revealed:false,echo:null},patch||{});
     next.idx=this.drillActiveFrom(d.skip,d.idx+1,end);
     const again=Array.isArray(next.again)?next.again:[],countRun=!d.counted&&next.idx>=end;
     if(countRun)next.counted=true;
     next.done=next.idx>=end+again.length;
     next.count=this.drillOptionCount(next,this.drillQuestionAt(next,next.idx));
+    return {next:next,countRun:countRun};
+  }
+  drillAdvance(patch){
+    const d=this.state.drill;if(!d)return;
+    const step=this.drillAdvanced(d,patch),next=step.next,countRun=step.countRun;
     this.saveDrillProgress(next,countRun);
     if(countRun)this.recordDrillRun(next);
     if(next.done)this.sfx('clear');
     this.setState({drill:next,input:''});
+  }
+  // Leaving a run while a correct answer's pair is still up (issue #130): the answer has already
+  // moved its dial, so the advance it was waiting for is applied before the run is saved.
+  saveDrillOnLeave(){
+    const d=this.state.drill,patch=this._drillEchoPatch;
+    this.clearDrillEcho();this.stopDrillSpeech();
+    if(!d)return null;
+    if(!d.echo||!patch){this.saveDrillProgress(d,false);return d;}
+    const step=this.drillAdvanced(d,patch);
+    this.saveDrillProgress(step.next,step.countRun);
+    if(step.countRun)this.recordDrillRun(step.next);
+    return step.next;
   }
   drillEchoMs(){return 700;}
   drillSpeechMaxMs(){return 4000;}
@@ -663,9 +694,9 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     if(miss===1&&d.idx<this.drillEnd(d))this.noteDrillRunMiss(d);
     if(firstMiss)this.saveDrillProgress(nextDrill,false);
   }
-  exitDrill(){const d=this.state.drill;this.clearDrillEcho();this.stopDrillSpeech();this.saveDrillProgress(d,false);this.sfx('tap');this.setState({screen:'start',drill:null,drillAsk:'',drillCourseChoice:'',input:''});}
+  exitDrill(){this.saveDrillOnLeave();this.sfx('tap');this.setState({screen:'start',drill:null,drillAsk:'',drillCourseChoice:'',input:''});}
   // From the finish screen: back to the course's stages, or on to the answer mode of the next stage.
-  leaveDrillTo(screen,stage){const d=this.state.drill;if(!d)return;this.clearDrillEcho();this.stopDrillSpeech();this.saveDrillProgress(d,false);this.sfx('tap');this.setState({screen:screen,drill:null,drillAsk:'',drillCourseChoice:d.id,drillStageChoice:stage,input:''});}
+  leaveDrillTo(screen,stage){const d=this.saveDrillOnLeave();if(!d)return;this.sfx('tap');this.setState({screen:screen,drill:null,drillAsk:'',drillCourseChoice:d.id,drillStageChoice:stage,input:''});}
   drillToStages(){const d=this.state.drill;if(d)this.leaveDrillTo('drill-stage',d.stage||0);}
   drillGoNextStage(){const d=this.state.drill;if(d)this.leaveDrillTo('drill-mode',(d.stage||0)+1);}
   askDrillReset(id){this.sfx('tap');this.setState({drillAsk:this.state.drillAsk===id?'':id});}

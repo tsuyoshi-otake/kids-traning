@@ -445,7 +445,7 @@ internal static class Program
         Assert(
             html.Contains("<sc-if value=\"{{ isDrillStage }}\" hint-placeholder-val=\"{{ false }}\">", StringComparison.Ordinal) &&
             html.Contains("isDrillStage:sc==='drill-stage'", StringComparison.Ordinal) &&
-            html.Contains("this.setState({screen:'drill-stage',drillCourseChoice:id,drillStageChoice:0});", StringComparison.Ordinal) &&
+            html.Contains("this.setState({screen:'drill-stage',drillAsk:'',drillCourseChoice:id,drillStageChoice:0});", StringComparison.Ordinal) &&
             html.Contains("this.setState({screen:'drill-mode',drillStageChoice:s});", StringComparison.Ordinal) &&
             html.Contains("drillStageSize(){return 25;}", StringComparison.Ordinal) &&
             html.Contains("drillStageOpen(record,stage){const rows=record&&Array.isArray(record.stages)?record.stages:[];for(let s=0;s<stage;s++)if(!(rows[s]&&rows[s].runs>0))return false;return true;}", StringComparison.Ordinal) &&

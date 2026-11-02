@@ -3616,6 +3616,99 @@ observe(DRILL_REORDER_CHECK, 5);
     drillStorage.clear();
   }
 }
+// Issue #130: leaving a run midway keeps exactly what was answered. A correct answer whose pair is
+// still up advances before the run is saved, a miss on the question left stays a miss, revealed
+// questions are still asked again, and an armed さいしょから is disarmed by opening the course.
+const DRILL_RESUME_CHECK = 'a drill run left midway resumes with the same answers, misses, and re-ask queue';
+observe(DRILL_RESUME_CHECK, 6);
+{
+  const resumeApp = new app.constructor();
+  resumeApp.props = resumeApp.props || {};
+  const stored = () => JSON.parse(drillStorage.get('kt_drill_v1')).g1;
+  const typeAnswer = (value) => { resumeApp.setState({ input: String(value) }); resumeApp.drillSubmit(); };
+  const right = () => { typeAnswer(resumeApp.drillQuestion().ans); resumeApp.drillFlushEcho(); };
+  const wrong = () => typeAnswer(resumeApp.drillQuestion().ans + 1);
+  try {
+    drillStorage.clear();
+    // Exit while the pair of a correct first answer is still up: one step on the dial, one first try.
+    resumeApp.startDrill('g1', true, 'input', 0);
+    typeAnswer(resumeApp.drillQuestion().ans);
+    resumeApp.exitDrill();
+    const echoed = stored();
+    resumeApp.startDrill('g1', false, 'input', 0);
+    const echoResumedAt = resumeApp.drillQuestion().no;
+    resumeApp.exitDrill();
+    if (echoed.stages[0].idx !== 1 || echoed.stages[0].perfect !== 1 || JSON.stringify(echoed.opts) !== '{"1":{"c":3}}' || echoResumedAt !== 2) {
+      violated(DRILL_RESUME_CHECK, `leaving during the pair saved ${JSON.stringify(echoed)} and resumed at question ${echoResumedAt}`, 'idx 1, perfect 1, question 1 at three options, resume at question 2');
+    }
+    // A miss on the question left stays a miss after resuming.
+    resumeApp.startDrill('g1', false, 'input', 0);
+    wrong();
+    resumeApp.exitDrill();
+    const missed = stored().stages[0];
+    resumeApp.startDrill('g1', false, 'input', 0);
+    const missedResume = { no: resumeApp.drillQuestion().no, miss: resumeApp.state.drill.miss, mistakes: resumeApp.state.drill.mistakes };
+    right();
+    resumeApp.exitDrill();
+    const afterMiss = stored();
+    if (missed.miss !== 1 || missedResume.no !== 2 || missedResume.miss !== 1 || missedResume.mistakes !== 1 ||
+        afterMiss.stages[0].perfect !== 1 || afterMiss.stages[0].idx !== 2 || afterMiss.stages[0].miss || JSON.stringify(afterMiss.opts['2']) !== '{"c":2}') {
+      violated(DRILL_RESUME_CHECK, `a miss before leaving was saved as ${JSON.stringify(missed)}, resumed as ${JSON.stringify(missedResume)}, then stored ${JSON.stringify(afterMiss)}`, 'the resumed question still missed once, perfect stays 1, its dial stays at two');
+    }
+    // A miss on the first question of a stage resumes the run instead of starting it fresh.
+    resumeApp.startDrill('g1', true, 'input', 0);
+    wrong();
+    resumeApp.exitDrill();
+    resumeApp.startDrill('g1', false, 'input', 0);
+    const firstResume = { no: resumeApp.drillQuestion().no, miss: resumeApp.state.drill.miss, mistakes: resumeApp.state.drill.mistakes };
+    resumeApp.exitDrill();
+    const log = JSON.parse(drillStorage.get('kt_drill_log_v1') || '{}');
+    if (firstResume.no !== 1 || firstResume.miss !== 1 || firstResume.mistakes !== 1 || !log.open || JSON.stringify(log.open.g1) !== '[0]') {
+      violated(DRILL_RESUME_CHECK, `a miss on question 1 resumed as ${JSON.stringify(firstResume)} with the log open ${JSON.stringify(log.open)}`, 'question 1 still missed once, the logged miss kept');
+    }
+    // A revealed answer left on screen is still revealed after resuming.
+    resumeApp.startDrill('g1', true, 'input', 0);
+    wrong();
+    wrong();
+    resumeApp.exitDrill();
+    resumeApp.startDrill('g1', false, 'input', 0);
+    const revealed = { miss: resumeApp.state.drill.miss, revealed: resumeApp.state.drill.revealed, show: resumeApp.renderVals().drillView.showAnswer };
+    // Copying it queues it for the re-ask pass, and that queue survives another break.
+    typeAnswer(resumeApp.drillQuestion().ans);
+    resumeApp.drillFlushEcho();
+    right();
+    resumeApp.exitDrill();
+    const queued = stored().stages[0];
+    resumeApp.startDrill('g1', false, 'input', 0);
+    const again = resumeApp.state.drill.again.join(',');
+    resumeApp.exitDrill();
+    if (revealed.miss !== 2 || !revealed.revealed || !revealed.show || JSON.stringify(queued.again) !== '[0]' || queued.idx !== 2 || again !== '0') {
+      violated(DRILL_RESUME_CHECK, `a revealed answer resumed as ${JSON.stringify(revealed)}; the queue was saved as ${JSON.stringify(queued)} and resumed as [${again}]`, 'still revealed, then question 1 waiting to be asked again after the break');
+    }
+    // Finishing the resumed run asks the queued question again before the stage ends.
+    resumeApp.startDrill('g1', false, 'input', 0);
+    const asked = [];
+    while (resumeApp.state.drill && !resumeApp.state.drill.done && asked.length < 60) { asked.push(resumeApp.drillQuestion().no); right(); }
+    resumeApp.exitDrill();
+    if (asked.at(-1) !== 1 || asked.filter((no) => no === 1).length !== 1) {
+      violated(DRILL_RESUME_CHECK, `the resumed run asked ${asked.join(',')}`, 'questions 3-24, then question 1 again');
+    }
+    // Opening a course or leaving its stages disarms さいしょから.
+    resumeApp.askDrillReset('g1');
+    resumeApp.selectDrillCourse('g1');
+    const afterOpen = resumeApp.state.drillAsk;
+    resumeApp.askDrillReset('g1');
+    resumeApp.cancelDrillStage();
+    if (afterOpen !== '' || resumeApp.state.drillAsk !== '') {
+      violated(DRILL_RESUME_CHECK, `the armed reset read '${afterOpen}' after opening the course and '${resumeApp.state.drillAsk}' after leaving it`, 'disarmed both times');
+    }
+  } catch (error) {
+    violated(DRILL_RESUME_CHECK, 'resuming a drill run threw', String(error && error.stack));
+  } finally {
+    if (resumeApp.state.drill) resumeApp.exitDrill();
+    drillStorage.clear();
+  }
+}
 {
   const stageApp = hissanViewApp;
   const p2Bank = app.drillBank('p2');
