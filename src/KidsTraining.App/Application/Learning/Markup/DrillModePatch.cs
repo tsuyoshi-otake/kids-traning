@@ -129,7 +129,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   drillStorageKey(){return 'kt_drill_v1';}
   drillCourses(){return [
     {id:'g1',grade:1,total:100,badge:'1年生',title:'たしざん・ひきざん',sub:'1＋1から じゅんばんに 100もん',cuts:[[24,'たしざんの きほんと 10の ともだち'],[42,'10の ともだち つづき'],[66,'ひきざんの きほんと 10から ひく'],[84,'10から ひく つづき'],[100,'くりあがり・くりさがり']],color:'#ff8a3d',edge:'#e07d2a',shade:'#fff3e6'},
-    {id:'g2',grade:2,total:100,badge:'2年生',title:'かけざん（九九）',sub:'2のだんから じゅんばんに 100もん',cuts:[[27,'2・5・3の だん'],[54,'4・6・7の だん'],[81,'8・9・1の だん'],[100,'しあげの ミックス']],color:'#4a9bf0',edge:'#2f7ccd',shade:'#eaf3ff'},
+    {id:'g2',grade:2,total:100,badge:'2年生',title:'かけざん（九九）',sub:'1のだんから じゅんばんに 100もん',cuts:[[9,'1の だん'],[18,'2の だん'],[27,'3の だん'],[38,'4の だん'],[47,'5の だん'],[60,'6の だん'],[74,'7の だん'],[87,'8の だん'],[100,'9の だん']],moved:['27,54,81,100','25,50,75,100'],color:'#4a9bf0',edge:'#2f7ccd',shade:'#eaf3ff'},
     // ひっ算は くりあがり・くりさがりの ない コースと ある コースに わける（Issue #95）。
     // h2 は もとの「くりあがり・くりさがりの たしざん・ひきざん」コースの id を ひきつぐ。
     // かいしがめんの カードは せまいので、cardTitle と cardTag に わけて 1ぎょうに おさめる（Issue #98）。
@@ -142,8 +142,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   ];}
   drillCourse(id){const list=this.drillCourses();for(let i=0;i<list.length;i++)if(list[i].id===id)return list[i];return null;}
   // A course is asked one stage at a time (issue #117): stage s holds the bank positions
-  // [from, to). Stage 1 is always open, and stage s+1 opens once stage s has finished a run, so
-  // the run counts double as the unlock record. A course with cuts ([end, name], cumulative)
+  // [from, to). Stage 1 is always open, and a later stage opens once the stages before it have
+  // finished a run (see drillStageOpen), so the run counts double as the unlock record. A course with cuts ([end, name], cumulative)
   // starts every stage at a group start, such as 3 × 1 rather than 3 × 8 (issue #122); a course
   // without them is cut every 25 questions, the layout every course used in #117.
   drillStageSize(){return 25;}
@@ -153,31 +153,36 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   drillRangeIn(ends,stage){return {from:stage>0?ends[stage-1]:0,to:ends[stage]};}
   drillStageRange(c,stage){return this.drillRangeIn(this.drillStageEnds(c),stage);}
   drillStageName(c,stage){const range=this.drillStageRange(c,stage);return Array.isArray(c.cuts)?c.cuts[stage][1]:(range.from+1)+'〜'+range.to+'もんめ';}
-  drillStageOpen(record,stage){return stage===0||!!(record&&record.stages&&record.stages[stage-1]&&record.stages[stage-1].runs>0);}
+  // A stage opens once every stage before it has finished a run. Played in order that is the
+  // stage just before it; a reordered record (issue #127) can hold a finished stage after an
+  // unfinished one, and that stage stays shut until the ones ahead of it are done.
+  drillStageOpen(record,stage){const rows=record&&Array.isArray(record.stages)?record.stages:[];for(let s=0;s<stage;s++)if(!(rows[s]&&rows[s].runs>0))return false;return true;}
   drillDefaultRecord(c){const stages=[];for(let s=0;s<this.drillStageCount(c);s++)stages.push({idx:0,perfect:0,mistakes:0,runs:0,best:0});return {opts:{},cuts:this.drillStageEnds(c).join(','),stages:stages};}
   readDrillStages(c,row,whole,opts){
     // Each stage keeps its own run: idx is the position inside the stage, runs the finished runs.
-    const stages=[];
+    // Stage rows saved before a course had cuts (v1.44.0) were cut every 25 questions. A record
+    // saved in a layout the course lists as moved predates a reorder of its bank (issue #127), so
+    // it is read in that layout and then follows its questions to their new positions.
+    const ends=this.drillStageEnds(c),saved=typeof row.cuts==='string'?row.cuts:this.drillLegacyStageEnds(c).join(',');
+    const moved=Array.isArray(c.moved)&&c.moved.indexOf(saved)>=0&&saved!==ends.join(',');
+    const savedEnds=saved===ends.join(',')?ends:moved?saved.split(',').map(Number):this.drillLegacyStageEnds(c),stages=[];
     if(Array.isArray(row.stages)){
-      // Stage rows saved before a course had cuts (v1.44.0) were cut every 25 questions.
-      const ends=this.drillStageEnds(c),saved=typeof row.cuts==='string'?row.cuts:this.drillLegacyStageEnds(c).join(',');
-      const savedEnds=saved===ends.join(',')?ends:this.drillLegacyStageEnds(c);
       for(let s=0;s<savedEnds.length;s++){
         const range=this.drillRangeIn(savedEnds,s),len=range.to-range.from,st=row.stages[s]&&typeof row.stages[s]==='object'?row.stages[s]:{};
         stages.push({idx:this.clamp(whole(st.idx),0,len),perfect:this.clamp(whole(st.perfect),0,len),mistakes:whole(st.mistakes),runs:whole(st.runs),best:this.clamp(whole(st.best),0,len)});
       }
-      return savedEnds===ends?stages:this.drillRestage(c,savedEnds,stages,opts);
+      return moved?this.drillReorder(c,savedEnds,stages,opts):savedEnds===ends?stages:this.drillRestage(c,savedEnds,stages,opts);
     }
     // A record saved before stages kept one position over the whole course. Every stage that
     // position has passed finished a run, so retirements stamped with the course run keep their
     // meaning; the stage holding the position resumes there. Its first-try count is the part of
     // the saved count the earlier stages cannot hold, so it never claims more than was answered.
-    const at=this.clamp(whole(row.idx),0,c.total),runs=whole(row.runs),perfect=whole(row.perfect);
-    for(let s=0;s<this.drillStageCount(c);s++){
-      const range=this.drillStageRange(c,s),here=at>range.from&&at<range.to,local=here?at-range.from:0;
+    const layout=moved?savedEnds:ends,at=this.clamp(whole(row.idx),0,c.total),runs=whole(row.runs),perfect=whole(row.perfect);
+    for(let s=0;s<layout.length;s++){
+      const range=this.drillRangeIn(layout,s),here=at>range.from&&at<range.to,local=here?at-range.from:0;
       stages.push({idx:local,perfect:here?this.clamp(perfect-range.from,0,local):0,mistakes:0,runs:runs+(at>=range.to?1:0),best:0});
     }
-    return stages;
+    return moved?this.drillReorder(c,savedEnds,stages,opts):stages;
   }
   drillRestage(c,savedEnds,saved,opts){
     // Moving to new cuts (issue #122): each new stage takes the runs and best of the saved
@@ -203,6 +208,37 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     }
     return stages;
   }
+  drillReorder(c,savedEnds,saved,opts){
+    // Moving to a reordered bank (issue #127): each question takes its option dial to its new
+    // position, the n-th copy of a question to the n-th copy, since a fact can be asked twice.
+    // A new stage has finished as many runs as the fewest of the saved stages its questions came
+    // from, so a stage counts as finished only if all its questions were; drillStageOpen keeps such
+    // a stage shut until the stages ahead of it are done. A run in progress cannot follow its
+    // questions, so it starts over.
+    const ends=this.drillStageEnds(c),holder=(list,at)=>{for(let s=0;s<list.length;s++)if(at<list[s])return s;return list.length-1;};
+    const copies=list=>{const seen={};return list.map(text=>{seen[text]=(seen[text]||0)+1;return text+'#'+seen[text];});},now={};
+    copies(this.drillBank(c.id).map(q=>q.text)).forEach((key,i)=>{now[key]=i;});
+    const to=copies(this.drillBankBefore(c.id)).map(key=>now[key]),stages=ends.map(()=>({idx:0,perfect:0,mistakes:0,runs:Infinity,best:0}));
+    to.forEach((n,at)=>{if(n===undefined)return;const st=stages[holder(ends,n)];st.runs=Math.min(st.runs,saved[holder(savedEnds,at)].runs);});
+    for(const st of stages)if(!Number.isFinite(st.runs))st.runs=0;
+    // A retired question is judged against its new stage the way drillRestage judges it.
+    const entries=Object.keys(opts||{}).map(key=>[Number(key)-1,opts[key]]);
+    for(const [at] of entries)delete opts[at+1];
+    for(const [at,entry] of entries){
+      const n=to[at];if(n===undefined)continue;
+      if(entry.t===3){const before=saved[holder(savedEnds,at)].runs,after=stages[holder(ends,n)].runs;entry.r=entry.r<before?Math.max(0,Math.min(entry.r,after-1)):after;}
+      opts[n+1]=entry;
+    }
+    return stages;
+  }
+  // The g2 bank before issue #127: the tables in 2, 5, 3, 4, 6, 7, 8, 9, 1 order, then every
+  // hard fact out of order. Only drillReorder reads it, to move records saved in that order.
+  drillBankBefore(id){
+    if(id!=='g2')return [];
+    const out=[];[2,5,3,4,6,7,8,9,1].forEach(a=>{for(let b=1;b<=9;b++)out.push(a+' × '+b);});
+    this.drillKukuMix().forEach(pr=>out.push(pr[0]+' × '+pr[1]));return out;
+  }
+  drillKukuMix(){return [[7,8],[6,7],[8,7],[7,6],[9,7],[7,9],[8,6],[6,8],[9,6],[6,9],[8,8],[7,7],[9,8],[8,9],[4,7],[7,4],[6,4],[4,6],[9,9]];}
   readDrillProgress(){
     let raw=null;try{raw=localStorage.getItem(this.drillStorageKey());}catch(e){raw=null;}
     let data=null;try{data=raw?JSON.parse(raw):null;}catch(e){data=null;}
@@ -355,9 +391,13 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
       return list;
     }
     if(id==='g2'){
-      const A='九九を おぼえる',B='しあげの ミックス';
-      [2,5,3,4,6,7,8,9,1].forEach(a=>{for(let b=1;b<=9;b++)add(A,a+' × '+b,a*b,a+'のだんを 1から となえて みよう。');});
-      [[7,8],[6,7],[8,7],[7,6],[9,7],[7,9],[8,6],[6,8],[9,6],[6,9],[8,8],[7,7],[9,8],[8,9],[4,7],[7,4],[6,4],[4,6],[9,9]].forEach(pr=>add(B,pr[0]+' × '+pr[1],pr[0]*pr[1],pr[0]+'のだんを 1から おもいだそう。'));
+      // One stage per table, 1のだん to 9のだん (issue #127): each table is asked in order and
+      // then the hard facts of that table come back out of order.
+      const A='九九を おぼえる',B='ばらばらで おさらい',mix=this.drillKukuMix();
+      for(let a=1;a<=9;a++){
+        for(let b=1;b<=9;b++)add(A,a+' × '+b,a*b,a+'のだんを 1から となえて みよう。');
+        mix.filter(pr=>pr[0]===a).forEach(pr=>add(B,pr[0]+' × '+pr[1],pr[0]*pr[1],pr[0]+'のだんを 1から おもいだそう。'));
+      }
       return list;
     }
     const A='たしざんの きほん',B='10の ともだち',C='ひきざんの きほん',D='10から ひく',E='くりあがりの たしざん',F='くりさがりの ひきざん';
@@ -653,7 +693,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     const drillStageState=(c,record,s)=>{
       const st=record.stages[s],range=this.drillStageRange(c,s),skip=this.drillRetiredIndexes(record.opts,st.runs,range.from,range.to);
       const active=Math.max(0,range.to-range.from-skip.length),done=st.idx-skip.filter(i=>i<range.from+st.idx).length;
-      return {range:range,active:active,done:done,retired:skip.length,open:this.drillStageOpen(record,s),cleared:st.runs>0,started:st.idx>0};
+      return {range:range,active:active,done:done,retired:skip.length,open:this.drillStageOpen(record,s),blocker:record.stages.findIndex(row=>!(row.runs>0)),cleared:st.runs>0,started:st.idx>0};
     };
     if(sc==='start'){
       const drillProgress=this.readDrillProgress(),drillAsk=String(S.drillAsk||'');
@@ -684,7 +724,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         badge:stageCourse.badge, title:stageCourse.title, headStyle:'background:'+stageCourse.color+';',
         stages:record.stages.map((st,s)=>{
           const x=drillStageState(stageCourse,record,s),name='ステージ '+(s+1);
-          const status=!x.open?'🔒 ステージ '+s+'を クリアしてね':!x.active?'ぜんぶ おぼえた':x.started?('つづき '+x.done+' / '+x.active):x.cleared?'クリア ✓':(x.active+'もん');
+          const status=!x.open?'🔒 ステージ '+(x.blocker+1)+'を クリアしてね':!x.active?'ぜんぶ おぼえた':x.started?('つづき '+x.done+' / '+x.active):x.cleared?'クリア ✓':(x.active+'もん');
           const pct=Math.round((x.started&&x.active?this.clamp(x.done/x.active,0,1):x.cleared||!x.active?1:0)*100);
           return {
             no:String(s+1), name:name, range:this.drillStageName(stageCourse,s), status:status,
@@ -695,6 +735,8 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
             onClick:()=>this.selectDrillStage(s)
           };
         }),
+        // More than five stages (九九, issue #127) wrap into rows of five, or three on a phone.
+        many:record.stages.length>5?'true':'false',
         keyHelp:'キーボードの 1〜'+record.stages.length+' でも えらべるよ',
         onBack:()=>this.cancelDrillStage()
       };
@@ -809,7 +851,7 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
         <span class="kt-drill-badge" style="{{ drillStageView.headStyle }}">{{ drillStageView.badge }}</span>
         <div class="kt-drill-mode-title">{{ drillStageView.title }}</div>
         <div class="kt-drill-mode-question">ステージを えらんでね</div>
-        <div class="kt-drill-stage-options" aria-label="ステージ">
+        <div class="kt-drill-stage-options" aria-label="ステージ" data-many="{{ drillStageView.many }}">
           <sc-for list="{{ drillStageView.stages }}" as="t" hint-placeholder-count="4">
             <button type="button" class="kt-drill-stage-option" style="{{ t.style }}" aria-disabled="{{ t.ariaDisabled }}" aria-label="{{ t.ariaLabel }}" onclick="{{ t.onClick }}">
               <span class="kt-drill-mode-number">{{ t.no }}</span>
@@ -1014,9 +1056,11 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
   .kt-drill-mode-help{font-size:16px;font-weight:700;color:#6b5e45;}
   .kt-drill-mode-key-help{font-size:15px;font-weight:700;color:#7b6a4d;}
   .kt-drill-mode-stage{background:#fff;border:3px solid #f0e2c8;border-radius:16px;padding:3px 14px;font-size:18px;font-weight:800;color:#6b5e45;}
-  /* Four stages read left to right in order; the number in the corner is the key that picks one. */
+  /* Stages read left to right in order; the number in the corner is the key that picks one. */
   /* One row of stages on a wide screen, however many the course has (four, or five for grade 1, #122). */
   .kt-drill-stage-options{width:100%;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:14px;margin-top:8px;}
+  .kt-drill-stage-options[data-many="true"]{grid-auto-flow:row;grid-template-columns:repeat(5,minmax(0,1fr));}
+  .kt-drill-stage-options[data-many="true"] .kt-drill-stage-option{min-height:150px;}
   .kt-drill-stage-option{position:relative;min-height:190px;min-width:0;background:#fff;border:4px solid #f0e2c8;border-radius:24px;padding:46px 12px 16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font:inherit;color:#3a3326;box-shadow:0 6px 0 #ecd9b9;cursor:pointer;word-break:keep-all;overflow-wrap:anywhere;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease,transform .2s ease;}
   .kt-drill-stage-option .kt-drill-mode-number{top:10px;left:10px;min-width:30px;height:30px;border-radius:10px;font-size:16px;}
   .kt-drill-stage-name{font-size:24px;font-weight:900;white-space:nowrap;}
@@ -1127,6 +1171,10 @@ this._drillKeyHandler=e=>{if(e.repeat||e.isComposing||e.key==='Process'||e.ctrlK
     .kt-drill-stage-options{grid-auto-flow:row;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;}
     .kt-drill-stage-option{min-height:140px;padding:44px 10px 12px;}
     .kt-drill-stage-name{font-size:20px;}
+    .kt-drill-stage-options[data-many="true"]{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+    .kt-drill-stage-options[data-many="true"] .kt-drill-stage-option{min-height:120px;padding:38px 6px 10px;gap:5px;border-width:3px;border-radius:18px;}
+    .kt-drill-stage-options[data-many="true"] .kt-drill-stage-name{font-size:16px;}
+    .kt-drill-stage-options[data-many="true"] .kt-drill-stage-range,.kt-drill-stage-options[data-many="true"] .kt-drill-stage-status{font-size:13px;}
   }
 
   @media (prefers-reduced-motion: reduce) {

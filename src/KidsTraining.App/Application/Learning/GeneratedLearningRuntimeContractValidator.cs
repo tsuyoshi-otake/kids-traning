@@ -224,6 +224,7 @@ internal static class GeneratedLearningRuntimeContractValidator
         ("drill-retirement", "drillRetiredIndexes(opts,runs,from,to)"),
         ("drill-stage-screen", "isDrillStage:sc==='drill-stage'"),
         ("drill-stage-unlock", "drillStageOpen(record,stage)"),
+        ("drill-bank-reorder", "drillReorder(c,savedEnds,saved,opts)"),
         ("drill-record-storage", "kt_drill_log_v1"),
         ("drill-record-screen", "isDrillLog:sc==='drill-log'"),
         ("drill-record-run", "if(countRun)this.recordDrillRun(next);"),
